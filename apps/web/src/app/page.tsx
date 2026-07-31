@@ -129,7 +129,7 @@ export default function Home() {
           <section className="mt-10 grid gap-5 md:grid-cols-3">
             {[
               ["Estructura organizacional", "Sedes, áreas, equipos y cargos", "01", "/organizacion"],
-              ["Terceros", "Personas y organizaciones relacionadas", "02", "#"],
+              ["Terceros", "Personas y organizaciones relacionadas", "02", "/terceros"],
               ["Inventario", "Elementos, asignaciones y movimientos", "03", "#"],
             ].map(([title, description, number, href]) => (
               <a

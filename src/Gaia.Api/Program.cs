@@ -1,6 +1,7 @@
 using Gaia.Modules.Identity;
 using Gaia.Modules.Identity.Infrastructure;
 using Gaia.Modules.Organization;
+using Gaia.Modules.ThirdParties;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,6 +10,7 @@ builder.Services.AddIdentityModule(
     builder.Configuration,
     builder.Environment.IsDevelopment());
 builder.Services.AddOrganizationModule(builder.Configuration);
+builder.Services.AddThirdPartiesModule(builder.Configuration);
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("WebDevelopment", policy =>
@@ -42,9 +44,11 @@ app.MapGet("/health", () => Results.Ok(new
 
 app.MapIdentityEndpoints();
 app.MapOrganizationEndpoints();
+app.MapThirdPartiesEndpoints();
 
 await app.Services.InitializeIdentityAsync(builder.Configuration);
 await app.Services.InitializeOrganizationAsync();
+await app.Services.InitializeThirdPartiesAsync();
 
 app.Run();
 

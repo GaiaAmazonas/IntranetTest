@@ -106,7 +106,7 @@ export default function OrganizationPage() {
   const [unitTypes, setUnitTypes] = useState<UnitType[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
-  const [tab, setTab] = useState<"units" | "positions" | "catalogs">("units");
+  const [tab, setTab] = useState<"chart" | "units" | "positions" | "catalogs">("chart");
   const [search, setSearch] = useState("");
   const [unitForm, setUnitForm] = useState<UnitForm>(emptyUnit);
   const [editingUnitId, setEditingUnitId] = useState<string | null>(null);
@@ -308,6 +308,7 @@ export default function OrganizationPage() {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex rounded-xl bg-[#f1f5ef] p-1">
               {[
+                ["chart", "Organigrama"],
                 ["units", "Unidades"],
                 ["positions", "Cargos"],
                 ["catalogs", "Sedes y tipos"],
@@ -406,6 +407,10 @@ export default function OrganizationPage() {
                 )}
               </div>
             </div>
+          )}
+
+          {tab === "chart" && (
+            <OrganizationChart units={units} />
           )}
 
           {tab === "positions" && (
@@ -772,4 +777,61 @@ function CatalogRow({
       <span className="text-xs font-semibold text-[#66804e]">{value}</span>
     </div>
   );
+}
+
+function OrganizationChart({ units }: { units: Unit[] }) {
+  const roots = units.filter((unit) => !unit.parentId);
+  return (
+    <div className="mt-7 overflow-x-auto rounded-2xl bg-[#f3f6f1] p-6">
+      <div className="min-w-[1050px] space-y-10">
+        {roots.map((root) => (
+          <OrganizationBranch key={root.id} unit={root} units={units} />
+        ))}
+      </div>
+      <div className="mt-8 flex flex-wrap gap-3 border-t border-[#dce5d8] pt-5">
+        {Array.from(new Set(units.map((unit) => unit.unitTypeName))).map((type) => (
+          <span className="rounded-full px-3 py-1.5 text-xs font-bold text-white" key={type} style={{ backgroundColor: unitColor(type) }}>
+            {type}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function OrganizationBranch({ unit, units }: { unit: Unit; units: Unit[] }) {
+  const children = units.filter((candidate) => candidate.parentId === unit.id);
+  return (
+    <div className="flex flex-col items-center">
+      <article className="w-64 overflow-hidden rounded-xl border border-black/10 bg-white shadow-md">
+        <div className="px-4 py-3 text-white" style={{ backgroundColor: unitColor(unit.unitTypeName) }}>
+          <p className="text-[10px] font-bold tracking-widest opacity-80">{unit.code}</p>
+          <p className="mt-1 text-center text-xs font-bold leading-4">{unit.name}</p>
+        </div>
+        <div className="flex items-center justify-between px-3 py-1.5 text-[10px] font-semibold">
+          <span>{unit.unitTypeName}</span><span className="text-[#2d9f31]">▮ Activo</span>
+        </div>
+      </article>
+      {children.length > 0 && (
+        <>
+          <div className="h-5 w-px bg-[#718078]" />
+          <div className="flex items-start justify-center gap-5 border-t border-[#718078] px-4 pt-5">
+            {children.map((child) => (
+              <OrganizationBranch key={child.id} unit={child} units={units} />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function unitColor(type: string) {
+  const normalized = type.toLocaleUpperCase("es");
+  if (normalized.includes("DIRECTIVO")) return "#A0384D";
+  if (normalized.includes("SUBDIRECCI")) return "#3C838C";
+  if (normalized.includes("ASESOR")) return "#6F3873";
+  if (normalized.includes("DIRECTA")) return "#386037";
+  if (normalized.includes("TRANSVERSAL")) return "#2F5048";
+  return "#52685E";
 }

@@ -77,3 +77,19 @@ gestión administrativa para:
 
 Las unidades se inactivan en lugar de eliminarse. El backend calcula sus niveles,
 impide la autorreferencia y rechaza cualquier cambio que produzca ciclos.
+
+La carga inicial contiene 27 unidades procedentes de la hoja `Organizacional`.
+Los códigos visibles se resuelven hacia identificadores UUID y `ParentId`
+referencia el UUID de otra fila de la misma tabla. La discrepancia 20/2001 entre
+el Excel y la imagen de referencia permanece documentada; la carga usa el Excel.
+
+## Terceros
+
+El módulo `third_parties` separa la identidad personal de sus relaciones con
+Gaia. La ficha integral incluye datos básicos, vinculaciones, asignaciones,
+estudios, idiomas, formación, experiencia y contactos de emergencia.
+
+La migración local inicial procesó 148 filas de la hoja `Terceros`: insertó 147
+personas y omitió `BODEGA` porque no representa una persona. Las áreas no
+resueltas se conservan como incidencias de importación; nunca se inventan
+relaciones para completar datos ambiguos.
