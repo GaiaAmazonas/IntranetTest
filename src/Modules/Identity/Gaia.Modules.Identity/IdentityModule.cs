@@ -19,7 +19,8 @@ public static class IdentityModuleExtensions
 {
     public static IServiceCollection AddIdentityModule(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        bool isDevelopment)
     {
         var connectionString = configuration.GetConnectionString("GaiaDatabase")
             ?? throw new InvalidOperationException(
@@ -58,7 +59,9 @@ public static class IdentityModuleExtensions
         {
             options.Cookie.Name = "__Host-Gaia.Session";
             options.Cookie.HttpOnly = true;
-            options.Cookie.SameSite = SameSiteMode.Strict;
+            options.Cookie.SameSite = isDevelopment
+                ? SameSiteMode.None
+                : SameSiteMode.Strict;
             options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
             options.ExpireTimeSpan = TimeSpan.FromHours(8);
             options.SlidingExpiration = true;

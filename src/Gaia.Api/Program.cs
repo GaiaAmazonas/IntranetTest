@@ -5,7 +5,9 @@ using Gaia.Modules.Organization;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
-builder.Services.AddIdentityModule(builder.Configuration);
+builder.Services.AddIdentityModule(
+    builder.Configuration,
+    builder.Environment.IsDevelopment());
 builder.Services.AddOrganizationModule(builder.Configuration);
 builder.Services.AddCors(options =>
 {
