@@ -62,3 +62,18 @@ mediante cookie segura `HttpOnly`. Incluye:
 - administrador inicial configurable;
 - endpoints protegidos para consultar y crear usuarios;
 - estructura preparada para agregar Microsoft Entra ID como proveedor externo.
+
+## Organización
+
+El módulo organizacional mantiene su propio esquema `organization` y expone
+gestión administrativa para:
+
+- tipos de unidad con token de color;
+- sedes;
+- unidades organizacionales de jerarquía ilimitada;
+- cargos institucionales;
+- vigencias, estado y orden visual;
+- auditoría de cada creación y modificación con valores antes/después.
+
+Las unidades se inactivan en lugar de eliminarse. El backend calcula sus niveles,
+impide la autorreferencia y rechaza cualquier cambio que produzca ciclos.

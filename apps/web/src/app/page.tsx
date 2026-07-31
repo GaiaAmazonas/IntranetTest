@@ -128,12 +128,13 @@ export default function Home() {
 
           <section className="mt-10 grid gap-5 md:grid-cols-3">
             {[
-              ["Estructura organizacional", "Sedes, áreas, equipos y cargos", "01"],
-              ["Terceros", "Personas y organizaciones relacionadas", "02"],
-              ["Inventario", "Elementos, asignaciones y movimientos", "03"],
-            ].map(([title, description, number]) => (
-              <article
+              ["Estructura organizacional", "Sedes, áreas, equipos y cargos", "01", "/organizacion"],
+              ["Terceros", "Personas y organizaciones relacionadas", "02", "#"],
+              ["Inventario", "Elementos, asignaciones y movimientos", "03", "#"],
+            ].map(([title, description, number, href]) => (
+              <a
                 className="rounded-3xl border border-[#e2e9df] bg-white p-6 transition hover:-translate-y-1 hover:shadow-xl"
+                href={href}
                 key={number}
               >
                 <span className="text-xs font-bold tracking-[0.2em] text-[#a25b3c]">
@@ -142,9 +143,9 @@ export default function Home() {
                 <h3 className="mt-8 text-xl font-semibold">{title}</h3>
                 <p className="mt-2 text-sm leading-6 text-[#607065]">{description}</p>
                 <p className="mt-8 text-sm font-semibold text-[#66804e]">
-                  Próximamente →
+                  {href === "#" ? "Próximamente →" : "Gestionar estructura →"}
                 </p>
-              </article>
+              </a>
             ))}
           </section>
         </div>
