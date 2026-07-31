@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { AppHeader } from "@/components/app-header";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 const apiUrl = process.env.NEXT_PUBLIC_GAIA_API_URL ?? "https://localhost:7168";
@@ -69,18 +69,7 @@ export default function ThirdPartiesPage() {
 
   return (
     <main className="min-h-screen bg-[#eef3eb] text-[#193522]">
-      <header className="bg-[#173f2b] text-white">
-        <div className="mx-auto flex max-w-[1500px] items-center justify-between px-5 py-3.5">
-          <div className="flex items-center gap-4">
-            <Link className="grid size-11 place-items-center rounded-2xl bg-[#dce9d5] text-xl font-black text-[#21472f]" href="/">G</Link>
-            <div><p className="text-xs font-bold uppercase tracking-[.25em] text-[#aac49e]">Gaia Enterprise</p><h1 className="text-xl font-semibold">Gestión de terceros</h1></div>
-          </div>
-          <div className="flex gap-6 text-sm font-semibold text-[#d7e6d1]">
-            <Link href="/organizacion">Organización</Link><Link href="/">Inicio</Link>
-          </div>
-        </div>
-        <div className="h-1 bg-gradient-to-r from-[#a0384d] via-[#3c838c] via-50% to-[#386037]" />
-      </header>
+      <AppHeader title="Gestión de terceros" />
 
       <div className="mx-auto grid max-w-[1500px] gap-4 px-4 py-4 lg:grid-cols-[310px_1fr]">
         <aside className="overflow-hidden rounded-3xl bg-white shadow-sm">

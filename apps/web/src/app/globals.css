@@ -17,3 +17,10 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
+
+@media print {
+  body * { visibility: hidden !important; }
+  #organization-chart, #organization-chart * { visibility: visible !important; }
+  #organization-chart { position: absolute; inset: 0; margin: 0 !important; background: white !important; }
+  @page { size: A3 landscape; margin: 10mm; }
+}

@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { AppHeader } from "@/components/app-header";
 
 type CurrentUser = {
   id: string;
@@ -70,15 +71,6 @@ export default function Home() {
     }
   }
 
-  async function logout() {
-    await fetch(`${apiUrl}/api/auth/logout`, {
-      method: "POST",
-      credentials: "include",
-    });
-    setUser(null);
-    setStatus("anonymous");
-  }
-
   if (status === "loading") {
     return (
       <main className="grid min-h-screen place-items-center bg-[#f4f7f2]">
@@ -91,31 +83,10 @@ export default function Home() {
 
   if (status === "authenticated" && user) {
     return (
-      <main className="min-h-screen bg-[#f4f7f2] p-4 text-[#193522] lg:p-6">
-        <div className="mx-auto max-w-7xl">
-          <header className="flex items-center justify-between rounded-2xl bg-white px-5 py-3.5 shadow-[0_18px_60px_rgba(29,67,40,0.08)]">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#66804e]">
-                Fundación Gaia Amazonas
-              </p>
-              <h1 className="mt-0.5 text-xl font-semibold">Plataforma empresarial</h1>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="hidden text-right sm:block">
-                <p className="font-semibold">{user.displayName}</p>
-                <p className="text-sm text-[#607065]">{user.email}</p>
-              </div>
-              <button
-                className="rounded-full border border-[#d8e2d5] px-4 py-2 text-sm font-semibold hover:bg-[#f4f7f2]"
-                onClick={() => void logout()}
-                type="button"
-              >
-                Cerrar sesión
-              </button>
-            </div>
-          </header>
-
-          <section className="mt-5">
+      <main className="min-h-screen bg-[linear-gradient(145deg,#eef4e9_0%,#f7f3e8_48%,#e9f1ec_100%)] text-[#193522]">
+        <AppHeader title="Plataforma empresarial" user={user} />
+        <div className="mx-auto max-w-7xl px-4 py-5 lg:px-6">
+          <section>
             <p className="text-sm font-semibold text-[#66804e]">Inicio</p>
             <h2 className="mt-1 text-3xl font-semibold tracking-tight">
               Hola, {user.displayName.split(" ")[0]}
@@ -128,22 +99,24 @@ export default function Home() {
 
           <section className="mt-6 grid gap-4 md:grid-cols-3">
             {[
-              ["Estructura organizacional", "Sedes, áreas, equipos y cargos", "01", "/organizacion"],
-              ["Terceros", "Personas y organizaciones relacionadas", "02", "/terceros"],
-              ["Inventario", "Elementos, asignaciones y movimientos", "03", "/inventario"],
-            ].map(([title, description, number, href]) => (
+              ["Estructura organizacional", "Sedes, áreas, equipos y cargos", "01", "/organizacion", "from-[#214d38] to-[#3c838c]", "Jerarquía · Equipos"],
+              ["Terceros", "Personas y organizaciones relacionadas", "02", "/terceros", "from-[#6f3873] to-[#a0384d]", "Talento · Relaciones"],
+              ["Inventario", "Elementos, asignaciones y movimientos", "03", "/inventario", "from-[#52685e] to-[#66804e]", "Activos · Custodia"],
+            ].map(([title, description, number, href, color, motif]) => (
               <a
-                className="rounded-2xl border border-[#e2e9df] bg-white p-4 transition hover:-translate-y-1 hover:shadow-xl"
+                className={`group relative min-h-56 overflow-hidden rounded-3xl bg-gradient-to-br ${color} p-5 text-white shadow-[0_18px_45px_rgba(31,65,42,.16)] transition hover:-translate-y-1 hover:shadow-2xl`}
                 href={href}
                 key={number}
               >
-                <span className="text-xs font-bold tracking-[0.2em] text-[#a25b3c]">
+                <span className="relative text-xs font-bold tracking-[0.2em] text-white/75">
                   MÓDULO {number}
                 </span>
-                <h3 className="mt-5 text-lg font-semibold">{title}</h3>
-                <p className="mt-2 text-sm leading-6 text-[#607065]">{description}</p>
-                <p className="mt-5 text-sm font-semibold text-[#66804e]">
-                  {href === "#" ? "Próximamente →" : "Gestionar estructura →"}
+                <div className="absolute -bottom-20 -right-14 size-52 rounded-full border-[34px] border-white/10 transition group-hover:scale-110" />
+                <p className="relative mt-10 text-[10px] font-bold uppercase tracking-[.24em] text-white/60">{motif}</p>
+                <h3 className="relative mt-2 text-xl font-semibold">{title}</h3>
+                <p className="relative mt-2 max-w-xs text-sm leading-6 text-white/75">{description}</p>
+                <p className="relative mt-5 text-sm font-semibold text-white">
+                  Abrir módulo →
                 </p>
               </a>
             ))}
@@ -179,10 +152,7 @@ export default function Home() {
       <section className="flex items-center justify-center p-6 sm:p-12">
         <div className="w-full max-w-md rounded-[2rem] bg-white p-8 shadow-[0_30px_80px_rgba(30,65,40,0.12)] sm:p-10">
           <div className="mb-9">
-            <span className="inline-flex size-12 items-center justify-center rounded-2xl bg-[#e8efe3] text-xl font-bold text-[#34523a]">
-              G
-            </span>
-            <h2 className="mt-7 text-3xl font-semibold tracking-tight text-[#193522]">
+            <h2 className="text-3xl font-semibold tracking-tight text-[#193522]">
               Bienvenido a Gaia
             </h2>
             <p className="mt-2 text-sm leading-6 text-[#68766c]">

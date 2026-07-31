@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { AppHeader } from "@/components/app-header";
 import { useEffect, useMemo, useState } from "react";
 
 const apiUrl = process.env.NEXT_PUBLIC_GAIA_API_URL ?? "https://localhost:7168";
@@ -21,7 +21,7 @@ export default function InventoryPage() {
   const visible = useMemo(() => { const q = search.toLocaleLowerCase("es").trim(); return q ? items.filter(x => [x.assetCode, x.product, x.brand, x.serialNumber].some(v => v?.toLocaleLowerCase("es").includes(q))) : items; }, [items, search]);
   const tabs: Array<[Tab, string, number]> = [["items", "Elementos", dashboard.items], ["products", "Productos", dashboard.products], ["assignments", "Asignaciones", dashboard.assigned], ["movements", "Movimientos", 0], ["issues", "Incidencias", dashboard.issues]];
   return <main className="min-h-screen bg-[#eef3eb] text-[#193522]">
-    <header className="bg-[#173f2b] text-white"><div className="mx-auto flex max-w-[1500px] items-center justify-between px-5 py-3.5"><div className="flex items-center gap-3"><Link className="grid size-10 place-items-center rounded-xl bg-[#dce9d5] text-lg font-black text-[#21472f]" href="/">G</Link><div><p className="text-[10px] font-bold uppercase tracking-[.24em] text-[#aac49e]">Gaia Enterprise</p><h1 className="text-lg font-semibold">Gestión de inventarios</h1></div></div><nav className="flex gap-5 text-sm font-semibold text-[#d7e6d1]"><Link href="/organizacion">Organización</Link><Link href="/terceros">Terceros</Link><Link href="/">Inicio</Link></nav></div><div className="h-1 bg-gradient-to-r from-[#a0384d] via-[#3c838c] to-[#386037]" /></header>
+    <AppHeader title="Gestión de inventarios" />
     <div className="mx-auto max-w-[1500px] px-4 py-4"><section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{[["Elementos", dashboard.items, "#294f35"], ["Disponibles", dashboard.available, "#3c838c"], ["Asignados", dashboard.assigned, "#a0384d"], ["Productos", dashboard.products, "#6f3873"], ["Por revisar", dashboard.issues, "#b76d49"]].map(([label, value, color]) => <article className="rounded-2xl bg-white px-4 py-3 shadow-sm" key={String(label)}><div className="flex items-center gap-3"><span className="h-9 w-1 rounded-full" style={{ background: String(color) }} /><div><p className="text-[10px] font-bold uppercase tracking-widest text-[#78867c]">{label}</p><p className="text-2xl font-semibold">{value}</p></div></div></article>)}</section>
       <section className="mt-4 overflow-hidden rounded-2xl bg-white shadow-sm"><nav className="flex overflow-x-auto border-b border-[#e4ebe1] px-3">{tabs.map(([value, label, count]) => <button className={`border-b-2 px-4 py-3 text-sm font-semibold ${tab === value ? "border-[#386037] text-[#294f35]" : "border-transparent text-[#758179]"}`} key={value} onClick={() => setTab(value)}>{label}<span className="ml-2 rounded-full bg-[#edf2ea] px-2 py-0.5 text-[10px]">{count}</span></button>)}</nav><div className="p-4">
         {error && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{error}</p>}

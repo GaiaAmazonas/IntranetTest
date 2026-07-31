@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { AppHeader } from "@/components/app-header";
 
 const apiUrl = process.env.NEXT_PUBLIC_GAIA_API_URL ?? "https://localhost:7168";
 
@@ -267,27 +267,7 @@ export default function OrganizationPage() {
 
   return (
     <main className="min-h-screen bg-[#f4f7f2] text-[#193522]">
-      <header className="border-b border-[#dfe8dc] bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
-          <div className="flex items-center gap-4">
-            <Link
-              className="grid size-10 place-items-center rounded-xl bg-[#e8efe3] font-bold"
-              href="/"
-            >
-              G
-            </Link>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#66804e]">
-                Administración
-              </p>
-              <h1 className="text-xl font-semibold">Estructura organizacional</h1>
-            </div>
-          </div>
-          <Link className="text-sm font-semibold text-[#52675a]" href="/">
-            ← Volver al inicio
-          </Link>
-        </div>
-      </header>
+      <AppHeader title="Estructura organizacional" />
 
       <div className="mx-auto max-w-7xl px-6 py-8">
         <section className="grid gap-4 sm:grid-cols-3">
@@ -328,7 +308,16 @@ export default function OrganizationPage() {
                 </button>
               ))}
             </div>
-            {tab !== "catalogs" && (
+            {tab === "chart" && (
+              <button
+                className="rounded-xl border border-[#b9c9b5] bg-white px-4 py-2.5 text-sm font-semibold text-[#294f35] hover:bg-[#edf4e9]"
+                onClick={() => window.print()}
+                type="button"
+              >
+                Descargar / guardar PDF
+              </button>
+            )}
+            {(tab === "units" || tab === "positions") && (
               <button
                 className="rounded-xl bg-[#294f35] px-5 py-2.5 text-sm font-semibold text-white"
                 onClick={() =>
@@ -782,8 +771,13 @@ function CatalogRow({
 function OrganizationChart({ units }: { units: Unit[] }) {
   const roots = units.filter((unit) => !unit.parentId);
   return (
-    <div className="mt-7 overflow-x-auto rounded-2xl bg-[#f3f6f1] p-6">
-      <div className="min-w-[1050px] space-y-10">
+    <div className="organization-chart mt-7 rounded-2xl bg-[#f3f6f1] p-4 sm:p-6" id="organization-chart">
+      <div className="mb-5 border-b border-[#dce5d8] pb-4">
+        <p className="text-[10px] font-bold uppercase tracking-[.22em] text-[#66804e]">Fundación Gaia Amazonas</p>
+        <h2 className="mt-1 text-xl font-semibold">Diagrama organizacional de jerarquía</h2>
+        <p className="mt-1 text-xs text-[#7b887f]">Vista consolidada · {units.length} unidades</p>
+      </div>
+      <div className="space-y-8">
         {roots.map((root) => (
           <OrganizationBranch key={root.id} unit={root} units={units} />
         ))}
@@ -803,8 +797,8 @@ function OrganizationBranch({ unit, units }: { unit: Unit; units: Unit[] }) {
   const children = units.filter((candidate) => candidate.parentId === unit.id);
   return (
     <div className="flex flex-col items-center">
-      <article className="w-64 overflow-hidden rounded-xl border border-black/10 bg-white shadow-md">
-        <div className="px-4 py-3 text-white" style={{ backgroundColor: unitColor(unit.unitTypeName) }}>
+      <article className="w-48 overflow-hidden rounded-xl border border-black/10 bg-white shadow-md sm:w-52">
+        <div className="px-3 py-2.5 text-white" style={{ backgroundColor: unitColor(unit.unitTypeName) }}>
           <p className="text-[10px] font-bold tracking-widest opacity-80">{unit.code}</p>
           <p className="mt-1 text-center text-xs font-bold leading-4">{unit.name}</p>
         </div>
@@ -815,7 +809,7 @@ function OrganizationBranch({ unit, units }: { unit: Unit; units: Unit[] }) {
       {children.length > 0 && (
         <>
           <div className="h-5 w-px bg-[#718078]" />
-          <div className="flex items-start justify-center gap-5 border-t border-[#718078] px-4 pt-5">
+          <div className="flex max-w-full flex-wrap items-start justify-center gap-3 border-t border-[#718078] px-2 pt-4">
             {children.map((child) => (
               <OrganizationBranch key={child.id} unit={child} units={units} />
             ))}
