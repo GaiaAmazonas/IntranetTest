@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\Gaia.BuildingBlocks\Gaia.BuildingBlocks.csproj" />
+    <ProjectReference Include="..\..\Organization\Gaia.Modules.Organization\Gaia.Modules.Organization.csproj" />
+    <ProjectReference Include="..\..\ThirdParties\Gaia.Modules.ThirdParties\Gaia.Modules.ThirdParties.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

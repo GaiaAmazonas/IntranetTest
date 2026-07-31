@@ -1,0 +1,24 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Gaia.Api/Gaia.Api.csproj" />
+  </Folder>
+  <Folder Name="/src/BuildingBlocks/">
+    <Project Path="src/BuildingBlocks/Gaia.BuildingBlocks/Gaia.BuildingBlocks.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/" />
+  <Folder Name="/src/Modules/Identity/">
+    <Project Path="src/Modules/Identity/Gaia.Modules.Identity/Gaia.Modules.Identity.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Inventory/">
+    <Project Path="src/Modules/Inventory/Gaia.Modules.Inventory/Gaia.Modules.Inventory.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Organization/">
+    <Project Path="src/Modules/Organization/Gaia.Modules.Organization/Gaia.Modules.Organization.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/ThirdParties/">
+    <Project Path="src/Modules/ThirdParties/Gaia.Modules.ThirdParties/Gaia.Modules.ThirdParties.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Gaia.ArchitectureTests/Gaia.ArchitectureTests.csproj" />
+  </Folder>
+</Solution>
