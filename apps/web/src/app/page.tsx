@@ -91,14 +91,14 @@ export default function Home() {
 
   if (status === "authenticated" && user) {
     return (
-      <main className="min-h-screen bg-[#f4f7f2] p-6 text-[#193522] lg:p-10">
+      <main className="min-h-screen bg-[#f4f7f2] p-4 text-[#193522] lg:p-6">
         <div className="mx-auto max-w-7xl">
-          <header className="flex items-center justify-between rounded-3xl bg-white px-6 py-5 shadow-[0_18px_60px_rgba(29,67,40,0.08)]">
+          <header className="flex items-center justify-between rounded-2xl bg-white px-5 py-3.5 shadow-[0_18px_60px_rgba(29,67,40,0.08)]">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#66804e]">
                 Fundación Gaia Amazonas
               </p>
-              <h1 className="mt-1 text-2xl font-semibold">Plataforma empresarial</h1>
+              <h1 className="mt-0.5 text-xl font-semibold">Plataforma empresarial</h1>
             </div>
             <div className="flex items-center gap-4">
               <div className="hidden text-right sm:block">
@@ -115,34 +115,34 @@ export default function Home() {
             </div>
           </header>
 
-          <section className="mt-8">
+          <section className="mt-5">
             <p className="text-sm font-semibold text-[#66804e]">Inicio</p>
-            <h2 className="mt-2 text-4xl font-semibold tracking-tight">
+            <h2 className="mt-1 text-3xl font-semibold tracking-tight">
               Hola, {user.displayName.split(" ")[0]}
             </h2>
-            <p className="mt-3 max-w-2xl text-[#607065]">
+            <p className="mt-2 max-w-2xl text-sm text-[#607065]">
               Esta es la base operativa desde la que gestionaremos la organización,
               los terceros y el inventario institucional.
             </p>
           </section>
 
-          <section className="mt-10 grid gap-5 md:grid-cols-3">
+          <section className="mt-6 grid gap-4 md:grid-cols-3">
             {[
               ["Estructura organizacional", "Sedes, áreas, equipos y cargos", "01", "/organizacion"],
               ["Terceros", "Personas y organizaciones relacionadas", "02", "/terceros"],
-              ["Inventario", "Elementos, asignaciones y movimientos", "03", "#"],
+              ["Inventario", "Elementos, asignaciones y movimientos", "03", "/inventario"],
             ].map(([title, description, number, href]) => (
               <a
-                className="rounded-3xl border border-[#e2e9df] bg-white p-6 transition hover:-translate-y-1 hover:shadow-xl"
+                className="rounded-2xl border border-[#e2e9df] bg-white p-4 transition hover:-translate-y-1 hover:shadow-xl"
                 href={href}
                 key={number}
               >
                 <span className="text-xs font-bold tracking-[0.2em] text-[#a25b3c]">
                   MÓDULO {number}
                 </span>
-                <h3 className="mt-8 text-xl font-semibold">{title}</h3>
+                <h3 className="mt-5 text-lg font-semibold">{title}</h3>
                 <p className="mt-2 text-sm leading-6 text-[#607065]">{description}</p>
-                <p className="mt-8 text-sm font-semibold text-[#66804e]">
+                <p className="mt-5 text-sm font-semibold text-[#66804e]">
                   {href === "#" ? "Próximamente →" : "Gestionar estructura →"}
                 </p>
               </a>

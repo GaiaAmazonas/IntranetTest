@@ -70,7 +70,7 @@ export default function ThirdPartiesPage() {
   return (
     <main className="min-h-screen bg-[#eef3eb] text-[#193522]">
       <header className="bg-[#173f2b] text-white">
-        <div className="mx-auto flex max-w-[1500px] items-center justify-between px-6 py-5">
+        <div className="mx-auto flex max-w-[1500px] items-center justify-between px-5 py-3.5">
           <div className="flex items-center gap-4">
             <Link className="grid size-11 place-items-center rounded-2xl bg-[#dce9d5] text-xl font-black text-[#21472f]" href="/">G</Link>
             <div><p className="text-xs font-bold uppercase tracking-[.25em] text-[#aac49e]">Gaia Enterprise</p><h1 className="text-xl font-semibold">Gestión de terceros</h1></div>
@@ -82,9 +82,9 @@ export default function ThirdPartiesPage() {
         <div className="h-1 bg-gradient-to-r from-[#a0384d] via-[#3c838c] via-50% to-[#386037]" />
       </header>
 
-      <div className="mx-auto grid max-w-[1500px] gap-6 px-5 py-6 lg:grid-cols-[340px_1fr]">
+      <div className="mx-auto grid max-w-[1500px] gap-4 px-4 py-4 lg:grid-cols-[310px_1fr]">
         <aside className="overflow-hidden rounded-3xl bg-white shadow-sm">
-          <div className="border-b border-[#e4ebe1] p-5">
+          <div className="border-b border-[#e4ebe1] p-4">
             <div className="flex items-end justify-between"><div><p className="text-xs font-bold uppercase tracking-widest text-[#66804e]">Directorio</p><p className="mt-1 text-2xl font-semibold">{parties.length}</p></div><button className="rounded-xl bg-[#294f35] px-3 py-2 text-sm font-bold text-white">+ Nuevo</button></div>
             <input className="mt-4 w-full rounded-xl border border-[#d7e1d4] bg-[#f8faf7] px-4 py-2.5 outline-none focus:border-[#66804e]" onChange={(e) => setSearch(e.target.value)} placeholder="Nombre o documento" value={search} />
           </div>
@@ -100,10 +100,10 @@ export default function ThirdPartiesPage() {
         <section className="min-w-0">
           {detail ? (
             <>
-              <div className="relative overflow-hidden rounded-3xl bg-white p-7 shadow-sm">
+              <div className="relative overflow-hidden rounded-2xl bg-white p-5 shadow-sm">
                 <div className="absolute right-0 top-0 h-full w-52 bg-[radial-gradient(circle_at_top_right,#dcebd6,transparent_65%)]" />
                 <div className="relative flex flex-wrap items-center gap-5">
-                  <span className="grid size-20 place-items-center rounded-3xl bg-[#294f35] text-2xl font-bold text-white">{initials(detail.party.fullName)}</span>
+                  <span className="grid size-16 place-items-center rounded-2xl bg-[#294f35] text-xl font-bold text-white">{initials(detail.party.fullName)}</span>
                   <div className="flex-1"><div className="flex flex-wrap items-center gap-3"><h2 className="text-3xl font-semibold tracking-tight">{title(detail.party.fullName)}</h2><Status active={Boolean(detail.party.isActive)} /></div><p className="mt-2 text-sm text-[#718077]">{detail.party.documentType} {detail.party.documentNumber} · Persona {String(detail.party.personType).toLowerCase()}</p></div>
                   {detail.party.needsNameReview && <span className="rounded-xl bg-[#fff4df] px-3 py-2 text-xs font-semibold text-[#8a6328]">Nombre pendiente de separar</span>}
                 </div>
@@ -113,7 +113,7 @@ export default function ThirdPartiesPage() {
                 <nav className="flex overflow-x-auto border-b border-[#e5ebe3] px-4">
                   {tabs.map(([value, label]) => <button className={`whitespace-nowrap border-b-2 px-4 py-4 text-sm font-semibold ${tab === value ? "border-[#386037] text-[#294f35]" : "border-transparent text-[#78857d]"}`} key={value} onClick={() => { setTab(value); setAdding(false); }} type="button">{label}</button>)}
                 </nav>
-                <div className="min-h-[420px] p-7">
+                <div className="min-h-[420px] p-5">
                   <TabContent detail={detail} tab={tab} onAdd={() => setAdding(true)} />
                   {adding && selectedId && <RelatedForm id={selectedId} tab={tab} onDone={async () => { setAdding(false); setMessage("Información agregada correctamente."); await refresh(); }} />}
                   {message && <p className="mt-5 rounded-xl bg-[#eaf4e6] px-4 py-3 text-sm text-[#345a3c]">{message}</p>}

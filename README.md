@@ -93,3 +93,16 @@ La migración local inicial procesó 148 filas de la hoja `Terceros`: insertó 1
 personas y omitió `BODEGA` porque no representa una persona. Las áreas no
 resueltas se conservan como incidencias de importación; nunca se inventan
 relaciones para completar datos ambiguos.
+
+## Inventarios
+
+El módulo `inventory` administra catálogos de productos y marcas, elementos
+individualizados, asignaciones e historial de movimientos. Sus identificadores
+internos son UUID; los códigos visibles del Excel se conservan como claves de
+negocio para trazabilidad.
+
+La carga local inicial concilió las hojas `Productos`, `Marcas`,
+`RegistroElementos` y `Asignaciones`: registró 76 productos, 92 marcas, 670
+elementos y 231 registros de asignación. Cuando un elemento aparece más de una
+vez, solo la asignación más reciente queda activa. Las referencias no resueltas
+se conservan como incidencias y no bloquean los registros confiables.
