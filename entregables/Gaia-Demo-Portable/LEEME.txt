@@ -11,6 +11,14 @@ Contraseña sugerida: GaiaDemo2026
 La demostración acepta cualquier correo y contraseña no vacíos.
 No requiere internet, instalación, Visual Studio Code ni base de datos.
 
+FUNCIONALIDADES INCLUIDAS
+- Búsqueda de unidades, terceros, productos y elementos.
+- Pestañas internas funcionales en todos los módulos.
+- Creación simulada de unidades, terceros y elementos.
+- Registro simulado de asignaciones, devoluciones y traslados.
+- Los registros creados se guardan localmente en el navegador del equipo.
+- Descarga del organigrama mediante la opción de imprimir/guardar como PDF.
+
 IMPORTANTE
-Esta es una simulación comercial. Utiliza información ficticia, no se conecta
-a los sistemas de Gaia y no guarda los cambios realizados.
+Esta es una simulación comercial. Utiliza información ficticia y no se conecta
+a los sistemas productivos de Gaia.
