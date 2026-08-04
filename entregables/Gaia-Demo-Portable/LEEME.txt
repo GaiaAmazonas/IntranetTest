@@ -1,0 +1,16 @@
+GAIA ENTERPRISE PLATFORM — DEMOSTRACIÓN PORTABLE
+
+1. Extraiga completamente el archivo ZIP.
+2. Abra la carpeta Gaia-Demo-Portable.
+3. Haga doble clic en "Abrir Gaia Demo.html".
+4. La demostración se abrirá en el navegador predeterminado.
+
+Usuario sugerido: demo@gaiaamazonas.org
+Contraseña sugerida: GaiaDemo2026
+
+La demostración acepta cualquier correo y contraseña no vacíos.
+No requiere internet, instalación, Visual Studio Code ni base de datos.
+
+IMPORTANTE
+Esta es una simulación comercial. Utiliza información ficticia, no se conecta
+a los sistemas de Gaia y no guarda los cambios realizados.
