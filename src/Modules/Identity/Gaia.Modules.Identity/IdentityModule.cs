@@ -1,10 +1,10 @@
 using Gaia.BuildingBlocks;
-using Gaia.Modules.Identity.Infrastructure;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.Identity.Web;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -22,40 +22,25 @@ public static class IdentityModuleExtensions
         IConfiguration configuration,
         bool isDevelopment)
     {
-        var connectionString = configuration.GetConnectionString("GaiaDatabase")
-            ?? throw new InvalidOperationException(
-                "Connection string 'GaiaDatabase' is not configured.");
-
-        services.AddDbContext<GaiaIdentityDbContext>(options =>
-            options.UseNpgsql(
-                connectionString,
-                npgsql => npgsql.MigrationsHistoryTable(
-                    "__EFMigrationsHistory",
-                    GaiaIdentityDbContext.Schema)));
+        var dataverseScope = configuration["Dataverse:Scope"]
+            ?? throw new InvalidOperationException("Dataverse:Scope is required.");
 
         services
-            .AddIdentityCore<GaiaUser>(options =>
+            .AddAuthentication(options =>
             {
-                options.User.RequireUniqueEmail = true;
-                options.SignIn.RequireConfirmedEmail = false;
-                options.Password.RequiredLength = 12;
-                options.Password.RequireDigit = true;
-                options.Password.RequireLowercase = true;
-                options.Password.RequireUppercase = true;
-                options.Password.RequireNonAlphanumeric = true;
-                options.Lockout.MaxFailedAccessAttempts = 5;
-                options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+                options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
             })
-            .AddRoles<GaiaRole>()
-            .AddEntityFrameworkStores<GaiaIdentityDbContext>()
-            .AddSignInManager()
-            .AddDefaultTokenProviders();
+            .AddMicrosoftIdentityWebApp(
+                configuration.GetSection("MicrosoftEntra"),
+                openIdConnectScheme: OpenIdConnectDefaults.AuthenticationScheme,
+                cookieScheme: CookieAuthenticationDefaults.AuthenticationScheme)
+            .EnableTokenAcquisitionToCallDownstreamApi([dataverseScope])
+            .AddInMemoryTokenCaches();
 
-        services
-            .AddAuthentication(IdentityConstants.ApplicationScheme)
-            .AddIdentityCookies();
-
-        services.ConfigureApplicationCookie(options =>
+        services.Configure<CookieAuthenticationOptions>(
+            CookieAuthenticationDefaults.AuthenticationScheme,
+            options =>
         {
             options.Cookie.Name = "__Host-Gaia.Session";
             options.Cookie.HttpOnly = true;
@@ -77,13 +62,14 @@ public static class IdentityModuleExtensions
             };
         });
 
-        services.AddAuthorizationBuilder()
-            .AddPolicy(
-                GaiaPermissions.UsersRead,
-                policy => policy.RequireClaim(GaiaClaims.Permission, GaiaPermissions.UsersRead))
-            .AddPolicy(
-                GaiaPermissions.UsersManage,
-                policy => policy.RequireClaim(GaiaClaims.Permission, GaiaPermissions.UsersManage));
+        services.Configure<OpenIdConnectOptions>(
+            OpenIdConnectDefaults.AuthenticationScheme,
+            options =>
+            {
+                options.ResponseType = "code";
+                options.SaveTokens = false;
+                options.GetClaimsFromUserInfoEndpoint = false;
+            });
 
         return services;
     }

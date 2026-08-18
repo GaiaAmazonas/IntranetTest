@@ -1,10 +1,11 @@
-using Gaia.Modules.Identity.Infrastructure;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace Gaia.Modules.Identity;
 
@@ -14,171 +15,78 @@ internal static class IdentityEndpoints
     {
         var auth = endpoints.MapGroup("/api/auth").WithTags("Identity");
 
-        auth.MapPost("/login", LoginAsync).AllowAnonymous();
-        auth.MapPost("/logout", LogoutAsync).RequireAuthorization();
-        auth.MapGet("/me", GetCurrentUserAsync).RequireAuthorization();
+        auth.MapGet("/login", Login).AllowAnonymous();
+        auth.MapGet("/logout", Logout).RequireAuthorization();
+        auth.MapGet("/me", GetCurrentUser).RequireAuthorization();
 
-        var users = endpoints.MapGroup("/api/identity/users").WithTags("Identity");
-        users.MapGet("/", ListUsersAsync)
-            .RequireAuthorization(GaiaPermissions.UsersRead);
-        users.MapPost("/", CreateUserAsync)
-            .RequireAuthorization(GaiaPermissions.UsersManage);
     }
 
-    private static async Task<IResult> LoginAsync(
-        [FromBody] LoginRequest request,
-        UserManager<GaiaUser> userManager,
-        RoleManager<GaiaRole> roleManager,
-        SignInManager<GaiaUser> signInManager,
-        GaiaIdentityDbContext context,
-        HttpContext httpContext)
-    {
-        var normalizedEmail = request.Email.Trim();
-        var user = await userManager.FindByEmailAsync(normalizedEmail);
-        var result = user is { IsActive: true }
-            ? await signInManager.PasswordSignInAsync(
-                user,
-                request.Password,
-                isPersistent: false,
-                lockoutOnFailure: true)
-            : Microsoft.AspNetCore.Identity.SignInResult.Failed;
-
-        context.LoginAudits.Add(new LoginAudit
-        {
-            UserId = user?.Id,
-            Email = normalizedEmail,
-            WasSuccessful = result.Succeeded,
-            FailureReason = result.Succeeded
-                ? null
-                : result.IsLockedOut ? "locked_out" : "invalid_credentials",
-            IpAddress = httpContext.Connection.RemoteIpAddress?.ToString()
-        });
-        await context.SaveChangesAsync(httpContext.RequestAborted);
-
-        return result.Succeeded
-            ? Results.Ok(await BuildCurrentUserAsync(user!, userManager, roleManager))
-            : Results.Problem(
-                statusCode: StatusCodes.Status401Unauthorized,
-                title: "No fue posible iniciar sesión.",
-                detail: "Verifica las credenciales o contacta al administrador.");
-    }
-
-    private static async Task<IResult> LogoutAsync(SignInManager<GaiaUser> signInManager)
-    {
-        await signInManager.SignOutAsync();
-        return Results.NoContent();
-    }
-
-    private static async Task<IResult> GetCurrentUserAsync(
-        HttpContext context,
-        UserManager<GaiaUser> userManager,
-        RoleManager<GaiaRole> roleManager)
-    {
-        var user = await userManager.GetUserAsync(context.User);
-        return user is null
-            ? Results.Unauthorized()
-            : Results.Ok(await BuildCurrentUserAsync(user, userManager, roleManager));
-    }
-
-    private static async Task<IResult> ListUsersAsync(
-        GaiaIdentityDbContext context,
-        CancellationToken cancellationToken)
-    {
-        var users = await context.Users
-            .AsNoTracking()
-            .OrderBy(user => user.DisplayName)
-            .Select(user => new
+    private static IResult Login(string? returnUrl, IConfiguration configuration) =>
+        Results.Challenge(
+            new AuthenticationProperties
             {
-                user.Id,
-                user.DisplayName,
-                user.Email,
-                user.IsActive,
-                user.CreatedAtUtc
-            })
-            .ToListAsync(cancellationToken);
+                RedirectUri = SafeReturnUrl(returnUrl, configuration)
+            },
+            [OpenIdConnectDefaults.AuthenticationScheme]);
 
-        return Results.Ok(users);
+    private static IResult Logout(string? returnUrl, IConfiguration configuration) =>
+        Results.SignOut(
+            new AuthenticationProperties
+            {
+                RedirectUri = SafeReturnUrl(returnUrl, configuration)
+            },
+            [
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                OpenIdConnectDefaults.AuthenticationScheme
+            ]);
+
+    private static IResult GetCurrentUser(ClaimsPrincipal principal)
+    {
+        var id = principal.FindFirstValue("oid")
+            ?? principal.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? string.Empty;
+        var displayName = principal.FindFirstValue("name")
+            ?? principal.Identity?.Name
+            ?? "Usuario Gaia";
+        var email = principal.FindFirstValue("preferred_username")
+            ?? principal.FindFirstValue(ClaimTypes.Email)
+            ?? string.Empty;
+        var roles = principal.FindAll("roles")
+            .Select(claim => claim.Value)
+            .Concat(principal.FindAll(ClaimTypes.Role).Select(claim => claim.Value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        return Results.Ok(new CurrentUserResponse(
+            id,
+            displayName,
+            email,
+            roles));
     }
 
-    private static async Task<IResult> CreateUserAsync(
-        [FromBody] CreateUserRequest request,
-        UserManager<GaiaUser> userManager)
+    private static string SafeReturnUrl(string? requested, IConfiguration configuration)
     {
-        var user = new GaiaUser
+        var configured = configuration["WebApplication:BaseUrl"]
+            ?? "https://localhost:3000";
+        if (!Uri.TryCreate(configured, UriKind.Absolute, out var allowed))
         {
-            Id = Guid.NewGuid(),
-            UserName = request.Email.Trim(),
-            Email = request.Email.Trim(),
-            EmailConfirmed = true,
-            DisplayName = request.DisplayName.Trim(),
-            IsActive = true
-        };
-
-        var result = await userManager.CreateAsync(user, request.TemporaryPassword);
-        if (!result.Succeeded)
-        {
-            return Results.ValidationProblem(
-                result.Errors
-                    .GroupBy(error => error.Code)
-                    .ToDictionary(
-                        group => group.Key,
-                        group => group.Select(error => error.Description).ToArray()));
+            throw new InvalidOperationException("WebApplication:BaseUrl is invalid.");
         }
 
-        return Results.Created($"/api/identity/users/{user.Id}", new
+        if (Uri.TryCreate(requested, UriKind.Absolute, out var candidate)
+            && string.Equals(candidate.Scheme, allowed.Scheme, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(candidate.Host, allowed.Host, StringComparison.OrdinalIgnoreCase)
+            && candidate.Port == allowed.Port)
         {
-            user.Id,
-            user.DisplayName,
-            user.Email,
-            user.IsActive
-        });
-    }
-
-    private static async Task<CurrentUserResponse> BuildCurrentUserAsync(
-        GaiaUser user,
-        UserManager<GaiaUser> userManager,
-        RoleManager<GaiaRole> roleManager)
-    {
-        var roles = await userManager.GetRolesAsync(user);
-        var claims = await userManager.GetClaimsAsync(user);
-        var roleClaims = new List<System.Security.Claims.Claim>();
-
-        foreach (var roleName in roles)
-        {
-            var role = await roleManager.FindByNameAsync(roleName);
-            if (role is not null)
-            {
-                roleClaims.AddRange(await roleManager.GetClaimsAsync(role));
-            }
+            return candidate.ToString();
         }
 
-        return new CurrentUserResponse(
-            user.Id,
-            user.DisplayName,
-            user.Email!,
-            roles,
-            claims
-                .Where(claim => claim.Type == GaiaClaims.Permission)
-                .Select(claim => claim.Value)
-                .Concat(roleClaims
-                    .Where(claim => claim.Type == GaiaClaims.Permission)
-                    .Select(claim => claim.Value))
-                .Distinct()
-                .Order()
-                .ToArray());
+        return allowed.ToString();
     }
 }
 
-public sealed record LoginRequest(string Email, string Password);
-
-public sealed record CreateUserRequest(
-    string DisplayName,
-    string Email,
-    string TemporaryPassword);
-
 public sealed record CurrentUserResponse(
-    Guid Id,
+    string Id,
     string DisplayName,
     string Email,
-    IList<string> Roles,
-    IReadOnlyCollection<string> Permissions);
+    IReadOnlyCollection<string> Roles);

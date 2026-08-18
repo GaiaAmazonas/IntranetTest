@@ -6,6 +6,7 @@
     <Project Path="src/BuildingBlocks/Gaia.BuildingBlocks/Gaia.BuildingBlocks.csproj" />
   </Folder>
   <Folder Name="/src/Modules/" />
+  <Folder Name="/src/Modules/Security/"><Project Path="src/Modules/Security/Gaia.Modules.Security/Gaia.Modules.Security.csproj" /></Folder>
   <Folder Name="/src/Modules/Identity/">
     <Project Path="src/Modules/Identity/Gaia.Modules.Identity/Gaia.Modules.Identity.csproj" />
   </Folder>

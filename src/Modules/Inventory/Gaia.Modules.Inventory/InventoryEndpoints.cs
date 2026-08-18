@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Gaia.Modules.Inventory.Infrastructure;
 using Gaia.Modules.ThirdParties.Infrastructure;
+using Gaia.Modules.Security;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -12,16 +13,16 @@ internal static class InventoryEndpoints
 {
     public static void Map(IEndpointRouteBuilder endpoints)
     {
-        var group = endpoints.MapGroup("/api/inventory").WithTags("Inventory").RequireAuthorization(InventoryPermissions.Read);
-        group.MapGet("/dashboard", DashboardAsync);
-        group.MapGet("/products", ProductsAsync);
-        group.MapGet("/items", ItemsAsync);
-        group.MapGet("/items/{id:guid}", ItemAsync);
-        group.MapGet("/assignments", AssignmentsAsync);
-        group.MapGet("/movements", MovementsAsync);
-        group.MapGet("/import-issues", IssuesAsync);
-        group.MapPost("/items/{id:guid}/assign", AssignAsync).RequireAuthorization(InventoryPermissions.Manage);
-        group.MapPost("/import", ImportAsync).RequireAuthorization(InventoryPermissions.Manage);
+        var group = endpoints.MapGroup("/api/inventory").WithTags("Inventory").RequireAuthorization();
+        group.MapGet("/dashboard", DashboardAsync).RequireAuthorization(AdminCorePermissions.InvVer);
+        group.MapGet("/products", ProductsAsync).RequireAuthorization(AdminCorePermissions.InvVer);
+        group.MapGet("/items", ItemsAsync).RequireAuthorization(AdminCorePermissions.InvVer);
+        group.MapGet("/items/{id:guid}", ItemAsync).RequireAuthorization(AdminCorePermissions.InvVer);
+        group.MapGet("/assignments", AssignmentsAsync).RequireAuthorization(AdminCorePermissions.InvVer);
+        group.MapGet("/movements", MovementsAsync).RequireAuthorization(AdminCorePermissions.InvVer);
+        group.MapGet("/import-issues", IssuesAsync).RequireAuthorization(AdminCorePermissions.InvImportar);
+        group.MapPost("/items/{id:guid}/assign", AssignAsync).RequireAuthorization(AdminCorePermissions.InvAsignar);
+        group.MapPost("/import", ImportAsync).RequireAuthorization(AdminCorePermissions.InvImportar);
     }
 
     private static async Task<IResult> DashboardAsync(InventoryDbContext db, CancellationToken ct) => Results.Ok(new

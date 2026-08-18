@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { FeedbackProvider } from "@/components/feedback";
+import { SecurityProvider } from "@/components/security-context";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -25,9 +27,13 @@ export default function RootLayout({
   return (
     <html
       lang="es"
+      data-gaia-theme={process.env.NEXT_PUBLIC_GAIA_THEME === "classic" ? "classic" : "renewed"}
+      data-gaia-accent="forest"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <head><script dangerouslySetInnerHTML={{ __html: `try{const t=localStorage.getItem('gaia-accent-theme');if(['forest','teal','purple','red'].includes(t))document.documentElement.dataset.gaiaAccent=t}catch{}` }} /></head>
+      <body className="min-h-full flex flex-col"><FeedbackProvider><SecurityProvider>{children}</SecurityProvider></FeedbackProvider></body>
     </html>
   );
 }

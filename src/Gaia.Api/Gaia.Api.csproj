@@ -21,6 +21,11 @@
     <ProjectReference Include="..\Modules\Organization\Gaia.Modules.Organization\Gaia.Modules.Organization.csproj" />
     <ProjectReference Include="..\Modules\ThirdParties\Gaia.Modules.ThirdParties\Gaia.Modules.ThirdParties.csproj" />
     <ProjectReference Include="..\Modules\Inventory\Gaia.Modules.Inventory\Gaia.Modules.Inventory.csproj" />
+    <ProjectReference Include="..\Modules\Security\Gaia.Modules.Security\Gaia.Modules.Security.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Gaia.ArchitectureTests" />
   </ItemGroup>
 
 </Project>

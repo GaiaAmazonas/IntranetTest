@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\BuildingBlocks\Gaia.BuildingBlocks\Gaia.BuildingBlocks.csproj" />
+    <ProjectReference Include="..\..\Security\Gaia.Modules.Security\Gaia.Modules.Security.csproj" />
     <ProjectReference Include="..\..\Organization\Gaia.Modules.Organization\Gaia.Modules.Organization.csproj" />
   </ItemGroup>
 

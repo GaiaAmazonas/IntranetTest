@@ -1,10 +1,9 @@
 using System.Security.Claims;
-using Gaia.Modules.Organization.Infrastructure;
+using Gaia.Modules.Security;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.EntityFrameworkCore;
 
 namespace Gaia.Modules.Organization;
 
@@ -14,305 +13,146 @@ internal static class OrganizationEndpoints
     {
         var group = endpoints.MapGroup("/api/organization")
             .WithTags("Organization")
-            .RequireAuthorization(OrganizationPermissions.Read);
+            .RequireAuthorization();
 
-        group.MapGet("/unit-types", ListUnitTypesAsync);
+        group.MapGet("/unit-types", ListUnitTypesAsync).RequireAuthorization(AdminCorePermissions.OrgCatalogosVer);
         group.MapPost("/unit-types", CreateUnitTypeAsync)
-            .RequireAuthorization(OrganizationPermissions.Manage);
+            .RequireAuthorization(AdminCorePermissions.OrgCatalogosCrear);
         group.MapPut("/unit-types/{id:guid}", UpdateUnitTypeAsync)
-            .RequireAuthorization(OrganizationPermissions.Manage);
+            .RequireAuthorization(AdminCorePermissions.OrgCatalogosActualizar);
 
-        group.MapGet("/sites", ListSitesAsync);
+        group.MapGet("/sites", ListSitesAsync).RequireAuthorization(AdminCorePermissions.OrgCatalogosVer);
         group.MapPost("/sites", CreateSiteAsync)
-            .RequireAuthorization(OrganizationPermissions.Manage);
+            .RequireAuthorization(AdminCorePermissions.OrgCatalogosCrear);
         group.MapPut("/sites/{id:guid}", UpdateSiteAsync)
-            .RequireAuthorization(OrganizationPermissions.Manage);
+            .RequireAuthorization(AdminCorePermissions.OrgCatalogosActualizar);
 
-        group.MapGet("/units", ListUnitsAsync);
+        group.MapGet("/units", ListUnitsAsync).RequireAuthorization(AdminCorePermissions.OrgUnidadesVer);
         group.MapPost("/units", CreateUnitAsync)
-            .RequireAuthorization(OrganizationPermissions.Manage);
+            .RequireAuthorization(AdminCorePermissions.OrgUnidadesCrear);
         group.MapPut("/units/{id:guid}", UpdateUnitAsync)
-            .RequireAuthorization(OrganizationPermissions.Manage);
+            .RequireAuthorization(AdminCorePermissions.OrgUnidadesActualizar);
 
-        group.MapGet("/positions", ListPositionsAsync);
+        group.MapGet("/positions", ListPositionsAsync).RequireAuthorization(AdminCorePermissions.OrgCargosVer);
         group.MapPost("/positions", CreatePositionAsync)
-            .RequireAuthorization(OrganizationPermissions.Manage);
+            .RequireAuthorization(AdminCorePermissions.OrgCargosCrear);
         group.MapPut("/positions/{id:guid}", UpdatePositionAsync)
-            .RequireAuthorization(OrganizationPermissions.Manage);
+            .RequireAuthorization(AdminCorePermissions.OrgCargosActualizar);
     }
 
     private static async Task<IResult> ListUnitTypesAsync(
-        OrganizationDbContext context,
+        IOrganizationUnitTypeReader reader,
         CancellationToken cancellationToken) =>
-        Results.Ok(await context.UnitTypes
-            .AsNoTracking()
-            .OrderBy(item => item.VisualOrder)
-            .ThenBy(item => item.Name)
-            .ToListAsync(cancellationToken));
+        Results.Ok(await reader.ListAsync(cancellationToken));
 
     private static async Task<IResult> CreateUnitTypeAsync(
         [FromBody] UnitTypeRequest request,
         ClaimsPrincipal principal,
-        OrganizationDbContext context,
+        IOrganizationUnitTypeCreator creator,
         CancellationToken cancellationToken)
     {
-        if (await context.UnitTypes.AnyAsync(
-                item => item.Code == NormalizeCode(request.Code),
-                cancellationToken))
+        var result = await creator.CreateAsync(
+            new UnitTypeCreateCommand(
+                NormalizeCode(request.Code),
+                request.Name.Trim(),
+                Clean(request.Description),
+                request.ColorToken.Trim(),
+                request.VisualOrder,
+                request.IsActive,
+                Actor(principal)),
+            cancellationToken);
+        if (result.IsDuplicate)
         {
             return Conflict("Ya existe un tipo de unidad con ese código.");
         }
-
-        var item = new UnitType
-        {
-            Code = NormalizeCode(request.Code),
-            Name = request.Name.Trim(),
-            Description = Clean(request.Description),
-            ColorToken = request.ColorToken.Trim(),
-            VisualOrder = request.VisualOrder,
-            IsActive = request.IsActive,
-            CreatedBy = Actor(principal)
-        };
-        context.UnitTypes.Add(item);
-        await context.SaveChangesAsync(cancellationToken);
+        var item = result.Item
+            ?? throw new InvalidOperationException("Dataverse no devolvió el tipo de unidad creado.");
         return Results.Created($"/api/organization/unit-types/{item.Id}", item);
     }
 
     private static async Task<IResult> UpdateUnitTypeAsync(
         Guid id,
         [FromBody] UnitTypeRequest request,
-        ClaimsPrincipal principal,
-        OrganizationDbContext context,
+        IOrganizationUnitTypeUpdater updater,
         CancellationToken cancellationToken)
     {
-        var item = await context.UnitTypes.FindAsync([id], cancellationToken);
-        if (item is null)
+        var result = await updater.UpdateAsync(
+            id,
+            new UnitTypeUpdateCommand(
+                NormalizeCode(request.Code),
+                request.Name.Trim(),
+                Clean(request.Description),
+                request.ColorToken.Trim(),
+                request.VisualOrder,
+                request.IsActive),
+            cancellationToken);
+        if (result.NotFound)
         {
             return Results.NotFound();
         }
-
-        item.Code = NormalizeCode(request.Code);
-        item.Name = request.Name.Trim();
-        item.Description = Clean(request.Description);
-        item.ColorToken = request.ColorToken.Trim();
-        item.VisualOrder = request.VisualOrder;
-        item.IsActive = request.IsActive;
-        Touch(item, principal);
-        await context.SaveChangesAsync(cancellationToken);
+        var item = result.Item
+            ?? throw new InvalidOperationException("Dataverse no devolvió el tipo actualizado.");
         return Results.Ok(item);
     }
 
     private static async Task<IResult> ListSitesAsync(
-        OrganizationDbContext context,
+        IOrganizationSiteReader reader,
         CancellationToken cancellationToken) =>
-        Results.Ok(await context.Sites
-            .AsNoTracking()
-            .OrderBy(item => item.Name)
-            .ToListAsync(cancellationToken));
+        Results.Ok(await reader.ListAsync(cancellationToken));
 
     private static async Task<IResult> CreateSiteAsync(
         [FromBody] SiteRequest request,
         ClaimsPrincipal principal,
-        OrganizationDbContext context,
+        IOrganizationSiteCreator creator,
         CancellationToken cancellationToken)
     {
-        if (await context.Sites.AnyAsync(
-                item => item.Code == NormalizeCode(request.Code),
-                cancellationToken))
+        var result = await creator.CreateAsync(new SiteCreateCommand(
+            NormalizeCode(request.Code),
+            request.Name.Trim(),
+            Clean(request.City),
+            Clean(request.Address),
+            request.IsActive,
+            Actor(principal)), cancellationToken);
+        if (result.IsDuplicate)
         {
             return Conflict("Ya existe una sede con ese código.");
         }
-
-        var item = new Site
-        {
-            Code = NormalizeCode(request.Code),
-            Name = request.Name.Trim(),
-            City = Clean(request.City),
-            Address = Clean(request.Address),
-            IsActive = request.IsActive,
-            CreatedBy = Actor(principal)
-        };
-        context.Sites.Add(item);
-        await context.SaveChangesAsync(cancellationToken);
+        var item = result.Item
+            ?? throw new InvalidOperationException("Dataverse no devolvió la sede creada.");
         return Results.Created($"/api/organization/sites/{item.Id}", item);
     }
 
     private static async Task<IResult> UpdateSiteAsync(
         Guid id,
         [FromBody] SiteRequest request,
-        ClaimsPrincipal principal,
-        OrganizationDbContext context,
+        IOrganizationSiteUpdater updater,
         CancellationToken cancellationToken)
     {
-        var item = await context.Sites.FindAsync([id], cancellationToken);
-        if (item is null)
+        var result = await updater.UpdateAsync(id, new SiteUpdateCommand(
+            NormalizeCode(request.Code),
+            request.Name.Trim(),
+            Clean(request.City),
+            Clean(request.Address),
+            request.IsActive), cancellationToken);
+        if (result.NotFound)
         {
             return Results.NotFound();
         }
-
-        item.Code = NormalizeCode(request.Code);
-        item.Name = request.Name.Trim();
-        item.City = Clean(request.City);
-        item.Address = Clean(request.Address);
-        item.IsActive = request.IsActive;
-        Touch(item, principal);
-        await context.SaveChangesAsync(cancellationToken);
+        var item = result.Item
+            ?? throw new InvalidOperationException("Dataverse no devolvió la sede actualizada.");
         return Results.Ok(item);
     }
 
     private static async Task<IResult> ListUnitsAsync(
         [AsParameters] UnitFilters filters,
-        OrganizationDbContext context,
-        CancellationToken cancellationToken)
-    {
-        var query = context.Units
-            .AsNoTracking()
-            .Include(item => item.UnitType)
-            .Include(item => item.Site)
-            .AsQueryable();
-
-        if (!string.IsNullOrWhiteSpace(filters.Search))
-        {
-            var pattern = $"%{filters.Search.Trim()}%";
-            query = query.Where(item =>
-                EF.Functions.ILike(item.Code, pattern)
-                || EF.Functions.ILike(item.Name, pattern));
-        }
-
-        if (filters.IsActive.HasValue)
-        {
-            query = query.Where(item => item.IsActive == filters.IsActive);
-        }
-
-        if (filters.UnitTypeId.HasValue)
-        {
-            query = query.Where(item => item.UnitTypeId == filters.UnitTypeId);
-        }
-
-        var units = await query
-            .OrderBy(item => item.Level)
-            .ThenBy(item => item.VisualOrder)
-            .ThenBy(item => item.Name)
-            .Select(item => new UnitResponse(
-                item.Id,
-                item.Code,
-                item.Name,
-                item.ShortName,
-                item.UnitTypeId,
-                item.UnitType!.Name,
-                item.UnitType.ColorToken,
-                item.ParentId,
-                item.SiteId,
-                item.Site != null ? item.Site.Name : null,
-                item.Level,
-                item.Description,
-                item.VisualOrder,
-                item.EffectiveFrom,
-                item.EffectiveTo,
-                item.IsActive))
-            .ToListAsync(cancellationToken);
-
-        return Results.Ok(units);
-    }
+        IOrganizationUnitReader reader,
+        CancellationToken cancellationToken) =>
+        Results.Ok(await reader.ListAsync(filters, cancellationToken));
 
     private static async Task<IResult> CreateUnitAsync(
         [FromBody] UnitRequest request,
         ClaimsPrincipal principal,
-        OrganizationDbContext context,
-        CancellationToken cancellationToken)
-    {
-        var validation = await ValidateUnitRequestAsync(
-            request,
-            null,
-            context,
-            cancellationToken);
-        if (validation is not null)
-        {
-            return validation;
-        }
-
-        var level = await OrganizationHierarchy.CalculateLevelAsync(
-            request.ParentId,
-            context,
-            cancellationToken);
-        var item = new OrganizationalUnit
-        {
-            Code = NormalizeCode(request.Code),
-            Name = request.Name.Trim(),
-            ShortName = Clean(request.ShortName),
-            UnitTypeId = request.UnitTypeId,
-            ParentId = request.ParentId,
-            SiteId = request.SiteId,
-            Level = level,
-            Description = Clean(request.Description),
-            VisualOrder = request.VisualOrder,
-            EffectiveFrom = request.EffectiveFrom,
-            EffectiveTo = request.EffectiveTo,
-            IsActive = request.IsActive,
-            CreatedBy = Actor(principal)
-        };
-        context.Units.Add(item);
-        await context.SaveChangesAsync(cancellationToken);
-        return Results.Created($"/api/organization/units/{item.Id}", new { item.Id });
-    }
-
-    private static async Task<IResult> UpdateUnitAsync(
-        Guid id,
-        [FromBody] UnitRequest request,
-        ClaimsPrincipal principal,
-        OrganizationDbContext context,
-        CancellationToken cancellationToken)
-    {
-        var item = await context.Units.FindAsync([id], cancellationToken);
-        if (item is null)
-        {
-            return Results.NotFound();
-        }
-
-        var validation = await ValidateUnitRequestAsync(
-            request,
-            id,
-            context,
-            cancellationToken);
-        if (validation is not null)
-        {
-            return validation;
-        }
-
-        var parentChanged = item.ParentId != request.ParentId;
-        item.Code = NormalizeCode(request.Code);
-        item.Name = request.Name.Trim();
-        item.ShortName = Clean(request.ShortName);
-        item.UnitTypeId = request.UnitTypeId;
-        item.ParentId = request.ParentId;
-        item.SiteId = request.SiteId;
-        item.Level = await OrganizationHierarchy.CalculateLevelAsync(
-            request.ParentId,
-            context,
-            cancellationToken);
-        item.Description = Clean(request.Description);
-        item.VisualOrder = request.VisualOrder;
-        item.EffectiveFrom = request.EffectiveFrom;
-        item.EffectiveTo = request.EffectiveTo;
-        item.IsActive = request.IsActive;
-        Touch(item, principal);
-
-        if (parentChanged)
-        {
-            await OrganizationHierarchy.RecalculateDescendantLevelsAsync(
-                item,
-                context,
-                cancellationToken);
-        }
-
-        await context.SaveChangesAsync(cancellationToken);
-        return Results.Ok(new { item.Id });
-    }
-
-    private static async Task<IResult?> ValidateUnitRequestAsync(
-        UnitRequest request,
-        Guid? existingId,
-        OrganizationDbContext context,
+        IOrganizationUnitCreator creator,
         CancellationToken cancellationToken)
     {
         var code = NormalizeCode(request.Code);
@@ -320,92 +160,97 @@ internal static class OrganizationEndpoints
         {
             return Validation("Código y nombre son obligatorios.");
         }
-
         if (request.EffectiveTo < request.EffectiveFrom)
         {
             return Validation("La fecha final no puede ser anterior a la inicial.");
         }
 
-        if (await context.Units.AnyAsync(
-                item => item.Code == code && item.Id != existingId,
-                cancellationToken))
+        var result = await creator.CreateAsync(new OrganizationUnitCreateCommand(
+            code,
+            request.Name.Trim(),
+            Clean(request.ShortName),
+            request.UnitTypeId,
+            request.ParentId,
+            request.SiteId,
+            Clean(request.Description),
+            request.VisualOrder,
+            request.EffectiveFrom,
+            request.EffectiveTo,
+            request.IsActive,
+            Actor(principal)), cancellationToken);
+
+        return result.Status switch
         {
-            return Conflict("Ya existe una unidad con ese código.");
+            OrganizationUnitCreateStatus.DuplicateCode => Conflict("Ya existe una unidad con ese código."),
+            OrganizationUnitCreateStatus.InvalidUnitType => Validation("El tipo de unidad no existe o está inactivo."),
+            OrganizationUnitCreateStatus.ParentNotFound => Validation("La unidad padre no existe."),
+            OrganizationUnitCreateStatus.SiteNotFound => Validation("La sede indicada no existe."),
+            OrganizationUnitCreateStatus.Created when result.Id.HasValue =>
+                Results.Created($"/api/organization/units/{result.Id.Value}", new { Id = result.Id.Value }),
+            _ => throw new InvalidOperationException("Dataverse no devolvió el identificador de la unidad creada.")
+        };
+    }
+
+    private static async Task<IResult> UpdateUnitAsync(
+        Guid id,
+        [FromBody] UnitRequest request,
+        ClaimsPrincipal principal,
+        IOrganizationUnitUpdater updater,
+        CancellationToken cancellationToken)
+    {
+        var code = NormalizeCode(request.Code);
+        if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(request.Name))
+        {
+            return Validation("Código y nombre son obligatorios.");
+        }
+        if (request.EffectiveTo < request.EffectiveFrom)
+        {
+            return Validation("La fecha final no puede ser anterior a la inicial.");
         }
 
-        if (!await context.UnitTypes.AnyAsync(
-                item => item.Id == request.UnitTypeId && item.IsActive,
-                cancellationToken))
+        var result = await updater.UpdateAsync(id, new OrganizationUnitUpdateCommand(
+            code,
+            request.Name.Trim(),
+            Clean(request.ShortName),
+            request.UnitTypeId,
+            request.ParentId,
+            request.SiteId,
+            Clean(request.Description),
+            request.VisualOrder,
+            request.EffectiveFrom,
+            request.EffectiveTo,
+            request.IsActive,
+            Actor(principal)), cancellationToken);
+
+        return result.Status switch
         {
-            return Validation("El tipo de unidad no existe o está inactivo.");
-        }
-
-        if (request.ParentId.HasValue)
-        {
-            if (request.ParentId == existingId)
-            {
-                return Validation("Una unidad no puede ser su propio padre.");
-            }
-
-            var parent = await context.Units
-                .AsNoTracking()
-                .FirstOrDefaultAsync(item => item.Id == request.ParentId, cancellationToken);
-            if (parent is null)
-            {
-                return Validation("La unidad padre no existe.");
-            }
-
-            if (existingId.HasValue && await OrganizationHierarchy.WouldCreateCycleAsync(
-                    existingId.Value,
-                    request.ParentId.Value,
-                    context,
-                    cancellationToken))
-            {
-                return Validation("El cambio produciría un ciclo en la jerarquía.");
-            }
-        }
-
-        if (request.SiteId.HasValue && !await context.Sites.AnyAsync(
-                item => item.Id == request.SiteId,
-                cancellationToken))
-        {
-            return Validation("La sede indicada no existe.");
-        }
-
-        return null;
+            OrganizationUnitUpdateStatus.NotFound => Results.NotFound(),
+            OrganizationUnitUpdateStatus.DuplicateCode => Conflict("Ya existe una unidad con ese código."),
+            OrganizationUnitUpdateStatus.InvalidUnitType => Validation("El tipo de unidad no existe o está inactivo."),
+            OrganizationUnitUpdateStatus.ParentNotFound => Validation("La unidad padre no existe."),
+            OrganizationUnitUpdateStatus.SelfParent => Validation("Una unidad no puede ser su propio padre."),
+            OrganizationUnitUpdateStatus.HierarchyCycle => Validation("El cambio produciría un ciclo en la jerarquía."),
+            OrganizationUnitUpdateStatus.SiteNotFound => Validation("La sede indicada no existe."),
+            OrganizationUnitUpdateStatus.Updated when result.Id.HasValue => Results.Ok(new { Id = result.Id.Value }),
+            _ => throw new InvalidOperationException("Dataverse no confirmó la actualización de la unidad.")
+        };
     }
 
     private static async Task<IResult> ListPositionsAsync(
-        OrganizationDbContext context,
+        IOrganizationPositionStore store,
         CancellationToken cancellationToken) =>
-        Results.Ok(await context.Positions
-            .AsNoTracking()
-            .OrderBy(item => item.Name)
-            .ToListAsync(cancellationToken));
+        Results.Ok(await store.ListAsync(cancellationToken));
 
     private static async Task<IResult> CreatePositionAsync(
         [FromBody] PositionRequest request,
         ClaimsPrincipal principal,
-        OrganizationDbContext context,
+        IOrganizationPositionStore store,
         CancellationToken cancellationToken)
     {
-        if (await context.Positions.AnyAsync(
-                item => item.Code == NormalizeCode(request.Code),
-                cancellationToken))
-        {
-            return Conflict("Ya existe un cargo con ese código.");
-        }
-
-        var item = new Position
-        {
-            Code = NormalizeCode(request.Code),
-            Name = request.Name.Trim(),
-            Description = Clean(request.Description),
-            IsActive = request.IsActive,
-            CreatedBy = Actor(principal)
-        };
-        context.Positions.Add(item);
-        await context.SaveChangesAsync(cancellationToken);
+        var result = await store.CreateAsync(new(NormalizeOptionalCode(request.Code), request.Name.Trim(),
+            Clean(request.Description), request.IsActive, Actor(principal)), cancellationToken);
+        if (result.Status == PositionWriteStatus.DuplicateCode) return Conflict("Ya existe un cargo con ese código.");
+        var item = result.Item ?? throw new InvalidOperationException("Dataverse no devolvió el cargo creado.");
         return Results.Created($"/api/organization/positions/{item.Id}", item);
     }
 
@@ -413,22 +258,14 @@ internal static class OrganizationEndpoints
         Guid id,
         [FromBody] PositionRequest request,
         ClaimsPrincipal principal,
-        OrganizationDbContext context,
+        IOrganizationPositionStore store,
         CancellationToken cancellationToken)
     {
-        var item = await context.Positions.FindAsync([id], cancellationToken);
-        if (item is null)
-        {
-            return Results.NotFound();
-        }
-
-        item.Code = NormalizeCode(request.Code);
-        item.Name = request.Name.Trim();
-        item.Description = Clean(request.Description);
-        item.IsActive = request.IsActive;
-        Touch(item, principal);
-        await context.SaveChangesAsync(cancellationToken);
-        return Results.Ok(item);
+        var result = await store.UpdateAsync(id, new(NormalizeOptionalCode(request.Code), request.Name.Trim(),
+            Clean(request.Description), request.IsActive, Actor(principal)), cancellationToken);
+        if (result.Status == PositionWriteStatus.NotFound) return Results.NotFound();
+        if (result.Status == PositionWriteStatus.DuplicateCode) return Conflict("Ya existe un cargo con ese código.");
+        return Results.Ok(result.Item ?? throw new InvalidOperationException("Dataverse no devolvió el cargo actualizado."));
     }
 
     private static string Actor(ClaimsPrincipal principal) =>
@@ -443,6 +280,8 @@ internal static class OrganizationEndpoints
     }
 
     private static string NormalizeCode(string code) => code.Trim().ToUpperInvariant();
+    private static string? NormalizeOptionalCode(string? code) =>
+        string.IsNullOrWhiteSpace(code) ? null : code.Trim().ToUpperInvariant();
 
     private static string? Clean(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
@@ -473,7 +312,7 @@ public sealed record SiteRequest(
     bool IsActive);
 
 public sealed record PositionRequest(
-    string Code,
+    string? Code,
     string Name,
     string? Description,
     bool IsActive);

@@ -1,159 +1,54 @@
 "use client";
 
 import { AppHeader } from "@/components/app-header";
+import { Button, IconButton } from "@/components/ui";
+import { ConfirmDialog, FormDialog } from "@/components/form-dialog";
+import { useFeedback } from "@/components/feedback";
+import { apiRequest } from "@/lib/api-client";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { Mail, Pencil, Phone, Plus, Star } from "lucide-react";
 
-const apiUrl = process.env.NEXT_PUBLIC_GAIA_API_URL ?? "https://localhost:7168";
+type Collaborator = { id:string; fullName:string; documentTypeId:string; documentType:string; documentNumber:string; firstName:string; middleName:string|null; firstSurname:string; secondSurname:string|null; sex:string; birthDate:string|null; observations:string|null; isActive:boolean };
+type CollaboratorDirectory = Pick<Collaborator,"id"|"fullName"|"documentType"|"documentNumber"|"isActive">;
+type Detail = { party: Collaborator };
+type DocumentType = { id:string; name:string; isActive:boolean };
+type Email = { id:string; email:string; observations:string|null; isPrimary:boolean; isActive:boolean };
+type PhoneRecord = { id:string; number:string; extension:string|null; observations:string|null; isPrimary:boolean; phoneType:string; isActive:boolean };
+type Tab = "personal" | "emails" | "phones";
 
-type PartySummary = {
-  id: string; fullName: string; documentType: string; documentNumber: string;
-  personType: string; isActive: boolean; needsNameReview: boolean;
-};
-type Detail = {
-  party: PartySummary & Record<string, string | boolean | null>;
-  engagements: Array<Record<string, string>>;
-  assignments: Array<Record<string, string>>;
-  studies: Array<Record<string, string>>;
-  languages: Array<Record<string, string>>;
-  trainings: Array<Record<string, string>>;
-  experiences: Array<Record<string, string>>;
-  emergencyContacts: Array<Record<string, string>>;
-};
-type Tab = "basic" | "links" | "assignments" | "studies" | "languages" | "trainings" | "experiences" | "emergency" | "inventory" | "history";
-
-async function api<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${apiUrl}${path}`, {
-    credentials: "include", ...options,
-    headers: { "Content-Type": "application/json", ...options?.headers },
-  });
-  if (response.status === 401) { window.location.href = "/"; throw new Error("Sesión finalizada."); }
-  if (!response.ok) throw new Error("No fue posible completar la operación.");
-  return (await response.json()) as T;
+export default function CollaboratorsPage() {
+  const [items,setItems]=useState<CollaboratorDirectory[]>([]), [selectedId,setSelectedId]=useState<string|null>(null), [detail,setDetail]=useState<Detail|null>(null);
+  const [documentTypes,setDocumentTypes]=useState<DocumentType[]>([]), [emails,setEmails]=useState<Email[]>([]), [phones,setPhones]=useState<PhoneRecord[]>([]);
+  const [search,setSearch]=useState(""), [tab,setTab]=useState<Tab>("personal");
+  const [partyEditor,setPartyEditor]=useState<Collaborator|null|undefined>(undefined), [emailEditor,setEmailEditor]=useState<Email|null|undefined>(undefined), [phoneEditor,setPhoneEditor]=useState<PhoneRecord|null|undefined>(undefined);
+  const [toggleTarget,setToggleTarget]=useState<{kind:"email"|"phone"; item:Email|PhoneRecord}|null>(null), [toggling,setToggling]=useState(false); const {notify}=useFeedback();
+  async function loadList(){const loaded=await apiRequest<CollaboratorDirectory[]>("/api/third-parties?directory=true");setItems(loaded);}
+  async function loadDetail(id:string){const [party,emailRows,phoneRows]=await Promise.all([apiRequest<Detail>(`/api/third-parties/${id}`),apiRequest<Email[]>(`/api/third-parties/${id}/emails`),apiRequest<PhoneRecord[]>(`/api/third-parties/${id}/phones`)]);setDetail(party);setEmails(emailRows);setPhones(phoneRows);}
+  useEffect(()=>{let active=true;apiRequest<CollaboratorDirectory[]>("/api/third-parties?directory=true").then(loaded=>{if(active)setItems(loaded);});return()=>{active=false;};},[]);
+  useEffect(()=>{if(partyEditor===undefined||documentTypes.length)return;void apiRequest<DocumentType[]>("/api/third-parties/document-types").then(setDocumentTypes);},[documentTypes.length,partyEditor]);
+  useEffect(()=>{if(!selectedId)return;let active=true;Promise.all([apiRequest<Detail>(`/api/third-parties/${selectedId}`),apiRequest<Email[]>(`/api/third-parties/${selectedId}/emails`),apiRequest<PhoneRecord[]>(`/api/third-parties/${selectedId}/phones`)]).then(([party,emailRows,phoneRows])=>{if(!active)return;setDetail(party);setEmails(emailRows);setPhones(phoneRows);});return()=>{active=false;};},[selectedId]);
+  const visible=useMemo(()=>{const q=search.trim().toLocaleLowerCase("es");return q?items.filter(x=>x.fullName.toLocaleLowerCase("es").includes(q)||x.documentNumber.includes(q)):items;},[items,search]);
+  async function saveParty(values:Record<string,unknown>){const id=partyEditor?.id;const result=await apiRequest<{id:string}>(id?`/api/third-parties/${id}`:"/api/third-parties",{method:id?"PUT":"POST",body:JSON.stringify(values)});await loadList();setSelectedId(result.id);await loadDetail(result.id);setPartyEditor(undefined);notify({tone:"success",title:id?"Colaborador actualizado":"Colaborador creado"});}
+  async function saveEmail(values:Record<string,unknown>){if(!selectedId)return;const id=emailEditor?.id;await apiRequest(id?`/api/third-parties/${selectedId}/emails/${id}`:`/api/third-parties/${selectedId}/emails`,{method:id?"PUT":"POST",body:JSON.stringify(values)});await loadDetail(selectedId);setEmailEditor(undefined);notify({tone:"success",title:id?"Correo actualizado":"Correo agregado"});}
+  async function savePhone(values:Record<string,unknown>){if(!selectedId)return;const id=phoneEditor?.id;await apiRequest(id?`/api/third-parties/${selectedId}/phones/${id}`:`/api/third-parties/${selectedId}/phones`,{method:id?"PUT":"POST",body:JSON.stringify(values)});await loadDetail(selectedId);setPhoneEditor(undefined);notify({tone:"success",title:id?"Teléfono actualizado":"Teléfono agregado"});}
+  async function toggle(){if(!selectedId||!toggleTarget||toggling)return;const item=toggleTarget.item;setToggling(true);try{const path=toggleTarget.kind==="email"?`emails/${item.id}`:`phones/${item.id}`;await apiRequest(`/api/third-parties/${selectedId}/${path}`,{method:"PUT",body:JSON.stringify(toggleTarget.kind==="email"?{email:(item as Email).email,observations:item.observations,isPrimary:item.isPrimary,isActive:!item.isActive}:{number:(item as PhoneRecord).number,extension:(item as PhoneRecord).extension,observations:item.observations,isPrimary:item.isPrimary,phoneType:(item as PhoneRecord).phoneType,isActive:!item.isActive})});await loadDetail(selectedId);setToggleTarget(null);notify({tone:"success",title:item.isActive?"Registro inactivado":"Registro activado"});}catch(error){notify({tone:"error",title:"No fue posible cambiar el estado",description:error instanceof Error?error.message:undefined});}finally{setToggling(false);}}
+  return <main className="gaia-app-page min-h-screen bg-[#eef3eb] text-[#193522]"><AppHeader title="Talento Humano · Colaboradores" />
+    <div className="mx-auto grid max-w-[1500px] gap-4 px-4 py-4 lg:grid-cols-[310px_1fr]"><aside className="overflow-hidden rounded-2xl bg-white shadow-sm"><div className="border-b border-[#e4ebe1] p-4"><div className="flex items-end justify-between"><div><p className="text-xs font-bold uppercase tracking-widest text-[#66804e]">Colaboradores</p><p className="mt-1 text-2xl font-semibold">{items.length}</p></div><Button onClick={()=>setPartyEditor(null)}><Plus size={16}/>Nuevo</Button></div><input className="mt-4 w-full rounded-xl border border-[#d7e1d4] bg-[#f8faf7] px-4 py-2.5 outline-none" onChange={e=>setSearch(e.target.value)} placeholder="Nombre o documento" value={search}/></div><div className="max-h-[calc(100vh-290px)] overflow-y-auto">{visible.map(item=><button className={`w-full border-b border-[#edf1eb] p-4 text-left ${selectedId===item.id?"bg-[#eaf2e6] shadow-[inset_4px_0_0_#386037]":"hover:bg-[#f7f9f6]"}`} key={item.id} onClick={()=>{setSelectedId(item.id);setTab("personal");}} type="button"><p className="truncate text-sm font-semibold">{title(item.fullName)}</p><p className="mt-1 text-xs text-[#77857b]">{item.documentType} · {item.documentNumber}</p></button>)}</div></aside>
+      <section className="min-w-0">{detail?<><div className="rounded-2xl bg-white p-5 shadow-sm"><div className="flex flex-wrap items-center gap-4"><span className="grid size-14 place-items-center rounded-2xl bg-[#294f35] text-lg font-bold text-white">{initials(detail.party.fullName)}</span><div className="flex-1"><div className="flex items-center gap-3"><h2 className="text-2xl font-semibold">{title(detail.party.fullName)}</h2><Status active={detail.party.isActive}/></div><p className="mt-1 text-sm text-[#718077]">{detail.party.documentType} {detail.party.documentNumber}</p></div><Button onClick={()=>setPartyEditor(detail.party)} variant="secondary"><Pencil size={16}/>Editar</Button></div></div>
+        <div className="mt-5 rounded-2xl bg-white p-5 shadow-sm"><div className="gaia-tabs" role="tablist">{([["personal","Información personal"],["emails","Correos"],["phones","Teléfonos"]] as Array<[Tab,string]>).map(([value,label])=><button aria-selected={tab===value} className="gaia-tab" key={value} onClick={()=>setTab(value)} role="tab" type="button">{label}</button>)}</div><div className="mt-6 min-h-[380px]">{tab==="personal"&&<Personal party={detail.party}/>} {tab==="emails"&&<ContactSection icon={Mail} title="Correos" onAdd={()=>setEmailEditor(null)}>{emails.map(item=><ContactCard active={item.isActive} key={item.id} observations={item.observations} primary={item.isPrimary} title={item.email} onEdit={()=>setEmailEditor(item)} onToggle={()=>setToggleTarget({kind:"email",item})}/>)}</ContactSection>} {tab==="phones"&&<ContactSection icon={Phone} title="Teléfonos" onAdd={()=>setPhoneEditor(null)}>{phones.map(item=><ContactCard active={item.isActive} detail={`${item.phoneType}${item.extension?` · Ext. ${item.extension}`:""}`} key={item.id} observations={item.observations} primary={item.isPrimary} title={item.number} onEdit={()=>setPhoneEditor(item)} onToggle={()=>setToggleTarget({kind:"phone",item})}/>)}</ContactSection>}</div></div></>:<div className="grid min-h-[600px] place-items-center rounded-2xl bg-white text-[#77857b]">Selecciona un colaborador</div>}</section></div>
+    {partyEditor!==undefined&&<PartyEditor documentTypes={documentTypes.filter(x=>x.isActive)} onCancel={()=>setPartyEditor(undefined)} onSave={saveParty} party={partyEditor}/>} {emailEditor!==undefined&&<EmailEditor item={emailEditor} onCancel={()=>setEmailEditor(undefined)} onSave={saveEmail}/>} {phoneEditor!==undefined&&<PhoneEditor item={phoneEditor} onCancel={()=>setPhoneEditor(undefined)} onSave={savePhone}/>}<ConfirmDialog confirmLabel={toggling?(toggleTarget?.item.isActive?"Inactivando…":"Activando…"):(toggleTarget?.item.isActive?"Inactivar":"Activar")} description="El registro conservará su historial en Dataverse." loading={toggling} onCancel={()=>setToggleTarget(null)} onConfirm={()=>void toggle()} open={Boolean(toggleTarget)} title={`${toggleTarget?.item.isActive?"Inactivar":"Activar"} registro`}/>
+  </main>;
 }
 
-const tabs: Array<[Tab, string]> = [
-  ["basic", "Datos básicos"], ["links", "Vinculaciones"], ["assignments", "Asignaciones"],
-  ["studies", "Estudios"], ["languages", "Idiomas"], ["trainings", "Formación"],
-  ["experiences", "Experiencia"], ["emergency", "Emergencia"], ["inventory", "Inventario"],
-  ["history", "Historial"],
-];
+function Personal({party}:{party:Collaborator}){return <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{[["Nombre registrado",party.fullName],["Documento",`${party.documentType} ${party.documentNumber}`],["Sexo",party.sex],["Fecha de nacimiento",party.birthDate],["Observaciones",party.observations]].map(([label,value])=><div className="rounded-xl bg-[#f7f9f6] p-4" key={label}><p className="text-[10px] font-bold uppercase tracking-wider text-[#829087]">{label}</p><p className="mt-2 text-sm font-semibold">{value||"Sin información"}</p></div>)}</div>}
+function ContactSection({title,icon:Icon,onAdd,children}:{title:string;icon:typeof Mail;onAdd:()=>void;children:React.ReactNode}){return <><div className="flex items-center justify-between"><div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl bg-[#e8efe5] text-[#386037]"><Icon size={19}/></span><h3 className="text-xl font-semibold">{title}</h3></div><Button onClick={onAdd}><Plus size={16}/>Agregar</Button></div><div className="mt-5 grid gap-3 md:grid-cols-2">{children}</div></>}
+function ContactCard({title,detail,observations,primary,active,onEdit,onToggle}:{title:string;detail?:string;observations?:string|null;primary:boolean;active:boolean;onEdit:()=>void;onToggle:()=>void}){return <article className="rounded-xl border border-[#e1e9de] p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="break-all font-semibold">{title}</p>{primary&&<span className="inline-flex items-center gap-1 rounded-full bg-[#edf3df] px-2 py-1 text-[10px] font-bold text-[#60733c]"><Star size={11} fill="currentColor"/>Principal</span>}<Status active={active}/></div>{detail&&<p className="mt-2 text-xs text-[#718077]">{detail}</p>}{observations&&<p className="mt-2 text-xs text-[#718077]">{observations}</p>}</div><IconButton label={`Editar ${title}`} onClick={onEdit}><Pencil size={15}/></IconButton></div><button className="mt-4 text-xs font-semibold text-[#527447] hover:underline" onClick={onToggle} type="button">{active?"Inactivar":"Activar"}</button></article>}
 
-export default function ThirdPartiesPage() {
-  const [parties, setParties] = useState<PartySummary[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [detail, setDetail] = useState<Detail | null>(null);
-  const [search, setSearch] = useState("");
-  const [tab, setTab] = useState<Tab>("basic");
-  const [adding, setAdding] = useState(false);
-  const [message, setMessage] = useState("");
-
-  useEffect(() => {
-    void api<PartySummary[]>("/api/third-parties").then((items) => {
-      setParties(items);
-      setSelectedId(items[0]?.id ?? null);
-    });
-  }, []);
-  useEffect(() => {
-    if (selectedId) void api<Detail>(`/api/third-parties/${selectedId}`).then(setDetail);
-  }, [selectedId]);
-
-  const visible = useMemo(() => {
-    const value = search.toLocaleLowerCase("es").trim();
-    return value ? parties.filter((item) =>
-      item.fullName.toLocaleLowerCase("es").includes(value) || item.documentNumber.includes(value)) : parties;
-  }, [parties, search]);
-
-  async function refresh() {
-    if (selectedId) setDetail(await api<Detail>(`/api/third-parties/${selectedId}`));
-  }
-
-  return (
-    <main className="min-h-screen bg-[#eef3eb] text-[#193522]">
-      <AppHeader title="Gestión de terceros" />
-
-      <div className="mx-auto grid max-w-[1500px] gap-4 px-4 py-4 lg:grid-cols-[310px_1fr]">
-        <aside className="overflow-hidden rounded-3xl bg-white shadow-sm">
-          <div className="border-b border-[#e4ebe1] p-4">
-            <div className="flex items-end justify-between"><div><p className="text-xs font-bold uppercase tracking-widest text-[#66804e]">Directorio</p><p className="mt-1 text-2xl font-semibold">{parties.length}</p></div><button className="rounded-xl bg-[#294f35] px-3 py-2 text-sm font-bold text-white">+ Nuevo</button></div>
-            <input className="mt-4 w-full rounded-xl border border-[#d7e1d4] bg-[#f8faf7] px-4 py-2.5 outline-none focus:border-[#66804e]" onChange={(e) => setSearch(e.target.value)} placeholder="Nombre o documento" value={search} />
-          </div>
-          <div className="max-h-[calc(100vh-260px)] overflow-y-auto">
-            {visible.map((party) => (
-              <button className={`w-full border-b border-[#edf1eb] p-4 text-left transition ${selectedId === party.id ? "bg-[#eaf2e6] shadow-[inset_4px_0_0_#386037]" : "hover:bg-[#f7f9f6]"}`} key={party.id} onClick={() => { setSelectedId(party.id); setTab("basic"); }} type="button">
-                <div className="flex gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-full bg-[#dce8d7] text-sm font-bold">{initials(party.fullName)}</span><div className="min-w-0"><p className="truncate text-sm font-semibold">{title(party.fullName)}</p><p className="mt-1 text-xs text-[#77857b]">{party.documentType} · {party.documentNumber}</p></div></div>
-              </button>
-            ))}
-          </div>
-        </aside>
-
-        <section className="min-w-0">
-          {detail ? (
-            <>
-              <div className="relative overflow-hidden rounded-2xl bg-white p-5 shadow-sm">
-                <div className="absolute right-0 top-0 h-full w-52 bg-[radial-gradient(circle_at_top_right,#dcebd6,transparent_65%)]" />
-                <div className="relative flex flex-wrap items-center gap-5">
-                  <span className="grid size-16 place-items-center rounded-2xl bg-[#294f35] text-xl font-bold text-white">{initials(detail.party.fullName)}</span>
-                  <div className="flex-1"><div className="flex flex-wrap items-center gap-3"><h2 className="text-3xl font-semibold tracking-tight">{title(detail.party.fullName)}</h2><Status active={Boolean(detail.party.isActive)} /></div><p className="mt-2 text-sm text-[#718077]">{detail.party.documentType} {detail.party.documentNumber} · Persona {String(detail.party.personType).toLowerCase()}</p></div>
-                  {detail.party.needsNameReview && <span className="rounded-xl bg-[#fff4df] px-3 py-2 text-xs font-semibold text-[#8a6328]">Nombre pendiente de separar</span>}
-                </div>
-              </div>
-
-              <div className="mt-5 overflow-hidden rounded-3xl bg-white shadow-sm">
-                <nav className="flex overflow-x-auto border-b border-[#e5ebe3] px-4">
-                  {tabs.map(([value, label]) => <button className={`whitespace-nowrap border-b-2 px-4 py-4 text-sm font-semibold ${tab === value ? "border-[#386037] text-[#294f35]" : "border-transparent text-[#78857d]"}`} key={value} onClick={() => { setTab(value); setAdding(false); }} type="button">{label}</button>)}
-                </nav>
-                <div className="min-h-[420px] p-5">
-                  <TabContent detail={detail} tab={tab} onAdd={() => setAdding(true)} />
-                  {adding && selectedId && <RelatedForm id={selectedId} tab={tab} onDone={async () => { setAdding(false); setMessage("Información agregada correctamente."); await refresh(); }} />}
-                  {message && <p className="mt-5 rounded-xl bg-[#eaf4e6] px-4 py-3 text-sm text-[#345a3c]">{message}</p>}
-                </div>
-              </div>
-            </>
-          ) : <div className="grid min-h-[600px] place-items-center rounded-3xl bg-white text-[#77857b]">Selecciona una persona</div>}
-        </section>
-      </div>
-    </main>
-  );
-}
-
-function TabContent({ detail, tab, onAdd }: { detail: Detail; tab: Tab; onAdd: () => void }) {
-  if (tab === "basic") return <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">{[
-    ["Nombre registrado", detail.party.fullName], ["Documento", `${detail.party.documentType} ${detail.party.documentNumber}`],
-    ["Correo personal", detail.party.personalEmail], ["Teléfono", detail.party.primaryPhone],
-    ["Ciudad", detail.party.city], ["Dirección", detail.party.address],
-  ].map(([label, value]) => <Info key={String(label)} label={String(label)} value={value ? String(value) : "Sin información"} />)}</div>;
-  const mapping: Record<Exclude<Tab, "basic">, [keyof Detail | null, string]> = {
-    links: ["engagements", "Vinculación"], assignments: ["assignments", "Asignación"],
-    studies: ["studies", "Estudio"], languages: ["languages", "Idioma"], trainings: ["trainings", "Formación"],
-    experiences: ["experiences", "Experiencia"], emergency: ["emergencyContacts", "Contacto"],
-    inventory: [null, "Elemento"], history: [null, "Evento"],
-  };
-  const [key, singular] = mapping[tab];
-  const records = key ? detail[key] as Array<Record<string, unknown>> : [];
-  const canAdd = ["studies", "languages", "trainings", "experiences", "emergency"].includes(tab);
-  return <><div className="flex items-center justify-between"><div><p className="text-xs font-bold uppercase tracking-[.2em] text-[#66804e]">{singular}</p><h3 className="mt-1 text-2xl font-semibold">{tabs.find(([value]) => value === tab)?.[1]}</h3></div>{canAdd && <button className="rounded-xl bg-[#294f35] px-4 py-2.5 text-sm font-semibold text-white" onClick={onAdd}>+ Agregar</button>}</div>
-    <div className="mt-6 grid gap-3 md:grid-cols-2">{records.map((record, index) => <article className="rounded-2xl border border-[#e1e9de] p-5" key={String(record.id ?? index)}><p className="font-semibold">{primary(record)}</p><p className="mt-2 text-sm leading-6 text-[#758179]">{secondary(record)}</p></article>)}</div>
-    {!records.length && <div className="mt-10 rounded-2xl border border-dashed border-[#cfdacb] py-14 text-center text-sm text-[#7b887f]">No hay información registrada en esta sección.</div>}</>;
-}
-
-function RelatedForm({ id, tab, onDone }: { id: string; tab: Tab; onDone: () => void }) {
-  const [values, setValues] = useState<Record<string, string>>({});
-  const configs: Partial<Record<Tab, { path: string; fields: Array<[string, string]>; extras?: Record<string, unknown> }>> = {
-    languages: { path: "languages", fields: [["language", "Idioma"], ["overallLevel", "Nivel general"], ["certification", "Certificación"]], extras: { readingLevel: null, writingLevel: null, speakingLevel: null } },
-    studies: { path: "studies", fields: [["academicLevel", "Nivel académico"], ["title", "Título"], ["institution", "Institución"]], extras: { graduated: false } },
-    trainings: { path: "trainings", fields: [["type", "Tipo"], ["name", "Nombre"], ["institution", "Institución"]], extras: { completionDate: null } },
-    experiences: { path: "experiences", fields: [["organization", "Organización"], ["role", "Cargo o rol"], ["description", "Descripción"]], extras: { startDate: null, endDate: null } },
-    emergency: { path: "emergency-contacts", fields: [["fullName", "Nombre"], ["relationship", "Parentesco"], ["phone", "Teléfono"], ["alternatePhone", "Teléfono alterno"]], extras: { isPrimary: true } },
-  };
-  const config = configs[tab];
-  if (!config) return null;
-  async function submit(event: FormEvent) { event.preventDefault(); await api(`/api/third-parties/${id}/${config!.path}`, { method: "POST", body: JSON.stringify({ ...values, ...config!.extras }) }); onDone(); }
-  return <form className="mt-6 rounded-2xl bg-[#f4f7f2] p-5" onSubmit={submit}><p className="mb-4 font-semibold">Nuevo registro</p><div className="grid gap-4 md:grid-cols-2">{config.fields.map(([name, label]) => <label className="text-sm font-semibold" key={name}>{label}<input className="mt-2 w-full rounded-xl border border-[#d3ddd0] bg-white px-4 py-3 font-normal outline-none" onChange={(e) => setValues({ ...values, [name]: e.target.value })} required={!["certification", "institution", "description", "alternatePhone"].includes(name)} /></label>)}</div><button className="mt-5 rounded-xl bg-[#294f35] px-5 py-3 font-semibold text-white">Guardar</button></form>;
-}
-
-function Info({ label, value }: { label: string; value: string }) { return <div className="rounded-2xl bg-[#f7f9f6] p-5"><p className="text-xs font-bold uppercase tracking-wider text-[#829087]">{label}</p><p className="mt-2 font-semibold">{value}</p></div>; }
-function Status({ active }: { active: boolean }) { return <span className={`rounded-full px-3 py-1 text-xs font-bold ${active ? "bg-[#e6f2e1] text-[#386037]" : "bg-[#eee] text-[#777]"}`}>{active ? "Activo" : "Inactivo"}</span>; }
-function initials(name: string) { return name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase(); }
-function title(name: string) { return name.toLocaleLowerCase("es").replace(/(^|\s)\p{L}/gu, (letter) => letter.toLocaleUpperCase("es")); }
-function primary(record: Record<string, unknown>) { return String(record.language ?? record.title ?? record.name ?? record.roleName ?? record.type ?? record.organization ?? record.fullName ?? "Registro"); }
-function secondary(record: Record<string, unknown>) { return String(record.overallLevel ?? record.institution ?? record.corporateEmail ?? record.role ?? record.relationship ?? record.sourceAreaCode ?? "Información registrada"); }
+function PartyEditor({party,documentTypes,onCancel,onSave}:{party:Collaborator|null;documentTypes:DocumentType[];onCancel:()=>void;onSave:(v:Record<string,unknown>)=>Promise<void>}){const [v,setV]=useState({documentTypeId:party?.documentTypeId??"",documentNumber:party?.documentNumber??"",firstName:party?.firstName??"",middleName:party?.middleName??"",firstSurname:party?.firstSurname??"",secondSurname:party?.secondSurname??"",sex:party?.sex??"",birthDate:party?.birthDate??"",observations:party?.observations??"",isActive:party?.isActive??true});return <EditorDialog formId="party-form" onCancel={onCancel} onSave={()=>onSave({...v,birthDate:v.birthDate||null})} submit={party?"Actualizar":"Crear colaborador"} title={party?"Editar colaborador":"Nuevo colaborador"}><div className="grid gap-4 md:grid-cols-2"><Label text="Tipo de documento"><select required value={v.documentTypeId} onChange={e=>setV({...v,documentTypeId:e.target.value})}><option value="">Seleccionar</option>{documentTypes.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></Label><Label text="Número de documento"><input required value={v.documentNumber} onChange={e=>setV({...v,documentNumber:e.target.value})}/></Label>{([['firstName','Primer nombre'],['middleName','Segundo nombre'],['firstSurname','Primer apellido'],['secondSurname','Segundo apellido']] as const).map(([k,l])=><Label key={k} text={l}><input required={k==='firstName'||k==='firstSurname'} value={v[k]} onChange={e=>setV({...v,[k]:e.target.value})}/></Label>)}<Label text="Sexo"><select required value={v.sex} onChange={e=>setV({...v,sex:e.target.value})}><option value="">Seleccionar</option><option>MASCULINO</option><option>FEMENINO</option></select></Label><Label text="Fecha de nacimiento"><input type="date" value={v.birthDate} onChange={e=>setV({...v,birthDate:e.target.value})}/></Label><Label text="Observaciones" wide><textarea rows={3} value={v.observations} onChange={e=>setV({...v,observations:e.target.value})}/></Label><CheckLabel checked={v.isActive} label="Colaborador activo" onChange={isActive=>setV({...v,isActive})}/></div></EditorDialog>}
+function EmailEditor({item,onCancel,onSave}:{item:Email|null;onCancel:()=>void;onSave:(v:Record<string,unknown>)=>Promise<void>}){const[v,setV]=useState({email:item?.email??"",observations:item?.observations??"",isPrimary:item?.isPrimary??false,isActive:item?.isActive??true});return <EditorDialog formId="email-form" onCancel={onCancel} onSave={()=>onSave(v)} submit={item?"Actualizar":"Agregar correo"} title={item?"Editar correo":"Nuevo correo"}><Label text="Correo electrónico"><input required type="email" value={v.email} onChange={e=>setV({...v,email:e.target.value})}/></Label><Label text="Observaciones"><textarea rows={3} value={v.observations} onChange={e=>setV({...v,observations:e.target.value})}/></Label><div className="mt-4 flex gap-6"><CheckLabel checked={v.isPrimary} label="Correo principal" onChange={isPrimary=>setV({...v,isPrimary})}/><CheckLabel checked={v.isActive} label="Activo" onChange={isActive=>setV({...v,isActive})}/></div></EditorDialog>}
+function PhoneEditor({item,onCancel,onSave}:{item:PhoneRecord|null;onCancel:()=>void;onSave:(v:Record<string,unknown>)=>Promise<void>}){const[v,setV]=useState({number:item?.number??"",extension:item?.extension??"",observations:item?.observations??"",isPrimary:item?.isPrimary??false,phoneType:item?.phoneType??"CELULAR",isActive:item?.isActive??true});return <EditorDialog formId="phone-form" onCancel={onCancel} onSave={()=>onSave(v)} submit={item?"Actualizar":"Agregar teléfono"} title={item?"Editar teléfono":"Nuevo teléfono"}><div className="grid gap-4 md:grid-cols-2"><Label text="Número"><input required value={v.number} onChange={e=>setV({...v,number:e.target.value})}/></Label><Label text="Tipo"><select value={v.phoneType} onChange={e=>setV({...v,phoneType:e.target.value})}><option>CELULAR</option><option>FIJO</option></select></Label><Label text="Extensión"><input value={v.extension} onChange={e=>setV({...v,extension:e.target.value})}/></Label><Label text="Observaciones" wide><textarea rows={3} value={v.observations} onChange={e=>setV({...v,observations:e.target.value})}/></Label></div><div className="mt-4 flex gap-6"><CheckLabel checked={v.isPrimary} label="Teléfono principal" onChange={isPrimary=>setV({...v,isPrimary})}/><CheckLabel checked={v.isActive} label="Activo" onChange={isActive=>setV({...v,isActive})}/></div></EditorDialog>}
+function EditorDialog({formId,title,submit,onCancel,onSave,children}:{formId:string;title:string;submit:string;onCancel:()=>void;onSave:()=>Promise<void>;children:React.ReactNode}){const[saving,setSaving]=useState(false),[error,setError]=useState("");async function handle(e:FormEvent){e.preventDefault();setSaving(true);setError("");try{await onSave();}catch(x){setError(x instanceof Error?x.message:"No fue posible guardar.");}finally{setSaving(false);}}return <FormDialog error={error} formId={formId} loading={saving} onClose={onCancel} open submitLabel={submit} subtitle="Información registrada en Dataverse" title={title}><form className="space-y-4" id={formId} onSubmit={handle}>{children}</form></FormDialog>}
+function Label({text,wide,children}:{text:string;wide?:boolean;children:React.ReactElement}){return <label className={`block text-sm font-semibold ${wide?"md:col-span-2":""}`}>{text}<span className="mt-2 block [&>*]:w-full [&>*]:rounded-xl [&>*]:border [&>*]:border-[#d3ddd0] [&>*]:bg-white [&>*]:px-4 [&>*]:py-3 [&>*]:font-normal">{children}</span></label>}
+function CheckLabel({checked,label,onChange}:{checked:boolean;label:string;onChange:(v:boolean)=>void}){return <label className="flex items-center gap-2 text-sm font-semibold"><input checked={checked} onChange={e=>onChange(e.target.checked)} type="checkbox"/>{label}</label>}
+function Status({active}:{active:boolean}){return <span className={`rounded-full border px-2 py-1 text-[10px] font-bold ${active?"border-[#cfe2c8] bg-[#e6f2e1] text-[#386037]":"border-[#d8aaa5] bg-[#f8e8e6] text-[#923b34]"}`}>{active?"Activo":"● Inactivo"}</span>}
+function initials(name:string){return name.trim().split(/\s+/).slice(0,2).map(x=>x[0]).join("").toUpperCase()} function title(name:string){return name.toLocaleLowerCase("es").replace(/(^|\s)\p{L}/gu,x=>x.toLocaleUpperCase("es"))}

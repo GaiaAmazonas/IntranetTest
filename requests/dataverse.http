@@ -1,0 +1,30 @@
+@host = https://localhost:7168
+
+###
+# Estado de Dataverse
+
+GET {{host}}/api/dataverse/status
+
+###
+
+# Metadata Organización
+
+GET {{host}}/api/dataverse/metadata/gaia_organizacion
+
+###
+
+# Metadata Tipo Unidad Organizacional
+
+GET {{host}}/api/dataverse/metadata/gaia_tipounidadorganizacional
+
+###
+
+# Listar Tipos Unidad Organizacional
+
+GET {{host}}/api/dataverse/organization/unit-types
+
+###
+
+# Importar Organización
+
+POST {{host}}/api/dataverse/organization/import

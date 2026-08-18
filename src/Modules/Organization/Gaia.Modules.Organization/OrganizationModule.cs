@@ -55,7 +55,6 @@ public static class OrganizationModuleExtensions
         await using var scope = services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<OrganizationDbContext>();
         await context.Database.MigrateAsync(cancellationToken);
-        await OrganizationSeeder.SeedAsync(context, cancellationToken);
     }
 
     private static void RequirePermissionOrAdministrator(
