@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 
 
 # \## 1. Resumen de la solución
@@ -502,3 +503,8 @@
 
 # 
 
+=======
+# IntranetTest
+**Este proyecto es para empezar con el testeo de la creación y conceptualización de la intranet de Gaia Amazonas
+*_Por lo tanto se pueden hacer todos los cambios que se necesiten_* sin afectar su comportamiento**
+>>>>>>> 60dc081fed993af2caf7279c0f36766bd09c5b6d
