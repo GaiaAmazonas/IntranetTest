@@ -1,108 +1,504 @@
-# Gaia Enterprise Platform
+# 
 
-Plataforma empresarial modular para la gestión institucional de Gaia y la
-proyección autorizada de información en su intranet.
+# \## 1. Resumen de la solución
 
-## Alcance inicial
+# 
 
-- Identidad, usuarios y permisos.
-- Estructura organizacional.
-- Terceros y vinculaciones.
-- Inventario, asignaciones y movimientos.
-- Auditoría, documentos e importaciones.
+# La plataforma se compone de dos procesos web independientes:
 
-## Principios
+# 
 
-- Monolito modular con límites explícitos por dominio.
-- PostgreSQL como fuente transaccional.
-- Backend en ASP.NET Core y frontend en Next.js.
-- Software libre y despliegue portable.
-- Auditoría, permisos y pruebas desde la primera entrega.
+# 1\. \*\*Frontend web:\*\* interfaz que utiliza el usuario desde el navegador.
 
-Los archivos originales de datos y diseño se mantienen fuera del control de
-versiones porque pueden contener información institucional o personal.
+# 2\. \*\*API backend:\*\* servicio que autentica al usuario, aplica permisos y reglas, y se comunica con Microsoft Dataverse.
 
-## Desarrollo local
+# 
 
-Requisitos instalados:
+# 
 
-- .NET SDK 10
-- Node.js 24 y pnpm
-- PostgreSQL 18
-- herramienta local `dotnet-ef`
+# La arquitectura objetivo utiliza \*\*Microsoft Dataverse como plataforma de datos empresarial\*\*. El navegador no debe conectarse directamente a Dataverse: todas las operaciones pasan por la API de Gaia.
 
-Comandos principales:
+# 
 
-```powershell
-dotnet tool restore
-dotnet build Gaia.Platform.slnx
-dotnet test Gaia.Platform.slnx
-dotnet run --project src\Gaia.Api\Gaia.Api.csproj
-```
+# 
 
-En otra terminal:
+# 
 
-```powershell
-Set-Location apps\web
-pnpm dev
-```
+# \## 2. Tecnologías implementadas
 
-La API utiliza secretos de usuario de .NET para la conexión a PostgreSQL y la
-contraseña del administrador inicial. Ninguna credencial debe agregarse a
-`appsettings.json` ni al repositorio.
+# 
 
-## Identidad
+# \### Frontend
 
-El primer incremento utiliza ASP.NET Core Identity con PostgreSQL y sesión
-mediante cookie segura `HttpOnly`. Incluye:
+# 
 
-- bloqueo temporal tras intentos fallidos;
-- auditoría de inicio de sesión;
-- roles y permisos propios de Gaia;
-- administrador inicial configurable;
-- endpoints protegidos para consultar y crear usuarios;
-- estructura preparada para agregar Microsoft Entra ID como proveedor externo.
+# \- \*\*Next.js 16.2.12\*\*.
 
-## Organización
+# \- \*\*React 19.2.4\*\*.
 
-El módulo organizacional mantiene su propio esquema `organization` y expone
-gestión administrativa para:
+# \- \*\*TypeScript 5\*\* y TSX.
 
-- tipos de unidad con token de color;
-- sedes;
-- unidades organizacionales de jerarquía ilimitada;
-- cargos institucionales;
-- vigencias, estado y orden visual;
-- auditoría de cada creación y modificación con valores antes/después.
+# \- \*\*HTML5 y CSS3\*\*, generados y administrados por React/Next.js.
 
-Las unidades se inactivan en lugar de eliminarse. El backend calcula sus niveles,
-impide la autorreferencia y rechaza cualquier cambio que produzca ciclos.
+# \- \*\*Tailwind CSS 4\*\* para utilidades visuales.
 
-La carga inicial contiene 27 unidades procedentes de la hoja `Organizacional`.
-Los códigos visibles se resuelven hacia identificadores UUID y `ParentId`
-referencia el UUID de otra fila de la misma tabla. La discrepancia 20/2001 entre
-el Excel y la imagen de referencia permanece documentada; la carga usa el Excel.
+# \- \*\*Lucide React\*\* para iconografía funcional.
 
-## Terceros
+# \- Recursos gráficos institucionales propios de Gaia.
 
-El módulo `third_parties` separa la identidad personal de sus relaciones con
-Gaia. La ficha integral incluye datos básicos, vinculaciones, asignaciones,
-estudios, idiomas, formación, experiencia y contactos de emergencia.
+# 
 
-La migración local inicial procesó 148 filas de la hoja `Terceros`: insertó 147
-personas y omitió `BODEGA` porque no representa una persona. Las áreas no
-resueltas se conservan como incidencias de importación; nunca se inventan
-relaciones para completar datos ambiguos.
+# 
 
-## Inventarios
+# 
 
-El módulo `inventory` administra catálogos de productos y marcas, elementos
-individualizados, asignaciones e historial de movimientos. Sus identificadores
-internos son UUID; los códigos visibles del Excel se conservan como claves de
-negocio para trazabilidad.
+# \### Backend y API
 
-La carga local inicial concilió las hojas `Productos`, `Marcas`,
-`RegistroElementos` y `Asignaciones`: registró 76 productos, 92 marcas, 670
-elementos y 231 registros de asignación. Cuando un elemento aparece más de una
-vez, solo la asignación más reciente queda activa. Las referencias no resueltas
-se conservan como incidencias y no bloquean los registros confiables.
+# 
+
+# \- \*\*.NET 10\*\*, SDK fijado actualmente en `10.0.301`.
+
+# \- \*\*ASP.NET Core 10\*\*.
+
+# \- Lenguaje \*\*C#\*\* con tipos nulos habilitados.
+
+# \- API HTTP/JSON con endpoints REST.
+
+# \- Cliente HTTP OData para la \*\*Dataverse Web API v9.2\*\*.
+
+# \- \*\*Microsoft.Identity.Web 4.14.0\*\* para autenticación y adquisición segura de tokens.
+
+# 
+
+# 
+
+# 
+
+# \### Datos
+
+# 
+
+# \- Plataforma objetivo: \*\*Microsoft Dataverse\*\*.
+
+# \- Entorno configurado actualmente: `https://org16eb6fd8.crm2.dynamics.com`.
+
+# \- API: `https://org16eb6fd8.api.crm2.dynamics.com/api/data/v9.2`.
+
+# \- Permiso delegado: `https://org16eb6fd8.crm2.dynamics.com/user\_impersonation`.
+
+# 
+
+# 
+
+# 
+
+# Organización, Tipos de Unidad, Sedes y el CRUD principal de Terceros ya utilizan adaptadores de Dataverse. El acceso se realiza mediante la API de Gaia y el token delegado del usuario autenticado.
+
+# 
+
+# \## 3. Autenticación
+
+# 
+
+# La aplicación utiliza \*\*Microsoft Entra ID\*\*, no usuarios ni contraseñas propios.
+
+# 
+
+# El flujo es:
+
+# 
+
+# 1\. El usuario pulsa \*\*Continuar con Microsoft\*\*.
+
+# 2\. La API inicia el protocolo \*\*OpenID Connect\*\*.
+
+# 3\. Microsoft Entra ID autentica la cuenta corporativa.
+
+# 4\. La API recibe el código de autorización y establece una cookie de sesión segura.
+
+# 5\. La API obtiene un token delegado para llamar Dataverse en nombre del usuario.
+
+# 6\. Dataverse aplica también los permisos asignados al usuario dentro del entorno.
+
+# 
+
+# La sesión de Gaia utiliza una cookie `\_\_Host-Gaia.Session`:
+
+# 
+
+# \- `HttpOnly` para impedir lectura desde JavaScript.
+
+# \- `Secure`, únicamente sobre HTTPS.
+
+# \- duración de 8 horas;
+
+# \- renovación deslizante mientras exista actividad;
+
+# \- cierre de sesión coordinado con Entra ID.
+
+# 
+
+# La aplicación registrada actualmente en Entra se denomina \*\*Gaia Enterprise Web - Desarrollo\*\*. Para producción puede usarse un registro independiente, lo cual es lo recomendado.
+
+# 
+
+# \## 4. Información que debe suministrar infraestructura
+
+# 
+
+# Antes del montaje deben definirse estos datos:
+
+# 
+
+# 1\. Dominio público del frontend, por ejemplo `https://plataforma.gaiaamazonas.org`.
+
+# 2\. Dominio público de la API, por ejemplo `https://api-plataforma.gaiaamazonas.org`.
+
+# 3\. Servidor y sistema operativo: Windows Server o Linux.
+
+# 4\. Método de publicación: IIS en Windows o Nginx/Apache como proxy inverso en Linux.
+
+# 5\. Certificado TLS válido para ambos dominios.
+
+# 6\. DNS que apunte los dominios al servidor.
+
+# 7\. Dirección IP pública o mecanismo institucional de publicación.
+
+# 8\. Responsable de administrar secretos y renovarlos.
+
+# 9\. Si se instalará inicialmente una sola instancia de la API o varias instancias balanceadas.
+
+# 10\. Política institucional de copias, monitoreo, logs, actualizaciones y recuperación.
+
+# 
+
+# \## 5. Configuración de Microsoft Entra ID
+
+# 
+
+# El administrador de Entra debe configurar el registro de producción con:
+
+# 
+
+# \- Tipo de cuenta: solo cuentas del inquilino de Fundación Gaia Amazonas.
+
+# \- URI de redirección: `https://DOMINIO\_API/signin-oidc`.
+
+# \- URI posterior al cierre: `https://DOMINIO\_API/signout-callback-oidc`.
+
+# \- Permiso delegado de Dynamics CRM/Dataverse: `user\_impersonation`.
+
+# \- Consentimiento administrativo concedido.
+
+# \- Un secreto de cliente o, preferiblemente cuando la infraestructura lo permita, un certificado de aplicación.
+
+# 
+
+# La API necesita estos valores como secretos o variables seguras:
+
+# 
+
+# \- `MicrosoftEntra\_\_TenantId`
+
+# \- `MicrosoftEntra\_\_ClientId`
+
+# \- `MicrosoftEntra\_\_ClientSecret`
+
+# \- `MicrosoftEntra\_\_Instance=https://login.microsoftonline.com/`
+
+# \- `MicrosoftEntra\_\_CallbackPath=/signin-oidc`
+
+# \- `MicrosoftEntra\_\_SignedOutCallbackPath=/signout-callback-oidc`
+
+# 
+
+# El secreto nunca debe guardarse en Git, archivos públicos, código fuente ni variables del frontend.
+
+# 
+
+# \## 6. Configuración de Dataverse
+
+# 
+
+# La API requiere:
+
+# 
+
+# \- `Dataverse\_\_EnvironmentUrl=https://org16eb6fd8.crm2.dynamics.com`
+
+# \- `Dataverse\_\_WebApiEndpoint=https://org16eb6fd8.api.crm2.dynamics.com/api/data/v9.2`
+
+# \- `Dataverse\_\_Scope=https://org16eb6fd8.crm2.dynamics.com/user\_impersonation`
+
+# 
+
+# Cada usuario que use la plataforma debe:
+
+# 
+
+# \- existir como usuario habilitado en el entorno de Dataverse;
+
+# \- contar con licencia/derecho de uso aplicable;
+
+# \- tener un rol de seguridad con permisos sobre las tablas y operaciones correspondientes.
+
+# 
+
+# El servidor necesita salida HTTPS por el puerto 443 hacia, como mínimo:
+
+# 
+
+# \- `login.microsoftonline.com`
+
+# \- `\*.dynamics.com`
+
+# \- los puntos de conexión de Microsoft requeridos por Entra y Dataverse.
+
+# 
+
+# No se debe exponer Dataverse directamente a través del servidor ni almacenar tokens en el frontend.
+
+# 
+
+# \## 7. Configuración del frontend
+
+# 
+
+# El frontend requiere durante su compilación:
+
+# 
+
+# \- `NEXT\_PUBLIC\_GAIA\_API\_URL=https://DOMINIO\_API`
+
+# 
+
+# Este valor es público por diseño y solo contiene la URL de la API; no debe contener secretos.
+
+# 
+
+# Para ejecutar el frontend se necesita una versión de Node.js compatible con Next.js 16 y el administrador de paquetes PNPM. La instalación debe ser reproducible utilizando `pnpm-lock.yaml`.
+
+# 
+
+# Comandos de publicación de referencia:
+
+# 
+
+# ```powershell
+
+# pnpm install --frozen-lockfile
+
+# pnpm --dir apps/web run build
+
+# pnpm --dir apps/web run start
+
+# ```
+
+# 
+
+# El proceso debe ejecutarse como servicio y reiniciarse automáticamente si el servidor se reinicia.
+
+# 
+
+# \## 8. Configuración y publicación de la API
+
+# 
+
+# El servidor de compilación necesita el SDK .NET 10. El servidor de ejecución necesita el runtime ASP.NET Core 10; si se publica de forma autocontenida, el runtime puede incluirse en el paquete.
+
+# 
+
+# Comando de referencia:
+
+# 
+
+# ```powershell
+
+# dotnet publish src/Gaia.Api/Gaia.Api.csproj -c Release -o ./publish/api
+
+# ```
+
+# 
+
+# Variables adicionales:
+
+# 
+
+# \- `ASPNETCORE\_ENVIRONMENT=Production`
+
+# \- `WebApplication\_\_BaseUrl=https://DOMINIO\_FRONTEND`
+
+# \- `Authorization\_\_BootstrapAdministrators\_\_0=correo-administrador@gaiaamazonas.org`
+
+# 
+
+# La API incluye el endpoint `/health`, que debe utilizarse para monitoreo.
+
+# 
+
+# \## 9. HTTPS, proxy y comunicaciones
+
+# 
+
+# La publicación recomendada es:
+
+# 
+
+# ```text
+
+# Internet
+
+# &#x20;  |
+
+# HTTPS 443
+
+# &#x20;  |
+
+# IIS o Nginx (certificado TLS)
+
+# &#x20;  |-- dominio frontend --> Next.js
+
+# &#x20;  |-- dominio API ------> ASP.NET Core
+
+# &#x20;                              |
+
+# &#x20;                              | HTTPS 443
+
+# &#x20;                              +--> Microsoft Entra ID
+
+# &#x20;                              +--> Microsoft Dataverse
+
+# ```
+
+# 
+
+# No deben exponerse directamente los puertos internos de Node.js ni Kestrel. El proxy debe agregar cabeceras reenviadas correctamente, limitar tamaños de solicitud y registrar errores sin exponer tokens o cookies.
+
+# 
+
+# Si frontend y API se publican en dominios diferentes, la API debe incluir en producción una política CORS explícita para el dominio exacto del frontend, con credenciales. Actualmente CORS está configurado solamente para `localhost` y únicamente en modo Development. Esto debe ajustarse antes de la publicación productiva o resolverse publicando ambos servicios bajo un mismo origen mediante proxy inverso.
+
+# 
+
+# \## 10. Recursos iniciales sugeridos
+
+# 
+
+# Para un piloto de 30 a 50 usuarios administrativos concurrentes, sin almacenar archivos ni base de datos local en el servidor, puede iniciarse con:
+
+# 
+
+# \- 2 vCPU.
+
+# \- 4 GB de RAM.
+
+# \- 20 a 40 GB de disco para sistema, aplicación y logs.
+
+# \- conexión estable a Internet.
+
+# \- certificado HTTPS válido.
+
+# 
+
+# Estos valores son un punto inicial y deben ajustarse con monitoreo real de CPU, memoria, tiempos de respuesta y volumen de logs.
+
+# 
+
+# \## 11. Seguridad y operación
+
+# 
+
+# Se requiere:
+
+# 
+
+# \- HTTPS obligatorio y HTTP redirigido a HTTPS.
+
+# \- Secretos almacenados en un almacén seguro o variables protegidas del servicio.
+
+# \- Renovación planificada del secreto/certificado de Entra.
+
+# \- Acceso administrativo al servidor limitado.
+
+# \- Logs centralizados y sin datos sensibles.
+
+# \- Monitoreo del endpoint `/health`.
+
+# \- Alertas por caída del frontend, API o errores de Dataverse.
+
+# \- Actualización periódica de .NET, Node.js y dependencias.
+
+# \- Copia de seguridad de configuración y paquetes de despliegue.
+
+# \- Entornos separados para desarrollo, pruebas y producción.
+
+# \- Roles de Dataverse con mínimo privilegio.
+
+# 
+
+# Para una sola instancia, la caché de tokens en memoria es suficiente como inicio. Si se despliegan varias instancias de la API, se necesitará caché de tokens distribuida y compartir las claves de protección de datos para que las sesiones funcionen en todos los nodos.
+
+# 
+
+# \## 12. Punto crítico antes de producción
+
+# 
+
+# Aunque el modelo objetivo solicitado es \*\*solo Dataverse\*\*, el código actual todavía registra contextos de Entity Framework y ejecuta migraciones de PostgreSQL al iniciar Organización, Terceros e Inventario. También Cargos e Inventario conservan operaciones sobre PostgreSQL.
+
+# 
+
+# En consecuencia, hoy existen dos alternativas:
+
+# 
+
+# 1\. \*\*Montaje transitorio:\*\* instalar/configurar PostgreSQL para que la versión actual pueda iniciar y conservar las funcionalidades aún no migradas.
+
+# 2\. \*\*Cierre recomendado antes del montaje definitivo:\*\* terminar la migración de Cargos e Inventario y retirar del arranque los contextos/migraciones de PostgreSQL. Después de este ajuste, el servidor podrá operar únicamente con Dataverse y no necesitará servidor de base de datos propio.
+
+# 
+
+# No se recomienda ocultar esta dependencia al responsable de infraestructura. Si el objetivo de producción es solo Dataverse, el cierre de esta deuda técnica debe ser una tarea previa formal.
+
+# 
+
+# \## 13. Checklist de aceptación del montaje
+
+# 
+
+# \- \[ ] Dominios y DNS resuelven correctamente.
+
+# \- \[ ] Certificados HTTPS válidos.
+
+# \- \[ ] Frontend responde por HTTPS.
+
+# \- \[ ] `/health` de la API responde correctamente.
+
+# \- \[ ] Inicio de sesión con cuenta Gaia funciona.
+
+# \- \[ ] Cierre de sesión funciona.
+
+# \- \[ ] Callback de Entra no produce errores de redirección.
+
+# \- \[ ] La API obtiene token delegado de Dataverse.
+
+# \- \[ ] Un usuario autorizado puede consultar y crear datos.
+
+# \- \[ ] Un usuario sin permisos recibe 403.
+
+# \- \[ ] CORS/origen único funciona en producción.
+
+# \- \[ ] No hay secretos en archivos públicos ni repositorio.
+
+# \- \[ ] Reiniciar el servidor levanta automáticamente ambos servicios.
+
+# \- \[ ] Logs y alertas están habilitados.
+
+# \- \[ ] Se ha decidido formalmente cómo cerrar la dependencia transitoria de PostgreSQL.
+
+# 
+
+# 
+
+# 
+
