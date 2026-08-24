@@ -18,6 +18,17 @@ public sealed class PersonnelWorkbookImportTests
     }
 
     [Fact]
+    public void AssignmentReaderCanRequireOnlyItsOwnSheet()
+    {
+        using var workbook = BuildAssignmentWorkbook();
+
+        var source = PersonnelWorkbookReader.Read(workbook, ["Cargos por persona"]);
+
+        Assert.Single(source.Sheets);
+        Assert.Equal("123", source.Required("Cargos por persona").Rows[0].Get("Número de documento"));
+    }
+
+    [Fact]
     public void DryRunIsValidAndReportsMissingContactAsWarnings()
     {
         using var workbook = BuildWorkbook();
@@ -114,6 +125,22 @@ public sealed class PersonnelWorkbookImportTests
             var index = 1; foreach (var sheet in sheets) Write(zip, $"xl/worksheets/sheet{index++}.xml", SheetXml(sheet.Value));
         }
         stream.Position = 0; return stream;
+    }
+    private static MemoryStream BuildAssignmentWorkbook()
+    {
+        var sheets = new Dictionary<string, string[][]>
+        {
+            ["Cargos por persona"] = [["Número de documento", "Nombre", "Cargo", "Unidad", "Nombre Unidad"], ["123", "ANA PÉREZ", "ANALISTA", "20", "PRESIDENCIA EJECUTIVA"]]
+        };
+        var stream = new MemoryStream();
+        using (var zip = new ZipArchive(stream, ZipArchiveMode.Create, true))
+        {
+            Write(zip, "xl/workbook.xml", WorkbookXml(sheets.Keys));
+            Write(zip, "xl/_rels/workbook.xml.rels", RelationshipsXml(sheets.Count));
+            Write(zip, "xl/worksheets/sheet1.xml", SheetXml(sheets["Cargos por persona"]));
+        }
+        stream.Position = 0;
+        return stream;
     }
     private static string WorkbookXml(IEnumerable<string> names) => $"<?xml version=\"1.0\"?><workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><sheets>{string.Join("", names.Select((name, i) => $"<sheet name=\"{Escape(name)}\" sheetId=\"{i + 1}\" r:id=\"rId{i + 1}\"/>"))}</sheets></workbook>";
     private static string RelationshipsXml(int count) => $"<?xml version=\"1.0\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">{string.Join("", Enumerable.Range(1, count).Select(i => $"<Relationship Id=\"rId{i}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet{i}.xml\"/>"))}</Relationships>";

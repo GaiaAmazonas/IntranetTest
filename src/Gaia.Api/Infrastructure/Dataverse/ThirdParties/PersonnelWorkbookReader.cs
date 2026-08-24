@@ -21,7 +21,7 @@ internal static partial class PersonnelWorkbookReader
 {
     private static readonly string[] RequiredSheets = ["Base Personal activo 2026", "Directorio personal", "Listado de cargos",
         "Cargos por persona", "Correos", "Teléfonos"];
-    internal static PersonnelWorkbook Read(Stream input)
+    internal static PersonnelWorkbook Read(Stream input, IReadOnlyCollection<string>? requiredSheets = null)
     {
         using var memory = new MemoryStream(); input.CopyTo(memory); memory.Position = 0;
         using var archive = new ZipArchive(memory, ZipArchiveMode.Read, leaveOpen: false);
@@ -37,7 +37,7 @@ internal static partial class PersonnelWorkbookReader
             var path = target.StartsWith('/') ? target.TrimStart('/') : "xl/" + target.Replace("../", "", StringComparison.Ordinal);
             sheets[name] = ReadSheet(archive, path, name, shared);
         }
-        foreach (var required in RequiredSheets) if (!sheets.ContainsKey(required)) throw new InvalidDataException($"Falta la hoja obligatoria '{required}'.");
+        foreach (var required in requiredSheets ?? RequiredSheets) if (!sheets.ContainsKey(required)) throw new InvalidDataException($"Falta la hoja obligatoria '{required}'.");
         return new(sheets);
     }
 

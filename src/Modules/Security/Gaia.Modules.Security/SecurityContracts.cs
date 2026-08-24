@@ -4,14 +4,23 @@ namespace Gaia.Modules.Security;
 
 public static class AdminCorePermissions
 {
+    public const string IntranetVer="INTRANET.VER";
+    public const string IntranetInicioVer="INT.INICIO.VER";
+    public const string IntranetPersonasVer="INT.PERSONAS.VER";
+    public const string IntranetCalendarioVer="INT.CALENDARIO.VER";
+    public const string IntranetAplicacionesVer="INT.APLICACIONES.VER";
+    public const string IntranetHelpdeskVer="INT.HELPDESK.VER";
+    public const string IntranetAdminCoreVer="INT.APP.ADMINCORE.VER";
     public const string InicioVer="INICIO.VER";
     public const string OrgOrganigramaVer="ORG.ORGANIGRAMA.VER"; public const string OrgOrganigramaExportar="ORG.ORGANIGRAMA.EXPORTAR";
     public const string OrgUnidadesVer="ORG.UNIDADES.VER"; public const string OrgUnidadesCrear="ORG.UNIDADES.CREAR"; public const string OrgUnidadesActualizar="ORG.UNIDADES.ACTUALIZAR"; public const string OrgUnidadesActivar="ORG.UNIDADES.ACTIVAR"; public const string OrgUnidadesInactivar="ORG.UNIDADES.INACTIVAR"; public const string OrgUnidadesExportar="ORG.UNIDADES.EXPORTAR";
+    public const string OrgAsignacionesVer="ORG.ASIGNACIONES.VER"; public const string OrgAsignacionesCrear="ORG.ASIGNACIONES.CREAR"; public const string OrgAsignacionesActualizar="ORG.ASIGNACIONES.ACTUALIZAR"; public const string OrgAsignacionesExportar="ORG.ASIGNACIONES.EXPORTAR";
     public const string OrgCargosVer="ORG.CARGOS.VER"; public const string OrgCargosCrear="ORG.CARGOS.CREAR"; public const string OrgCargosActualizar="ORG.CARGOS.ACTUALIZAR";
     public const string OrgCatalogosVer="ORG.SEDES_TIPOS.VER"; public const string OrgCatalogosCrear="ORG.SEDES_TIPOS.CREAR"; public const string OrgCatalogosActualizar="ORG.SEDES_TIPOS.ACTUALIZAR";
     public const string ThColaboradoresVer="TH.COLABORADORES.VER"; public const string ThColaboradoresCrear="TH.COLABORADORES.CREAR"; public const string ThColaboradoresActualizar="TH.COLABORADORES.ACTUALIZAR"; public const string ThColaboradoresActivar="TH.COLABORADORES.ACTIVAR"; public const string ThColaboradoresInactivar="TH.COLABORADORES.INACTIVAR";
     public const string ThColaboradoresImportar="TH.COL.IMPORT.ADMINISTRAR";
     public const string ThInfoVer="TH.COLABORADORES.INFO.VER"; public const string ThInfoActualizar="TH.COL.INFO.ACTUALIZAR";
+    public const string ThVinculacionesVer="TH.VINCULACIONES.VER"; public const string ThVinculacionesCrear="TH.VINCULACIONES.CREAR"; public const string ThVinculacionesActualizar="TH.VINCULACIONES.ACTUALIZAR";
     public const string ThCorreosVer="TH.COLABORADORES.CORREOS.VER"; public const string ThCorreosCrear="TH.COLABORADORES.CORREOS.CREAR"; public const string ThCorreosActualizar="TH.COL.EMAIL.ACTUALIZAR"; public const string ThCorreosActivar="TH.COL.EMAIL.ACTIVAR"; public const string ThCorreosInactivar="TH.COL.EMAIL.INACTIVAR";
     public const string ThTelefonosVer="TH.COLABORADORES.TELEFONOS.VER"; public const string ThTelefonosCrear="TH.COL.TEL.CREAR"; public const string ThTelefonosActualizar="TH.COL.TEL.ACTUALIZAR"; public const string ThTelefonosActivar="TH.COL.TEL.ACTIVAR"; public const string ThTelefonosInactivar="TH.COL.TEL.INACTIVAR";
     public const string InvVer="INV.VER"; public const string InvAsignar="INV.ASIGNAR.ACTUALIZAR"; public const string InvImportar="INV.IMPORTAR.ADMINISTRAR";
@@ -19,6 +28,26 @@ public static class AdminCorePermissions
     public const string TiRolesVer="TI.ROLES.VER"; public const string TiRolesCrear="TI.ROLES.CREAR"; public const string TiRolesActualizar="TI.ROLES.ACTUALIZAR"; public const string TiRolesAdministrar="TI.ROLES.ADMINISTRAR";
     public const string TiModulosVer="TI.MODULOS.VER"; public const string TiModulosCrear="TI.MODULOS.CREAR"; public const string TiModulosActualizar="TI.MODULOS.ACTUALIZAR"; public const string TiModulosActivar="TI.MODULOS.ACTIVAR"; public const string TiModulosInactivar="TI.MODULOS.INACTIVAR"; public const string TiModulosAdministrar="TI.MODULOS.ADMINISTRAR";
     public static readonly string[] All = typeof(AdminCorePermissions).GetFields().Where(f=>f.IsLiteral&&f.FieldType==typeof(string)).Select(f=>(string)f.GetRawConstantValue()!).Distinct().ToArray();
+}
+
+public static class DefaultRolePermissions
+{
+    public static readonly string[] Consulta =
+    [
+        AdminCorePermissions.IntranetVer,
+        AdminCorePermissions.IntranetInicioVer,
+        AdminCorePermissions.IntranetPersonasVer,
+        AdminCorePermissions.IntranetCalendarioVer,
+        AdminCorePermissions.IntranetAplicacionesVer,
+        AdminCorePermissions.IntranetHelpdeskVer,
+    ];
+}
+
+public static class PermissionScope
+{
+    public static bool RequiresAdminCore(string permission) =>
+        !permission.Equals(AdminCorePermissions.IntranetVer, StringComparison.OrdinalIgnoreCase) &&
+        !permission.StartsWith("INT.", StringComparison.OrdinalIgnoreCase);
 }
 
 public sealed record SecurityUser(Guid Id,string Name,string Email,string EntraObjectId,Guid? ThirdPartyId,string? DocumentNumber,DateTimeOffset? LastAccess,bool IsActive);

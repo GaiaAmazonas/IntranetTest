@@ -164,6 +164,9 @@ internal sealed class OrganizationDataverseImporter(
                 cancellationToken);
         }
 
+        var inactivatedCodes = await InactivateUnitsOutsideSourceAsync(
+            client, organization, codes, cancellationToken);
+
         return new
         {
             imported = OrganizationImportSource.Rows.Length,
@@ -172,8 +175,42 @@ internal sealed class OrganizationDataverseImporter(
             sitesAssigned = OrganizationImportSource.Rows.Length,
             bogotaSiteId,
             roots = OrganizationImportSource.Rows.Count(item => item.ParentCode is null),
+            inactivated = inactivatedCodes.Length,
+            inactivatedCodes,
             codes
         };
+    }
+
+    private static async Task<string[]> InactivateUnitsOutsideSourceAsync(
+        HttpClient client,
+        TableMetadata metadata,
+        IReadOnlyCollection<string> expectedCodes,
+        CancellationToken cancellationToken)
+    {
+        using var response = await client.GetAsync(
+            $"{metadata.EntitySetName}?$select={metadata.PrimaryIdAttribute},gaia_codigo,statecode",
+            cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+        var obsolete = json.RootElement.GetProperty("value").EnumerateArray()
+            .Select(item => new
+            {
+                Id = item.GetProperty(metadata.PrimaryIdAttribute).GetGuid(),
+                Code = item.TryGetProperty("gaia_codigo", out var code) ? code.GetString() : null,
+                State = item.TryGetProperty("statecode", out var state) && state.ValueKind == JsonValueKind.Number
+                    ? state.GetInt32() : 0
+            })
+            .Where(item => !string.IsNullOrWhiteSpace(item.Code)
+                && !expectedCodes.Contains(item.Code!, StringComparer.OrdinalIgnoreCase)
+                && item.State == 0)
+            .ToArray();
+
+        foreach (var item in obsolete)
+        {
+            await PatchAsync(client, $"{metadata.EntitySetName}({item.Id:D})",
+                new Dictionary<string, object?> { ["statecode"] = 1 }, cancellationToken);
+        }
+        return obsolete.Select(item => item.Code!).Order(StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
     private async Task<HttpClient> CreateClientAsync(CancellationToken cancellationToken)

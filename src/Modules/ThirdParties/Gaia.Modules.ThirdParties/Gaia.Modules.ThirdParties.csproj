@@ -3,21 +3,10 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\BuildingBlocks\Gaia.BuildingBlocks\Gaia.BuildingBlocks.csproj" />
     <ProjectReference Include="..\..\Security\Gaia.Modules.Security\Gaia.Modules.Security.csproj" />
-    <ProjectReference Include="..\..\Organization\Gaia.Modules.Organization\Gaia.Modules.Organization.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.10" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.10" />
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.1" />
   </ItemGroup>
 
   <PropertyGroup>

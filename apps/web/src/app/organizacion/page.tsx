@@ -3,9 +3,11 @@
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { AppHeader } from "@/components/app-header";
 import { Button, IconButton } from "@/components/ui";
-import { FormDialog } from "@/components/form-dialog";
+import { ConfirmDialog, FormDialog } from "@/components/form-dialog";
 import { useFeedback } from "@/components/feedback";
+import { useSecurity } from "@/components/security-context";
 import { exportOrganizationUnits } from "@/lib/exports/organization-units-export";
+import { OrganizationalAssignmentsExplorer } from "@/features/organization/organizational-assignments-explorer";
 import { Check, ChevronDown, ChevronRight, Download, FileSpreadsheet, LoaderCircle, Pencil, Plus, Search } from "lucide-react";
 import Image from "next/image";
 
@@ -79,6 +81,10 @@ type Position = {
   isActive: boolean;
 };
 
+type DirectoryPerson = { id: string; fullName: string; documentNumber: string; isActive: boolean };
+type OrganizationalAssignment = { id: string; thirdPartyId: string; thirdPartyName: string; documentNumber: string; positionId: string; positionName: string; organizationalUnitId: string; organizationalUnitCode: string; organizationalUnitName: string; startDate?: string; endDate?: string; isPrimary: boolean; observations?: string; isActive: boolean };
+type AssignmentForm = { thirdPartyId: string; positionId: string; organizationalUnitId: string; startDate: string; endDate: string; isPrimary: boolean; observations: string; isActive: boolean };
+
 type UnitForm = {
   code: string;
   name: string;
@@ -112,7 +118,9 @@ export default function OrganizationPage() {
   const [unitTypes, setUnitTypes] = useState<UnitType[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
-  const [tab, setTab] = useState<"chart" | "units" | "positions" | "catalogs">("chart");
+  const [assignments, setAssignments] = useState<OrganizationalAssignment[]>([]);
+  const [people, setPeople] = useState<DirectoryPerson[]>([]);
+  const [tab, setTab] = useState<"chart" | "units" | "assignments" | "positions" | "catalogs">("chart");
   const [search, setSearch] = useState("");
   const [positionSearch, setPositionSearch] = useState("");
   const [expandedUnits, setExpandedUnits] = useState<Set<string>>(new Set());
@@ -125,12 +133,17 @@ export default function OrganizationPage() {
     isActive: true,
   });
   const [editingPositionId, setEditingPositionId] = useState<string | null>(null);
+  const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null);
+  const [assignmentForm, setAssignmentForm] = useState<AssignmentForm>({ thirdPartyId: "", positionId: "", organizationalUnitId: "", startDate: new Date().toISOString().slice(0,10), endDate: "", isPrimary: true, observations: "", isActive: true });
   const [panelOpen, setPanelOpen] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [exportingUnits, setExportingUnits] = useState(false);
+  const [syncConfirmOpen, setSyncConfirmOpen] = useState(false);
+  const [syncingUnits, setSyncingUnits] = useState(false);
   const [loadedTabs, setLoadedTabs] = useState(() => new Set<string>());
   const { notify } = useFeedback();
+  const { can } = useSecurity();
 
   async function loadData() {
     try {
@@ -171,6 +184,7 @@ export default function OrganizationPage() {
   useEffect(() => {
     if (loadedTabs.has(tab)) return;
     if (tab === "positions") void apiRequest<Position[]>("/api/organization/positions").then(rows=>{setPositions(rows);setLoadedTabs(current=>new Set(current).add(tab));});
+    if (tab === "assignments") void Promise.all([apiRequest<OrganizationalAssignment[]>("/api/third-parties/organizational-assignments"),apiRequest<DirectoryPerson[]>("/api/third-parties?directory=true"),apiRequest<Position[]>("/api/organization/positions")]).then(([rows,directory,loadedPositions])=>{setAssignments(rows);setPeople(directory);setPositions(loadedPositions);setLoadedTabs(current=>new Set(current).add(tab));}).catch((caught:unknown)=>setError(caught instanceof Error?caught.message:"Error inesperado."));
     if (tab === "catalogs") void Promise.all([apiRequest<UnitType[]>("/api/organization/unit-types"),apiRequest<Site[]>("/api/organization/sites")]).then(([types,loadedSites])=>{setUnitTypes(types);setSites(loadedSites);setLoadedTabs(current=>{const next=new Set(current);next.add("catalogs");next.add("units");return next;});});
     if (tab === "units") void Promise.all([apiRequest<UnitType[]>("/api/organization/unit-types"),apiRequest<Site[]>("/api/organization/sites")]).then(([types,loadedSites])=>{setUnitTypes(types);setSites(loadedSites);setLoadedTabs(current=>{const next=new Set(current);next.add("catalogs");next.add("units");return next;});});
   }, [loadedTabs, tab]);
@@ -198,6 +212,8 @@ export default function OrganizationPage() {
 
   function startUnit(unit?: Unit) {
     setError("");
+    setEditingPositionId(null);
+    setEditingAssignmentId(null);
     setEditingUnitId(unit?.id ?? null);
     setUnitForm(
       unit
@@ -256,6 +272,8 @@ export default function OrganizationPage() {
 
   function startPosition(position?: Position) {
     setError("");
+    setEditingUnitId(null);
+    setEditingAssignmentId(null);
     setEditingPositionId(position?.id ?? null);
     setPositionForm({
       code: position?.code ?? "",
@@ -265,6 +283,23 @@ export default function OrganizationPage() {
     });
     setPanelOpen(true);
   }
+
+  function startAssignment(item?: OrganizationalAssignment) {
+    setError(""); setEditingUnitId(null); setEditingPositionId(null); setEditingAssignmentId(item?.id ?? null);
+    setAssignmentForm(item ? { thirdPartyId:item.thirdPartyId, positionId:item.positionId, organizationalUnitId:item.organizationalUnitId, startDate:item.startDate??"", endDate:item.endDate??"", isPrimary:item.isPrimary, observations:item.observations??"", isActive:item.isActive } : { thirdPartyId:"", positionId:"", organizationalUnitId:"", startDate:new Date().toISOString().slice(0,10), endDate:"", isPrimary:true, observations:"", isActive:true });
+    setPanelOpen(true);
+  }
+
+  async function saveAssignment(event: FormEvent) {
+    event.preventDefault(); if (saving) return; setSaving(true); setError("");
+    try {
+      await apiRequest(editingAssignmentId ? `/api/third-parties/organizational-assignments/${editingAssignmentId}` : "/api/third-parties/organizational-assignments", { method: editingAssignmentId ? "PUT" : "POST", body: JSON.stringify({ ...assignmentForm, startDate:assignmentForm.startDate||null, endDate:assignmentForm.endDate||null }) });
+      notify({ tone:"success", title:editingAssignmentId?"Asignación actualizada":"Asignación creada" }); setPanelOpen(false);
+      setAssignments(await apiRequest<OrganizationalAssignment[]>("/api/third-parties/organizational-assignments"));
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "Error inesperado."); }
+    finally { setSaving(false); }
+  }
+
 
   async function savePosition(event: FormEvent) {
     event.preventDefault();
@@ -304,6 +339,26 @@ export default function OrganizationPage() {
     }
   }
 
+  async function synchronizeBaseStructure() {
+    if (syncingUnits) return;
+    setSyncingUnits(true);
+    try {
+      const validation = await apiRequest<{ valid: boolean; errors: string[] }>("/api/dataverse/organization/import/validate");
+      if (!validation.valid) throw new Error(validation.errors.join(" ") || "La fuente organizacional no superó la validación.");
+      const result = await apiRequest<{ imported: number; inactivated: number }>("/api/dataverse/organization/import", { method: "POST" });
+      setSyncConfirmOpen(false);
+      await loadData();
+      notify({ tone: "success", title: "Estructura organizacional actualizada", description: `${result.imported} unidades sincronizadas y ${result.inactivated} registros ajenos a la fuente inactivados.` });
+    } catch (caught) {
+      notify({ tone: "error", title: "No fue posible actualizar la estructura", description: caught instanceof Error ? caught.message : undefined });
+    } finally {
+      setSyncingUnits(false);
+    }
+  }
+
+  const unitDialog = editingUnitId !== null || (tab === "units" && editingPositionId === null && editingAssignmentId === null);
+  const assignmentDialog = editingAssignmentId !== null || (tab === "assignments" && editingUnitId === null && editingPositionId === null);
+
   return (
     <main className="gaia-app-page min-h-screen bg-[#f4f7f2] text-[#193522]">
       <AppHeader title="Estructura organizacional" />
@@ -311,7 +366,7 @@ export default function OrganizationPage() {
       <div className="mx-auto max-w-7xl px-6 py-8">
         <section className="gaia-metrics grid gap-4 sm:grid-cols-3">
           {[
-            ["Unidades", units.length.toString(), "Áreas y equipos"],
+            ["Unidades", units.filter((unit) => unit.isActive).length.toString(), `${units.filter((unit) => !unit.isActive).length} históricas inactivas`],
             ["Cargos", positions.length.toString(), "Catálogo institucional"],
             ["Sedes", sites.length.toString(), "Ubicaciones operativas"],
           ].map(([label, value, detail]) => (
@@ -329,9 +384,10 @@ export default function OrganizationPage() {
               {[
                 ["chart", "Organigrama"],
                 ["units", "Unidades"],
+                ["assignments", "Asignaciones"],
                 ["positions", "Cargos"],
                 ["catalogs", "Sedes y tipos"],
-              ].map(([value, label]) => (
+              ].filter(([value]) => value !== "assignments" || can("ORG.ASIGNACIONES.VER")).map(([value, label]) => (
                 <button
                   aria-selected={tab === value}
                   className="gaia-tab"
@@ -348,16 +404,17 @@ export default function OrganizationPage() {
               ))}
             </div>
             {tab === "chart" && (
-              <Button
-                onClick={() => window.print()}
-                variant="secondary"
-              >
-                <Download size={16} />Descargar PDF
-              </Button>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button disabled={syncingUnits} onClick={() => setSyncConfirmOpen(true)} variant="secondary">
+                  {syncingUnits && <LoaderCircle className="gaia-spin" size={16} />}
+                  {syncingUnits ? "Actualizando…" : "Actualizar estructura base"}
+                </Button>
+                <Button onClick={() => window.print()} variant="secondary"><Download size={16} />Descargar PDF</Button>
+              </div>
             )}
-            {(tab === "units" || tab === "positions") && <div className="flex flex-wrap items-center gap-3">
+            {(tab === "units" || tab === "positions" || tab === "assignments") && <div className="flex flex-wrap items-center gap-3">
               {tab === "positions" && <div className="relative w-72 max-w-full"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7a887f]" size={17}/><input aria-label="Buscar cargos" className="w-full rounded-xl border border-[#d6dfd3] py-2.5 pl-10 pr-4 outline-none focus:border-[#66804e]" onChange={event=>setPositionSearch(event.target.value)} placeholder="Buscar por nombre o código" value={positionSearch}/></div>}
-              <Button onClick={() => tab === "units" ? startUnit() : startPosition()}><Plus size={17} />{tab === "units" ? "Nueva unidad" : "Nuevo cargo"}</Button>
+              {(tab !== "assignments" || can("ORG.ASIGNACIONES.CREAR")) && <Button onClick={() => tab === "units" ? startUnit() : tab === "assignments" ? startAssignment() : startPosition()}><Plus size={17} />{tab === "units" ? "Nueva unidad" : tab === "assignments" ? "Nueva asignación" : "Nuevo cargo"}</Button>}
             </div>}
           </div>
 
@@ -369,7 +426,14 @@ export default function OrganizationPage() {
 
           {tab === "units" && (
             <div className="mt-6">
-              <div className="flex flex-wrap items-center justify-between gap-3"><div className="relative w-full max-w-sm"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7a887f]" size={17} /><input className="w-full rounded-xl border border-[#d6dfd3] py-2.5 pl-10 pr-4 outline-none focus:border-[#66804e]" onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por código o nombre" value={search} /></div><Button disabled={exportingUnits || !units.length} onClick={() => void exportUnits()} variant="secondary">{exportingUnits ? <LoaderCircle className="gaia-spin" size={17} /> : <FileSpreadsheet size={17} />}{exportingUnits ? "Generando..." : "Exportar a Excel"}</Button></div>
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                <div className="relative w-full max-w-sm"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7a887f]" size={17} /><input className="w-full rounded-xl border border-[#d6dfd3] py-2.5 pl-10 pr-4 outline-none focus:border-[#66804e]" onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por código o nombre" value={search} /></div>
+                <div className="flex flex-wrap gap-2">
+                  <Button disabled={Boolean(search.trim()) || !units.length} onClick={() => setExpandedUnits(new Set())} variant="secondary"><ChevronRight size={16}/>Contraer todo</Button>
+                  <Button disabled={Boolean(search.trim()) || !units.length} onClick={() => setExpandedUnits(new Set(units.filter(unit => units.some(candidate => candidate.parentId === unit.id)).map(unit => unit.id)))} variant="secondary"><ChevronDown size={16}/>Expandir todo</Button>
+                  <Button disabled={exportingUnits || !units.length} onClick={() => void exportUnits()} variant="secondary">{exportingUnits ? <LoaderCircle className="gaia-spin" size={17} /> : <FileSpreadsheet size={17} />}{exportingUnits ? "Generando..." : "Exportar a Excel"}</Button>
+                </div>
+              </div>
               <div className="mt-5 overflow-x-auto">
                 <table className="w-full min-w-[760px] text-left text-sm">
                   <thead className="border-b border-[#e5ebe3] text-xs uppercase tracking-wider text-[#7a887f]">
@@ -416,7 +480,11 @@ export default function OrganizationPage() {
           )}
 
           {tab === "chart" && (
-            <OrganizationChart units={units} />
+            <OrganizationChart onEdit={startUnit} units={units.filter((unit) => unit.isActive)} />
+          )}
+
+          {tab === "assignments" && (
+            <OrganizationalAssignmentsExplorer assignments={assignments} error={error} onEdit={startAssignment} positions={positions} units={units}/>
           )}
 
           {tab === "positions" && (
@@ -471,8 +539,9 @@ export default function OrganizationPage() {
         </section>
       </div>
 
-      <FormDialog error={error} formId={tab === "units" ? "unit-form" : "position-form"} loading={saving} onClose={() => setPanelOpen(false)} open={panelOpen} submitLabel={editingUnitId || editingPositionId ? "Actualizar" : "Crear"} subtitle={tab === "units" ? "Datos, jerarquía y vigencia de la unidad" : "Información del catálogo institucional"} title={tab === "units" ? (editingUnitId ? "Editar unidad" : "Nueva unidad") : (editingPositionId ? "Editar cargo" : "Nuevo cargo")}>
-            {tab === "units" ? (
+      <ConfirmDialog confirmLabel="Sí, actualizar Dataverse" description="Se crearán o actualizarán por código las 46 unidades de la estructura base y se alinearán sus relaciones de tipo, padre y sede Bogotá. Los códigos activos que no pertenezcan a la fuente se conservarán como históricos inactivos; no se eliminarán físicamente." loading={syncingUnits} onCancel={() => setSyncConfirmOpen(false)} onConfirm={() => void synchronizeBaseStructure()} open={syncConfirmOpen} title="¿Actualizar la estructura organizacional?" />
+      <FormDialog error={error} formId={unitDialog ? "unit-form" : assignmentDialog ? "assignment-form" : "position-form"} loading={saving} onClose={() => setPanelOpen(false)} open={panelOpen} submitLabel={editingUnitId || editingPositionId || editingAssignmentId ? "Actualizar" : "Crear"} subtitle={unitDialog ? "Datos, jerarquía y vigencia de la unidad" : assignmentDialog ? "Persona, cargo y ubicación en la estructura" : "Información del catálogo institucional"} title={unitDialog ? (editingUnitId ? "Editar unidad" : "Nueva unidad") : assignmentDialog ? (editingAssignmentId ? "Editar asignación" : "Nueva asignación") : (editingPositionId ? "Editar cargo" : "Nuevo cargo")}>
+            {unitDialog ? (
               <UnitEditor
                 form={unitForm}
                 onChange={setUnitForm}
@@ -481,6 +550,8 @@ export default function OrganizationPage() {
                 types={unitTypes}
                 units={units.filter((unit) => unit.id !== editingUnitId)}
               />
+            ) : assignmentDialog ? (
+              <AssignmentEditor form={assignmentForm} onChange={setAssignmentForm} onSubmit={saveAssignment} people={people} positions={positions} units={units}/>
             ) : (
               <PositionEditor
                 form={positionForm}
@@ -491,6 +562,16 @@ export default function OrganizationPage() {
       </FormDialog>
     </main>
   );
+}
+
+function AssignmentEditor({form,onChange,onSubmit,people,positions,units}:{form:AssignmentForm;onChange:(form:AssignmentForm)=>void;onSubmit:(event:FormEvent)=>void;people:DirectoryPerson[];positions:Position[];units:Unit[]}) {
+  return <form className="space-y-5" id="assignment-form" onSubmit={onSubmit}>
+    <Field label="Colaborador"><select required value={form.thirdPartyId} onChange={event=>onChange({...form,thirdPartyId:event.target.value})}><option value="">Seleccionar colaborador</option>{people.filter(x=>x.isActive).sort((a,b)=>a.fullName.localeCompare(b.fullName,"es")).map(person=><option key={person.id} value={person.id}>{person.fullName} · {person.documentNumber}</option>)}</select></Field>
+    <div className="grid gap-4 sm:grid-cols-2"><Field label="Cargo"><select required value={form.positionId} onChange={event=>onChange({...form,positionId:event.target.value})}><option value="">Seleccionar cargo</option>{positions.filter(x=>x.isActive).sort((a,b)=>a.name.localeCompare(b.name,"es")).map(position=><option key={position.id} value={position.id}>{position.name}</option>)}</select></Field><Field label="Unidad organizacional"><select required value={form.organizationalUnitId} onChange={event=>onChange({...form,organizationalUnitId:event.target.value})}><option value="">Seleccionar unidad</option>{orderUnitsByHierarchy(units.filter(x=>x.isActive)).map(unit=><option key={unit.id} value={unit.id}>{"  ".repeat(Math.max(0,unit.level-1))}{unit.name} [{unit.code}]</option>)}</select></Field></div>
+    <div className="grid gap-4 sm:grid-cols-2"><Field label="Fecha inicial"><input type="date" value={form.startDate} onChange={event=>onChange({...form,startDate:event.target.value})}/></Field><Field label="Fecha final"><input min={form.startDate||undefined} type="date" value={form.endDate} onChange={event=>onChange({...form,endDate:event.target.value})}/></Field></div>
+    <Field label="Observaciones"><textarea rows={3} value={form.observations} onChange={event=>onChange({...form,observations:event.target.value})}/></Field>
+    <div className="grid gap-3 sm:grid-cols-2"><label className="flex items-center gap-3 rounded-xl bg-[#f5f8f3] p-4 text-sm font-semibold"><input checked={form.isPrimary} onChange={event=>onChange({...form,isPrimary:event.target.checked})} type="checkbox"/>Asignación principal</label><label className="flex items-center gap-3 rounded-xl bg-[#f5f8f3] p-4 text-sm font-semibold"><input checked={form.isActive} onChange={event=>onChange({...form,isActive:event.target.checked})} type="checkbox"/>Asignación activa</label></div>
+  </form>;
 }
 
 function UnitEditor({
@@ -823,7 +904,7 @@ function CatalogRow({
   );
 }
 
-function OrganizationChart({ units }: { units: Unit[] }) {
+function OrganizationChart({ units, onEdit }: { units: Unit[]; onEdit: (unit: Unit) => void }) {
   const ordered = orderUnitsByHierarchy(units);
   const roots = ordered.filter((unit) => !unit.parentId);
   const maxLevel = Math.max(1, ...units.map(unit => unit.level));
@@ -838,7 +919,7 @@ function OrganizationChart({ units }: { units: Unit[] }) {
         <aside className="org-level-rail" aria-label={`${maxLevel} niveles jerárquicos`}>{Array.from({ length: maxLevel }, (_, index) => <span key={index}>Nivel {index + 1}</span>)}</aside>
         <div className="org-chart-viewport">
           <div className="org-tree">
-            <ul className="org-tree-roots">{roots.map(root => <OrganizationBranch key={root.id} unit={root} units={ordered} />)}</ul>
+            <ul className="org-tree-roots">{roots.map(root => <OrganizationBranch key={root.id} onEdit={onEdit} unit={root} units={ordered} />)}</ul>
           </div>
         </div>
       </div>
@@ -851,17 +932,26 @@ function OrganizationChart({ units }: { units: Unit[] }) {
   );
 }
 
-function OrganizationBranch({ unit, units }: { unit: Unit; units: Unit[] }) {
+function OrganizationBranch({ unit, units, onEdit }: { unit: Unit; units: Unit[]; onEdit: (unit: Unit) => void }) {
   const children = units.filter((candidate) => candidate.parentId === unit.id);
   return (
     <li className="org-branch">
       <article className="org-node">
+        <button
+          aria-label={`Editar ${unit.name}`}
+          className="org-node-edit"
+          onClick={() => onEdit(unit)}
+          title={`Editar ${unit.name}`}
+          type="button"
+        >
+          <Pencil size={11} />
+        </button>
         <div className="org-node-main" style={{ backgroundColor: unitColor(unit.unitTypeName) }}>
           <span>{unit.code}</span><strong>{unit.name}</strong>
         </div>
         <footer><span>{unit.unitTypeName}</span><span className={unit.isActive ? "is-active" : "is-inactive"}><i />{unit.isActive ? "Activo" : "Inactivo"}</span></footer>
       </article>
-      {children.length > 0 && <ul>{children.map(child => <OrganizationBranch key={child.id} unit={child} units={units} />)}</ul>}
+      {children.length > 0 && <ul>{children.map(child => <OrganizationBranch key={child.id} onEdit={onEdit} unit={child} units={units} />)}</ul>}
     </li>
   );
 }

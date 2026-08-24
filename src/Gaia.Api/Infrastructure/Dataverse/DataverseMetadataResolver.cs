@@ -6,13 +6,31 @@ namespace Gaia.Api.Infrastructure.Dataverse;
 
 internal sealed record DataverseRelationship(string ReferencingAttribute, string NavigationProperty, string ReferencedEntity);
 internal sealed record DataverseTableMetadata(string LogicalName, string EntitySetName, string PrimaryIdAttribute,
-    string PrimaryNameAttribute, IReadOnlyDictionary<string, string> Attributes, DataverseRelationship[] Relationships)
+    string PrimaryNameAttribute, IReadOnlyDictionary<string, string> Attributes,
+    IReadOnlyDictionary<string, string> AttributeTypes, DataverseRelationship[] Relationships)
 {
     public string Attribute(string schemaName)
     {
         var resolved = OptionalAttribute(schemaName);
         return resolved ?? throw new InvalidOperationException($"Dataverse no contiene el campo {schemaName} en {EntitySetName}.");
     }
+
+    public bool UsesNumericLiteral(string schemaName)
+    {
+        var logicalName = Attribute(schemaName);
+        return AttributeTypes.TryGetValue(logicalName, out var type)
+            && type is "Picklist" or "Integer" or "BigInt" or "State" or "Status";
+    }
+
+    public string EncodedIntegerLiteral(string schemaName, int value) =>
+        UsesNumericLiteral(schemaName)
+            ? value.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            : $"'{value.ToString(System.Globalization.CultureInfo.InvariantCulture)}'";
+
+    public object EncodedIntegerValue(string schemaName, int value) =>
+        UsesNumericLiteral(schemaName)
+            ? value
+            : value.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     public string? OptionalAttribute(string schemaName)
     {
@@ -91,7 +109,7 @@ internal static class DataverseMetadataResolver
         var cacheKey = $"table:{logicalName}";
         if (CacheEnabled(client) && TryGet(cacheKey, out DataverseTableMetadata cached)) return cached;
         var path = $"EntityDefinitions(LogicalName='{logicalName}')?$select=LogicalName,EntitySetName,PrimaryIdAttribute,PrimaryNameAttribute" +
-            "&$expand=Attributes($select=LogicalName,SchemaName),ManyToOneRelationships($select=ReferencingAttribute,ReferencingEntityNavigationPropertyName,ReferencedEntity)";
+            "&$expand=Attributes($select=LogicalName,SchemaName,AttributeType),ManyToOneRelationships($select=ReferencingAttribute,ReferencingEntityNavigationPropertyName,ReferencedEntity)";
         var item = await ReadOneAsync(client, path, token)
             ?? throw new InvalidOperationException($"No existe la tabla Dataverse {logicalName}.");
         var result = new DataverseTableMetadata(logicalName, Required(item, "EntitySetName"), Required(item, "PrimaryIdAttribute"),
@@ -99,6 +117,10 @@ internal static class DataverseMetadataResolver
             item.GetProperty("Attributes").EnumerateArray()
                 .Where(x => x.TryGetProperty("SchemaName", out var s) && s.ValueKind == JsonValueKind.String)
                 .ToDictionary(x => Required(x, "SchemaName"), x => Required(x, "LogicalName"), StringComparer.OrdinalIgnoreCase),
+            item.GetProperty("Attributes").EnumerateArray()
+                .Where(x => x.TryGetProperty("LogicalName", out var logical) && logical.ValueKind == JsonValueKind.String
+                    && x.TryGetProperty("AttributeType", out var type) && type.ValueKind == JsonValueKind.String)
+                .ToDictionary(x => Required(x, "LogicalName"), x => Required(x, "AttributeType"), StringComparer.OrdinalIgnoreCase),
             item.GetProperty("ManyToOneRelationships").EnumerateArray()
                 .Where(x => x.TryGetProperty("ReferencingEntityNavigationPropertyName", out var n) && n.ValueKind == JsonValueKind.String)
                 .Select(x => new DataverseRelationship(Required(x, "ReferencingAttribute"), Required(x, "ReferencingEntityNavigationPropertyName"), Required(x, "ReferencedEntity"))).ToArray());

@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { FeedbackProvider } from "@/components/feedback";
 import { SecurityProvider } from "@/components/security-context";
+import { RouteAccessGate } from "@/components/route-access-gate";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,7 +34,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head><script dangerouslySetInnerHTML={{ __html: `try{const t=localStorage.getItem('gaia-accent-theme');if(['forest','teal','purple','red'].includes(t))document.documentElement.dataset.gaiaAccent=t}catch{}` }} /></head>
-      <body className="min-h-full flex flex-col"><FeedbackProvider><SecurityProvider>{children}</SecurityProvider></FeedbackProvider></body>
+      <body className="min-h-full flex flex-col"><FeedbackProvider><SecurityProvider><RouteAccessGate>{children}</RouteAccessGate></SecurityProvider></FeedbackProvider></body>
     </html>
   );
 }

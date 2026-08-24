@@ -20,6 +20,11 @@ public sealed class DataverseCollaboratorContactTests
 
         Assert.Equal(RelatedWriteStatus.Created, result.Status);
         Assert.Contains(handler.Bodies, body => body.Contains("\"gaia_principal\":false", StringComparison.Ordinal));
+        Assert.Contains(handler.Bodies, body => body.Contains("\"gaia_correoelectronico\":\"persona@gaia.org\"", StringComparison.Ordinal));
+        Assert.Contains(handler.Bodies, body => body.Contains("\"gaia_observaciones\":null", StringComparison.Ordinal));
+        Assert.Contains(handler.Bodies, body => body.Contains("\"gaia_principal\":true", StringComparison.Ordinal));
+        Assert.Contains(handler.Bodies, body => body.Contains("\"gaia_tipocorreo\":1", StringComparison.Ordinal));
+        Assert.DoesNotContain(handler.Bodies, body => body.Contains("\"gaia_tipocorreo\":\"1\"", StringComparison.Ordinal));
         Assert.Contains(handler.Bodies, body => body.Contains($"\"nav_tercero@odata.bind\":\"/gaia_terceroses({parent:D})\"", StringComparison.Ordinal));
     }
 
@@ -43,6 +48,7 @@ public sealed class DataverseCollaboratorContactTests
 
         Assert.Equal(RelatedWriteStatus.Created, result.Status);
         Assert.Contains(handler.Bodies, body => body.Contains("\"gaia_tipodetelefono\":7001", StringComparison.Ordinal));
+        Assert.Contains(handler.Bodies, body => body.Contains("\"gaia_tipotelefono\":1", StringComparison.Ordinal));
         Assert.Contains(handler.Bodies, body => body.Contains($"\"nav_tercero@odata.bind\":\"/gaia_terceroses({parent:D})\"", StringComparison.Ordinal));
     }
 
@@ -58,16 +64,22 @@ public sealed class DataverseCollaboratorContactTests
     }
 
     private static string EmailMetadata() => Metadata("gaia_correocolaboradors", "gaia_correocolaboradorid", "gaia_correoelectronico",
-        "gaia_Correoelectronico", "gaia_Observaciones", "gaia_Principal", "gaia_Tercero");
+        "gaia_Correoelectronico", "gaia_Observaciones", "gaia_Principal", "gaia_Tercero", "gaia_Tipocorreo");
     private static string PhoneMetadata() => Metadata("gaia_telefonocolaboradors", "gaia_telefonocolaboradorid", "gaia_numero",
-        "gaia_Numero", "gaia_Extension", "gaia_Observaciones", "gaia_Principal", "gaia_Tercero", "gaia_Tipodetelefono");
+        "gaia_Numero", "gaia_Extension", "gaia_Observaciones", "gaia_Principal", "gaia_Tercero", "gaia_Tipodetelefono", "gaia_TipoTelefono");
     private static string ParentMetadata() => Metadata("gaia_terceroses", "gaia_tercerosid", "gaia_nombretercero", "gaia_Nombretercero");
     private static string Metadata(string set, string id, string name, params string[] schemas)
     {
-        var attributes = string.Join(',', schemas.Select(x => $"{{\"SchemaName\":\"{x}\",\"LogicalName\":\"{x.ToLowerInvariant()}\"}}"));
+        var attributes = string.Join(',', schemas.Select(x => $"{{\"SchemaName\":\"{x}\",\"LogicalName\":\"{x.ToLowerInvariant()}\",\"AttributeType\":\"{AttributeType(x)}\"}}"));
         var relations = schemas.Contains("gaia_Tercero", StringComparer.Ordinal) ? "[{\"ReferencingAttribute\":\"gaia_tercero\",\"ReferencingEntityNavigationPropertyName\":\"nav_tercero\",\"ReferencedEntity\":\"gaia_terceros\"}]" : "[]";
         return $"{{\"EntitySetName\":\"{set}\",\"PrimaryIdAttribute\":\"{id}\",\"PrimaryNameAttribute\":\"{name}\",\"Attributes\":[{attributes}],\"ManyToOneRelationships\":{relations}}}";
     }
+    private static string AttributeType(string schema) => schema switch
+    {
+        "gaia_Tipocorreo" or "gaia_TipoTelefono" or "gaia_Tipodetelefono" => "Picklist",
+        "gaia_Principal" => "Boolean",
+        _ => "String"
+    };
     private static HttpResponseMessage Json(string value) => new(HttpStatusCode.OK) { Content = new StringContent(value, Encoding.UTF8, "application/json") };
     private static HttpResponseMessage Empty() => Json("{\"value\":[]}");
     private static HttpResponseMessage Entity(Guid id) => Json($"{{\"gaia_tercerosid\":\"{id:D}\"}}");

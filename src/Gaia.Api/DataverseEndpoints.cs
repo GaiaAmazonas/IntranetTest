@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
 using Gaia.Api.Infrastructure.Dataverse.Organization;
+using Gaia.Modules.Security;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Identity.Client;
 using Microsoft.Identity.Web;
@@ -27,11 +28,11 @@ internal static class DataverseEndpoints
             .WithName("GetDataverseOrganizationRecords")
             .WithTags("Dataverse");
         endpoints.MapGet("/api/dataverse/organization/import/validate", ValidateOrganizationImportAsync)
-            .RequireAuthorization()
+            .RequireAuthorization(AdminCorePermissions.OrgUnidadesActualizar)
             .WithName("ValidateDataverseOrganizationImport")
             .WithTags("Dataverse");
         endpoints.MapPost("/api/dataverse/organization/import", ImportOrganizationAsync)
-            .RequireAuthorization()
+            .RequireAuthorization(AdminCorePermissions.OrgUnidadesActualizar)
             .WithName("ImportDataverseOrganization")
             .WithTags("Dataverse");
         return endpoints;
@@ -209,7 +210,8 @@ internal static class DataverseEndpoints
             var metadataPath =
                 $"EntityDefinitions(LogicalName='{normalizedLogicalName}')" +
                 "?$select=LogicalName,SchemaName,EntitySetName," +
-                "PrimaryIdAttribute,PrimaryNameAttribute";
+                "PrimaryIdAttribute,PrimaryNameAttribute" +
+                "&$expand=Attributes($select=LogicalName,SchemaName,AttributeType,RequiredLevel)";
 
             using var request = new HttpRequestMessage(
                 HttpMethod.Get,
@@ -236,13 +238,24 @@ internal static class DataverseEndpoints
             using var document = JsonDocument.Parse(content);
             var root = document.RootElement;
 
+            var attributes = root.GetProperty("Attributes").EnumerateArray().Select(attribute => new
+            {
+                logicalName = ReadString(attribute, "LogicalName"),
+                schemaName = ReadString(attribute, "SchemaName"),
+                type = ReadString(attribute, "AttributeType"),
+                required = attribute.TryGetProperty("RequiredLevel", out var requiredLevel)
+                    ? ReadString(requiredLevel, "Value")
+                    : null
+            }).ToArray();
+
             return Results.Ok(new
             {
                 logicalName = ReadString(root, "LogicalName"),
                 schemaName = ReadString(root, "SchemaName"),
                 entitySetName = ReadString(root, "EntitySetName"),
                 primaryIdAttribute = ReadString(root, "PrimaryIdAttribute"),
-                primaryNameAttribute = ReadString(root, "PrimaryNameAttribute")
+                primaryNameAttribute = ReadString(root, "PrimaryNameAttribute"),
+                attributes
             });
         }
         catch (MicrosoftIdentityWebChallengeUserException exception)

@@ -9,14 +9,15 @@ using Gaia.Modules.Security;
 using Gaia.Modules.ThirdParties;
 
 var builder = WebApplication.CreateBuilder(args);
+var dataverseConfiguration = DataverseConfiguration.From(builder.Configuration);
 
 builder.Services.AddOpenApi();
+builder.Services.AddProblemDetails();
+builder.Services.AddSingleton(dataverseConfiguration);
 builder.Services.AddTransient<DataverseDiagnosticsHandler>();
 builder.Services.AddHttpClient("Dataverse", client =>
 {
-    var endpoint = builder.Configuration["Dataverse:WebApiEndpoint"]
-        ?? throw new InvalidOperationException("Dataverse:WebApiEndpoint is required.");
-    client.BaseAddress = new Uri(endpoint.TrimEnd('/') + "/");
+    client.BaseAddress = dataverseConfiguration.WebApiEndpoint;
     client.DefaultRequestHeaders.Add("OData-MaxVersion", "4.0");
     client.DefaultRequestHeaders.Add("OData-Version", "4.0");
     client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
@@ -39,7 +40,10 @@ builder.Services.AddScoped<IThirdPartyWriter>(provider => provider.GetRequiredSe
 builder.Services.AddScoped<IDocumentTypeReader>(provider => provider.GetRequiredService<DataverseThirdPartyStore>());
 builder.Services.AddScoped<ICollaboratorEmailStore, DataverseCollaboratorEmailStore>();
 builder.Services.AddScoped<ICollaboratorPhoneStore, DataverseCollaboratorPhoneStore>();
+builder.Services.AddScoped<IIntranetDirectoryReader, DataverseIntranetDirectoryReader>();
 builder.Services.AddScoped<IAdministrativePersonnelImporter, DataversePersonnelImporter>();
+builder.Services.AddScoped<IOrganizationalAssignmentStore, DataverseOrganizationalAssignmentStore>();
+builder.Services.AddScoped<IOrganizationalAssignmentImporter, OrganizationalAssignmentWorkbookImporter>();
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<DataverseSecurityStore>();
 builder.Services.AddScoped<ISecurityStore>(provider => provider.GetRequiredService<DataverseSecurityStore>());
@@ -59,17 +63,29 @@ builder.Services.AddAuthorizationBuilder().AddPolicy("SecurityBootstrap", policy
         var administrators = builder.Configuration.GetSection("Authorization:BootstrapAdministrators").Get<string[]>() ?? [];
         return email is not null && administrators.Contains(email, StringComparer.OrdinalIgnoreCase);
     }));
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("WebDevelopment", policy =>
-        policy
-            .WithOrigins("https://localhost:3000", "http://localhost:3000")
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials());
-});
+var configuredWebUrl = builder.Configuration["WebApplication:BaseUrl"]
+    ?? throw new InvalidOperationException("WebApplication:BaseUrl is required.");
+if (!Uri.TryCreate(configuredWebUrl, UriKind.Absolute, out var configuredWebUri)
+    || configuredWebUri.Scheme is not ("http" or "https"))
+    throw new InvalidOperationException("WebApplication:BaseUrl must be an absolute HTTP or HTTPS URL.");
+var allowedWebOrigins = builder.Environment.IsDevelopment()
+    ? new[] { configuredWebUri.GetLeftPart(UriPartial.Authority), "https://localhost:3000", "http://localhost:3000" }.Distinct().ToArray()
+    : new[] { configuredWebUri.GetLeftPart(UriPartial.Authority) };
+builder.Services.AddCors(options => options.AddPolicy("WebClient", policy => policy
+    .WithOrigins(allowedWebOrigins)
+    .AllowAnyHeader()
+    .AllowAnyMethod()
+    .AllowCredentials()));
 
 var app = builder.Build();
+if (!app.Environment.IsDevelopment()) app.UseExceptionHandler();
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers["X-Frame-Options"] = "DENY";
+    context.Response.Headers["Referrer-Policy"] = "no-referrer";
+    await next();
+});
 var logApiCompleted = LoggerMessage.Define<string, string, int, long>(LogLevel.Information,
     new EventId(4200, "ApiRequestCompleted"), "Gaia.Api {Method} {Path} returned {StatusCode} in {ElapsedMs} ms");
 app.Use(async (context, next) =>
@@ -81,6 +97,8 @@ app.Use(async (context, next) =>
 });
 var logReauthentication = LoggerMessage.Define(Microsoft.Extensions.Logging.LogLevel.Information, new EventId(4101, "DataverseReauthenticationRequired"),
     "El usuario debe renovar la autorización delegada de Dataverse.");
+var logDataverseUnavailable = LoggerMessage.Define(Microsoft.Extensions.Logging.LogLevel.Error, new EventId(4102, "DataverseUnavailable"),
+    "No fue posible establecer comunicación con Dataverse.");
 
 app.Use(async (context, next) =>
 {
@@ -99,15 +117,29 @@ app.Use(async (context, next) =>
             detail = "Por seguridad, vuelve a iniciar sesión para continuar."
         });
     }
+    catch (DataverseConnectivityException exception)
+    {
+        logDataverseUnavailable(app.Logger, exception);
+        context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+        context.Response.ContentType = "application/problem+json";
+        await context.Response.WriteAsJsonAsync(new
+        {
+            type = "https://gaiaamazonas.org/problems/dataverse-unavailable",
+            title = "Dataverse no está disponible",
+            status = StatusCodes.Status503ServiceUnavailable,
+            code = "dataverse_unavailable",
+            detail = "No fue posible conectar con el servicio de datos. Intenta nuevamente o contacta al administrador."
+        });
+    }
 });
 
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
-    app.UseCors("WebDevelopment");
 }
 
 app.UseHttpsRedirection();
+app.UseCors("WebClient");
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -126,10 +158,6 @@ app.MapOrganizationEndpoints();
 app.MapThirdPartiesEndpoints();
 app.MapInventoryEndpoints();
 app.MapSecurityEndpoints();
-
-await app.Services.InitializeOrganizationAsync();
-await app.Services.InitializeThirdPartiesAsync();
-await app.Services.InitializeInventoryAsync();
 
 app.Run();
 

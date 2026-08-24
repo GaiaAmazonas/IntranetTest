@@ -13,7 +13,8 @@ namespace Gaia.Api.Infrastructure.Dataverse.Security;
 internal sealed class DataverseSecurityStore(
     IDataverseDelegatedClientFactory clientFactory,
     IMemoryCache cache,
-    ILogger<DataverseSecurityStore> logger) : ISecurityStore, IAdminCoreAuthorization
+    ILogger<DataverseSecurityStore> logger,
+    IConfiguration configuration) : ISecurityStore, IAdminCoreAuthorization
 {
     private static readonly Action<ILogger, string, Exception?> LogPermissionResolutionFailure =
         LoggerMessage.Define<string>(LogLevel.Warning, new EventId(4601, "SecurityPermissionResolutionFailed"),
@@ -30,8 +31,6 @@ internal sealed class DataverseSecurityStore(
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> ProvisionLocks = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> AssignmentLocks = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, byte> SecurityCacheKeys = new(StringComparer.OrdinalIgnoreCase);
-    private const string YilverAdministratorDocument = "1015994056";
-    private const string EdgarAdministratorEmail = "emunar@gaiaamazonas.org";
     private static readonly SemaphoreSlim PreprovisionLock = new(1, 1);
 
     public async Task<bool> HasPermissionAsync(ClaimsPrincipal principal, string permission, CancellationToken token = default)
@@ -138,7 +137,7 @@ internal sealed class DataverseSecurityStore(
 
         var adminId = await UpsertRole(client, roleMeta, "ADMIN", "Administrador", "Acceso administrativo completo al AdminCore Gaia.", true, token);
         var consultId = await UpsertRole(client, roleMeta, "CONSULTA", "Consulta", "Acceso de consulta a los módulos operativos autorizados.", true, token);
-        var readCodes = permissionIds.Keys.Where(IsConsultaPermission).ToArray();
+        var readCodes = DefaultRolePermissions.Consulta.Where(permissionIds.ContainsKey).ToArray();
         await EnsureRolePermissions(client, rolePermissionMeta, roleMeta, permissionMeta, adminId, permissionIds.Values, token);
         await EnsureRolePermissions(client, rolePermissionMeta, roleMeta, permissionMeta, consultId, readCodes.Select(x => permissionIds[x]), token);
 
@@ -146,10 +145,17 @@ internal sealed class DataverseSecurityStore(
         await EnsureUserRole(client, current.User.Id, adminId, "Bootstrap ADMIN", token);
         Invalidate(IdentityFrom(principal).Oid);
         var refreshed = await GetOrProvisionAsync(principal, token);
-        var yilver = await FindThirdPartyByDocumentAsync(client, YilverAdministratorDocument, token);
+        var bootstrapDocument = BootstrapAdministratorDocuments().FirstOrDefault();
+        var bootstrapThirdParty = string.IsNullOrWhiteSpace(bootstrapDocument)
+            ? null
+            : await FindThirdPartyByDocumentAsync(client, bootstrapDocument, token);
         return new(moduleIds.Count, permissionIds.Count, 2, permissionIds.Count + readCodes.Length,
             refreshed.Roles.Contains("ADMIN") ? "ADMIN asignado y verificado." : "No fue posible verificar ADMIN.",
-            yilver is null ? "Yilver no se resolvió de forma única; se asignará cuando inicie sesión." : "Yilver identificado; se asignará con OID real cuando inicie sesión.");
+            string.IsNullOrWhiteSpace(bootstrapDocument)
+                ? "No hay un documento administrador adicional configurado."
+                : bootstrapThirdParty is null
+                    ? "El administrador adicional no se resolvió de forma única; se asignará cuando inicie sesión."
+                    : "Administrador adicional identificado; se asignará con OID real cuando inicie sesión.");
     }
 
     public Task<SecurityContextResponse> GetOrProvisionAsync(ClaimsPrincipal principal, CancellationToken token)
@@ -215,7 +221,7 @@ internal sealed class DataverseSecurityStore(
                 var relation = userMeta.Relationship("gaia_Tercero", ThirdPartyTable);
                 payload[$"{relation.NavigationProperty}@odata.bind"] = $"/{thirdMeta.EntitySetName}({thirdPartyId:D})";
                 userId = await Post(client, userMeta.EntitySetName, payload, token);
-                var role = forcedRole ?? await FindRoleId(client, document == YilverAdministratorDocument ? "ADMIN" : "CONSULTA", token)
+                var role = forcedRole ?? await FindRoleId(client, IsBootstrapAdministrator(identity.Email, document) ? "ADMIN" : "CONSULTA", token)
                     ?? throw new InvalidOperationException("El catálogo de roles de Seguridad aún no ha sido inicializado.");
                 await EnsureUserRole(client, userId, role, "Asignación automática JIT", token);
             }
@@ -362,6 +368,8 @@ internal sealed class DataverseSecurityStore(
             var consulta = await FindRoleId(client, "CONSULTA", token) ?? throw new InvalidOperationException("No existe el rol CONSULTA activo.");
             var admin = await FindRoleId(client, "ADMIN", token) ?? throw new InvalidOperationException("No existe el rol ADMIN activo.");
             var created = 0; var existing = analysis.Audit.ExistingApplicationUsers; var assignedConsulta = 0; var assignedAdmin = 0; var errors = new List<SecurityPreprovisionIssue>();
+            var administratorEmails = BootstrapAdministratorEmails();
+            var administratorDocuments = BootstrapAdministratorDocuments();
             foreach (var candidate in analysis.ToCreate)
             {
                 try
@@ -375,7 +383,8 @@ internal sealed class DataverseSecurityStore(
                         [$"{relation.NavigationProperty}@odata.bind"] = $"/{thirdParty.EntitySetName}({candidate.ThirdPartyId:D})"
                     };
                     var id = await Post(client, user.EntitySetName, payload, token);
-                    var isAdmin = candidate.Document == YilverAdministratorDocument || candidate.Email.Equals(EdgarAdministratorEmail, StringComparison.OrdinalIgnoreCase);
+                    var isAdmin = administratorDocuments.Contains(candidate.Document, StringComparer.OrdinalIgnoreCase)
+                        || administratorEmails.Contains(candidate.Email, StringComparer.OrdinalIgnoreCase);
                     await EnsureUserRole(client, id, isAdmin ? admin : consulta, "Preaprovisionamiento administrativo", token);
                     created++; if (isAdmin) assignedAdmin++; else assignedConsulta++;
                 }
@@ -389,6 +398,16 @@ internal sealed class DataverseSecurityStore(
         }
         finally { PreprovisionLock.Release(); }
     }
+
+    private string[] BootstrapAdministratorEmails() =>
+        configuration.GetSection("Authorization:BootstrapAdministrators").Get<string[]>() ?? [];
+
+    private string[] BootstrapAdministratorDocuments() =>
+        configuration.GetSection("Authorization:BootstrapAdministratorDocuments").Get<string[]>() ?? [];
+
+    private bool IsBootstrapAdministrator(string? email, string? document) =>
+        (!string.IsNullOrWhiteSpace(email) && BootstrapAdministratorEmails().Contains(email, StringComparer.OrdinalIgnoreCase))
+        || (!string.IsNullOrWhiteSpace(document) && BootstrapAdministratorDocuments().Contains(document, StringComparer.OrdinalIgnoreCase));
 
     private static async Task<PreprovisionAnalysis> AnalyzePreprovisionAsync(HttpClient client, CancellationToken token)
     {
@@ -642,14 +661,23 @@ internal sealed class DataverseSecurityStore(
 
     private static IReadOnlyList<ModuleSeed> ModuleSeeds() =>
     [
-        new("INICIO","Inicio","MÓDULO",null,"/","home",10,true,"Página inicial de la plataforma."),
+        new("INTRANET","Intranet Gaia","MÓDULO",null,"/intranet","intranet",5,true,"Espacio institucional de los colaboradores."),
+        new("INT.INICIO","Inicio","SUBMÓDULO","INTRANET","/intranet","home",6,true,"Inicio de la Intranet Gaia."),
+        new("INT.PERSONAS","Personas","SUBMÓDULO","INTRANET","/intranet/personas","people",7,true,"Directorio corporativo autorizado."),
+        new("INT.CALENDARIO","Calendario","SUBMÓDULO","INTRANET","/intranet/calendario","calendar",8,true,"Agenda y actividades institucionales."),
+        new("INT.APLICACIONES","Aplicaciones","SUBMÓDULO","INTRANET","/intranet/aplicaciones","applications",9,true,"Catálogo de aplicaciones autorizadas."),
+        new("INT.HELPDESK","Helpdesk","SUBMÓDULO","INTRANET","/intranet/helpdesk","helpdesk",10,true,"Autoservicio del colaborador."),
+        new("INT.APP.ADMINCORE","AdminCore","FUNCIONALIDAD","INT.APLICACIONES","/admincore","admincore",11,true,"Espacio de administración de la plataforma Gaia."),
+        new("INICIO","Inicio","MÓDULO",null,"/admincore","home",10,true,"Página inicial de la plataforma."),
         new("ORG","Organización","MÓDULO",null,"/organizacion","organization",20,true,"Estructura organizacional."),
         new("ORG.ORGANIGRAMA","Organigrama","SUBMÓDULO","ORG","/organizacion?tab=organigrama","hierarchy",21,true,"Diagrama organizacional."),
         new("ORG.UNIDADES","Unidades","SUBMÓDULO","ORG","/organizacion?tab=unidades","units",22,true,"Unidades organizacionales."),
-        new("ORG.CARGOS","Cargos","SUBMÓDULO","ORG","/organizacion?tab=cargos","positions",23,true,"Cargos institucionales."),
-        new("ORG.SEDES_TIPOS","Sedes y tipos","SUBMÓDULO","ORG","/organizacion?tab=catalogos","catalog",24,true,"Catálogos organizacionales."),
+        new("ORG.ASIGNACIONES","Asignaciones","SUBMÓDULO","ORG","/organizacion?tab=asignaciones","assignments",23,true,"Asignaciones de personas a cargos y unidades."),
+        new("ORG.CARGOS","Cargos","SUBMÓDULO","ORG","/organizacion?tab=cargos","positions",24,true,"Cargos institucionales."),
+        new("ORG.SEDES_TIPOS","Sedes y tipos","SUBMÓDULO","ORG","/organizacion?tab=catalogos","catalog",25,true,"Catálogos organizacionales."),
         new("TH","Talento Humano","MÓDULO",null,"/talento-humano/colaboradores","people",30,true,"Gestión de colaboradores."),
         new("TH.COLABORADORES","Colaboradores","SUBMÓDULO","TH","/talento-humano/colaboradores","collaborators",31,true,"Directorio de colaboradores."),
+        new("TH.VINCULACIONES","Vinculaciones","SUBMÓDULO","TH","/talento-humano/vinculaciones","links",32,true,"Gestión de asignaciones organizacionales."),
         new("TH.COLABORADORES.IMPORTAR","Carga administrativa","FUNCIONALIDAD","TH.COLABORADORES",null,null,31,false,"Herramienta técnica de importación."),
         new("TH.COLABORADORES.INFO","Información del colaborador","FUNCIONALIDAD","TH.COLABORADORES",null,null,32,false,"Información personal."),
         new("TH.COLABORADORES.CORREOS","Correos","FUNCIONALIDAD","TH.COLABORADORES",null,null,33,false,"Correos del colaborador."),
@@ -657,10 +685,10 @@ internal sealed class DataverseSecurityStore(
         new("INV","Inventario","MÓDULO",null,"/inventario","inventory",40,true,"Inventario institucional."),
         new("INV.ASIGNAR","Asignar inventario","FUNCIONALIDAD","INV",null,null,41,false,"Asignación de elementos."),
         new("INV.IMPORTAR","Importar inventario","FUNCIONALIDAD","INV",null,null,42,false,"Carga administrativa de inventario."),
-        new("TI","Tecnología y seguridad","MÓDULO",null,"/ti","security",90,true,"Administración de acceso."),
-        new("TI.USUARIOS","Usuarios","SUBMÓDULO","TI","/ti/usuarios","users",91,true,"Usuarios y roles."),
-        new("TI.ROLES","Roles y permisos","SUBMÓDULO","TI","/ti/roles","roles",92,true,"Roles y permisos."),
-        new("TI.MODULOS","Módulos","SUBMÓDULO","TI","/ti/modulos","modules",93,true,"Catálogo de recursos protegidos.")
+        new("TI","Seguridad","MÓDULO",null,"/seguridad","security",90,true,"Administración de identidad, roles, permisos y recursos protegidos."),
+        new("TI.USUARIOS","Usuarios","SUBMÓDULO","TI","/seguridad/usuarios","users",91,true,"Usuarios y roles."),
+        new("TI.ROLES","Roles y permisos","SUBMÓDULO","TI","/seguridad/roles","roles",92,true,"Roles y permisos."),
+        new("TI.MODULOS","Módulos","SUBMÓDULO","TI","/seguridad/modulos","modules",93,true,"Catálogo de recursos protegidos.")
     ];
 
     private static async Task<(Guid? Id,string? Document)> MatchThirdPartyByEmailAsync(HttpClient client,string email,CancellationToken token)
@@ -724,7 +752,6 @@ internal sealed class DataverseSecurityStore(
     private static (string Oid,string Email,string Name) IdentityFrom(ClaimsPrincipal p){var oid=p.FindFirstValue("oid")??p.FindFirstValue("http://schemas.microsoft.com/identity/claims/objectidentifier");var email=(p.FindFirstValue("preferred_username")??p.FindFirstValue(ClaimTypes.Email))?.Trim().ToLowerInvariant();var name=p.FindFirstValue("name")??p.Identity?.Name;if(string.IsNullOrWhiteSpace(oid)||!Guid.TryParse(oid,out _))throw new InvalidOperationException("Microsoft Entra no entregó un Object ID válido.");if(string.IsNullOrWhiteSpace(email)||!email.EndsWith("@gaiaamazonas.org",StringComparison.OrdinalIgnoreCase))throw new InvalidOperationException("Solo se permiten cuentas corporativas @gaiaamazonas.org.");return(oid,email,string.IsNullOrWhiteSpace(name)?email:name);}
     private static int Choice(IReadOnlyDictionary<string,int> choices,string label){var normalized=Normalize(label);var match=choices.FirstOrDefault(x=>Normalize(x.Key)==normalized);if(string.IsNullOrEmpty(match.Key))throw new InvalidOperationException($"Dataverse no contiene la opción {label}.");return match.Value;}
     private static string Normalize(string value){var text=value.Normalize(NormalizationForm.FormD);var chars=text.Where(c=>CharUnicodeInfo.GetUnicodeCategory(c)!=UnicodeCategory.NonSpacingMark).ToArray();return new string(chars).Normalize(NormalizationForm.FormC).Replace("_","",StringComparison.Ordinal).Replace(" ","",StringComparison.Ordinal).ToUpperInvariant();}
-    private static bool IsConsultaPermission(string code)=>code.EndsWith(".VER",StringComparison.OrdinalIgnoreCase)||code==AdminCorePermissions.InicioVer;
     private static string PermissionModuleCode(string code) => code switch
     {
         "TH.COL.INFO" => "TH.COLABORADORES.INFO",

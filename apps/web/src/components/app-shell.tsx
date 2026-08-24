@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Building2, ChevronDown, ChevronRight, Home, LoaderCircle, LogOut, Menu, PackageSearch, Palette, PanelLeftClose, PanelLeftOpen, Settings, UserRound, Users, X } from "lucide-react";
+import { Building2, ChevronDown, ChevronLeft, ChevronRight, Home, LoaderCircle, LogOut, Menu, PackageSearch, Palette, PanelLeftClose, PanelLeftOpen, Settings, UserRound, Users, X } from "lucide-react";
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { Avatar, IconButton } from "./ui";
 import { ConfirmDialog } from "./form-dialog";
@@ -20,14 +20,15 @@ const accentThemes: { value: AccentTheme; label: string; color: string }[] = [
   { value: "red", label: "Rojo Gaia", color: "#923449" },
 ];
 const navigation = [
-  { href: "/", label: "Inicio", icon: Home, exact: true, permission: "INICIO.VER" },
+  { href: "/intranet", label: "Volver a la intranet", icon: ChevronLeft, exact: true, permission: "INTRANET.VER" },
+  { href: "/admincore", label: "Inicio", icon: Home, exact: true, permission: "INICIO.VER" },
   { href: "/organizacion", label: "Organización", icon: Building2, permission: "ORG.UNIDADES.VER" },
-  { label: "Talento Humano", icon: Users, permission: "TH.COLABORADORES.VER", children: [{ href: "/talento-humano/colaboradores", aliases: ["/terceros"], label: "Colaboradores", permission: "TH.COLABORADORES.VER" }] },
+  { label: "Talento Humano", icon: Users, permission: "TH.COLABORADORES.VER|TH.VINCULACIONES.VER", children: [{ href: "/talento-humano/colaboradores", aliases: ["/terceros"], label: "Colaboradores", permission: "TH.COLABORADORES.VER" },{ href: "/talento-humano/vinculaciones", aliases: [], label: "Vinculaciones", permission: "TH.VINCULACIONES.VER" }] },
   { href: "/inventario", label: "Inventario", icon: PackageSearch, permission: "INV.VER" },
-  { label: "Tecnología", icon: Settings, permission: "TI.USUARIOS.VER|TI.ROLES.VER|TI.MODULOS.VER", children: [
-    { href: "/ti/usuarios", aliases: [], label: "Usuarios", permission: "TI.USUARIOS.VER" },
-    { href: "/ti/roles", aliases: [], label: "Roles y permisos", permission: "TI.ROLES.VER" },
-    { href: "/ti/modulos", aliases: [], label: "Módulos", permission: "TI.MODULOS.VER" },
+  { label: "Seguridad", icon: Settings, permission: "TI.USUARIOS.VER|TI.ROLES.VER|TI.MODULOS.VER", children: [
+    { href: "/seguridad/usuarios", aliases: [], label: "Usuarios", permission: "TI.USUARIOS.VER" },
+    { href: "/seguridad/roles", aliases: [], label: "Roles y permisos", permission: "TI.ROLES.VER" },
+    { href: "/seguridad/modulos", aliases: [], label: "Módulos", permission: "TI.MODULOS.VER" },
   ] },
 ];
 

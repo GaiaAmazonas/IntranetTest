@@ -12,14 +12,12 @@ internal interface IDataverseDelegatedClientFactory
 internal sealed class DataverseDelegatedClientFactory(
     ITokenAcquisition tokenAcquisition,
     IHttpClientFactory httpClientFactory,
-    IConfiguration configuration) : IDataverseDelegatedClientFactory
+    DataverseConfiguration configuration) : IDataverseDelegatedClientFactory
 {
     public async Task<HttpClient> CreateAsync()
     {
-        var scope = configuration["Dataverse:Scope"]
-            ?? throw new InvalidOperationException("Dataverse:Scope is required.");
         var token = await tokenAcquisition.GetAccessTokenForUserAsync(
-            [scope],
+            [configuration.Scope],
             authenticationScheme: OpenIdConnectDefaults.AuthenticationScheme);
         var client = httpClientFactory.CreateClient("Dataverse");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);

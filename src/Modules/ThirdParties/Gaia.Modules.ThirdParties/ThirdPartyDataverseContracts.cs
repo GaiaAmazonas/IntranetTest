@@ -33,6 +33,31 @@ public interface IAdministrativePersonnelImporter
     Task<PersonnelImportResult> ImportAsync(Stream workbook, CancellationToken cancellationToken);
 }
 
+public interface IOrganizationalAssignmentStore
+{
+    Task<IReadOnlyList<OrganizationalAssignmentResponse>> ListAsync(CancellationToken cancellationToken);
+    Task<OrganizationalAssignmentWriteResult> CreateAsync(OrganizationalAssignmentCommand command, CancellationToken cancellationToken);
+    Task<OrganizationalAssignmentWriteResult> UpdateAsync(Guid id, OrganizationalAssignmentCommand command, CancellationToken cancellationToken);
+}
+public interface IOrganizationalAssignmentImporter
+{
+    Task<OrganizationalAssignmentImportValidation> ValidateAsync(Stream workbook, CancellationToken cancellationToken);
+    Task<OrganizationalAssignmentImportResult> ImportAsync(Stream workbook, CancellationToken cancellationToken);
+}
+
+public sealed record OrganizationalAssignmentResponse(Guid Id, Guid ThirdPartyId, string ThirdPartyName,
+    string DocumentNumber, Guid PositionId, string PositionName, Guid OrganizationalUnitId,
+    string OrganizationalUnitCode, string OrganizationalUnitName, DateOnly? StartDate, DateOnly? EndDate,
+    bool IsPrimary, string? Observations, bool IsActive);
+public sealed record OrganizationalAssignmentCommand(Guid ThirdPartyId, Guid PositionId, Guid OrganizationalUnitId,
+    DateOnly? StartDate, DateOnly? EndDate, bool IsPrimary, string? Observations, bool IsActive, string Actor);
+public enum OrganizationalAssignmentWriteStatus { Created, Updated, NotFound, InvalidThirdParty, InvalidPosition, InvalidUnit, Duplicate }
+public sealed record OrganizationalAssignmentWriteResult(OrganizationalAssignmentWriteStatus Status, Guid? Id = null);
+public sealed record OrganizationalAssignmentImportValidation(bool Valid, int Rows, int ToCreate, int ToUpdate,
+    int Unchanged, IReadOnlyList<AdministrativeImportIssue> Issues);
+public sealed record OrganizationalAssignmentImportResult(OrganizationalAssignmentImportValidation Validation,
+    int Created, int Updated, int Unchanged, int Errors);
+
 public sealed record DocumentTypeResponse(Guid Id, string Name, bool IsActive);
 public sealed record ThirdPartyResponse(Guid Id, string FullName, Guid DocumentTypeId, string DocumentType,
     string DocumentNumber, string FirstName, string? MiddleName, string FirstSurname, string? SecondSurname,
@@ -40,12 +65,12 @@ public sealed record ThirdPartyResponse(Guid Id, string FullName, Guid DocumentT
 public sealed record ThirdPartyWriteCommand(Guid DocumentTypeId, string DocumentNumber, string FirstName,
     string? MiddleName, string FirstSurname, string? SecondSurname, string Sex, DateOnly? BirthDate,
     string? Observations, bool IsActive, string Actor);
-public sealed record CollaboratorEmailResponse(Guid Id, string Email, string? Observations, bool IsPrimary, bool IsActive);
-public sealed record CollaboratorEmailCommand(string Email, string? Observations, bool IsPrimary, bool IsActive, string Actor);
+public sealed record CollaboratorEmailResponse(Guid Id, string Email, string? Observations, bool IsPrimary, bool IsActive, int ContactType);
+public sealed record CollaboratorEmailCommand(string Email, string? Observations, bool IsPrimary, bool IsActive, string Actor, int ContactType = 1);
 public sealed record CollaboratorPhoneResponse(Guid Id, string Number, string? Extension, string? Observations,
-    bool IsPrimary, string PhoneType, bool IsActive);
+    bool IsPrimary, string PhoneType, bool IsActive, int ContactType);
 public sealed record CollaboratorPhoneCommand(string Number, string? Extension, string? Observations,
-    bool IsPrimary, string PhoneType, bool IsActive, string Actor);
+    bool IsPrimary, string PhoneType, bool IsActive, string Actor, int ContactType = 1);
 
 public enum ThirdPartyWriteStatus { Created, Updated, NotFound, InvalidDocumentType, InvalidSex, DuplicateDocument }
 public sealed record ThirdPartyWriteResult(ThirdPartyWriteStatus Status, Guid? Id = null);

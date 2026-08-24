@@ -36,9 +36,9 @@ La arquitectura objetivo utiliza **Microsoft Dataverse como plataforma de datos 
 ### Datos
 
 - Plataforma objetivo: **Microsoft Dataverse**.
-- Entorno configurado actualmente: `https://org16eb6fd8.crm2.dynamics.com`.
-- API: `https://org16eb6fd8.api.crm2.dynamics.com/api/data/v9.2`.
-- Permiso delegado: `https://org16eb6fd8.crm2.dynamics.com/user_impersonation`.
+- Entorno Dataverse: `https://<organizacion>.crm<region>.dynamics.com`.
+- API: `https://<organizacion>.api.crm<region>.dynamics.com/api/data/v9.2`.
+- Permiso delegado: `https://<organizacion>.crm<region>.dynamics.com/user_impersonation`.
 
 Organización, Tipos de Unidad, Sedes y el CRUD principal de Terceros ya utilizan adaptadores de Dataverse. El acceso se realiza mediante la API de Gaia y el token delegado del usuario autenticado.
 
@@ -106,9 +106,9 @@ El secreto nunca debe guardarse en Git, archivos públicos, código fuente ni va
 
 La API requiere:
 
-- `Dataverse__EnvironmentUrl=https://org16eb6fd8.crm2.dynamics.com`
-- `Dataverse__WebApiEndpoint=https://org16eb6fd8.api.crm2.dynamics.com/api/data/v9.2`
-- `Dataverse__Scope=https://org16eb6fd8.crm2.dynamics.com/user_impersonation`
+- `Dataverse__EnvironmentUrl=https://<organizacion>.crm<region>.dynamics.com`
+- `Dataverse__WebApiEndpoint=https://<organizacion>.api.crm<region>.dynamics.com/api/data/v9.2`
+- `Dataverse__Scope=https://<organizacion>.crm<region>.dynamics.com/user_impersonation`
 
 Cada usuario que use la plataforma debe:
 
@@ -242,4 +242,3 @@ No se recomienda ocultar esta dependencia al responsable de infraestructura. Si 
 - [ ] Reiniciar el servidor levanta automáticamente ambos servicios.
 - [ ] Logs y alertas están habilitados.
 - [ ] Se ha decidido formalmente cómo cerrar la dependencia transitoria de PostgreSQL.
-

@@ -1,6 +1,10 @@
 # Local source material and working files
 /RelacionEquipos.xlsx
 /Gaia _ Paleta de color 2021.pdf
+/Org_*.xlsx
+/*.xlsx.inspect.ndjson
+*.xlsx
+*.xls
 /tmp/
 /work/
 
