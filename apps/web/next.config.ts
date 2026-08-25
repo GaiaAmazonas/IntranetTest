@@ -1,10 +1,12 @@
 import type { NextConfig } from "next";
 
+const basePath = process.env.GAIA_BASE_PATH ?? "";
+
 const nextConfig: NextConfig = {
-  /* config options here */
-   output: "export",
-  basePath: "/IntranetTest",
-  assetPrefix: "/IntranetTest/",
+  output: "export",
+  trailingSlash: true,
+  basePath,
+  assetPrefix: basePath || undefined,
   images: {
     unoptimized: true,
   },

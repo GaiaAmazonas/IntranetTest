@@ -37,6 +37,9 @@ jobs:
 
       - name: Build
         working-directory: apps/web
+        env:
+          GAIA_BASE_PATH: /IntranetTest
+          NEXT_PUBLIC_GAIA_API_URL: https://apitestintranet.gaiaamazonas.org
         run: npm run build
 
       - name: Setup Pages
