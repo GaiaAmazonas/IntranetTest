@@ -21,7 +21,7 @@ internal static class SecurityEndpoints
   group.MapGet("/permissions",(ISecurityStore store,CancellationToken ct)=>store.ListPermissionsAsync(ct)).RequireAuthorization(AdminCorePermissions.TiRolesVer);
   group.MapPost("/roles",(RoleWriteRequest request,ISecurityStore store,CancellationToken ct)=>WriteRoleAsync(null,request,store,ct)).RequireAuthorization(AdminCorePermissions.TiRolesCrear);
   group.MapPut("/roles/{id:guid}",(Guid id,RoleWriteRequest request,ISecurityStore store,CancellationToken ct)=>WriteRoleAsync(id,request,store,ct)).RequireAuthorization(AdminCorePermissions.TiRolesActualizar);
-  group.MapPut("/roles/{id:guid}/permissions",(Guid id,RolePermissionsRequest request,ISecurityStore store,CancellationToken ct)=>store.SetRolePermissionsAsync(id,request,ct)).RequireAuthorization(AdminCorePermissions.TiRolesAdministrar);
+  group.MapPut("/roles/{id:guid}/permissions",SetRolePermissionsAsync).RequireAuthorization(AdminCorePermissions.TiRolesAdministrar);
   group.MapGet("/modules",(ISecurityStore store,CancellationToken ct)=>store.ListModulesAsync(ct)).RequireAuthorization(AdminCorePermissions.TiModulosVer);
   group.MapPost("/modules",(ModuleWriteRequest request,ISecurityStore store,CancellationToken ct)=>WriteModuleAsync(null,request,store,ct)).RequireAuthorization(AdminCorePermissions.TiModulosCrear);
   group.MapPut("/modules/{id:guid}",(Guid id,ModuleWriteRequest request,ISecurityStore store,CancellationToken ct)=>WriteModuleAsync(id,request,store,ct)).RequireAuthorization(AdminCorePermissions.TiModulosActualizar);
@@ -59,6 +59,12 @@ internal static class SecurityEndpoints
   { return Results.ValidationProblem(new Dictionary<string,string[]>{{"assignment",[exception.Message]}}); }
   catch(KeyNotFoundException exception)
   { return Results.NotFound(new { title="Asignación no encontrada",detail=exception.Message }); }
+ }
+
+ private static async Task<IResult> SetRolePermissionsAsync(Guid id,RolePermissionsRequest request,ISecurityStore store,CancellationToken ct)
+ {
+  await store.SetRolePermissionsAsync(id,request,ct);
+  return Results.NoContent();
  }
 
  private static async Task<IResult> WriteRoleAsync(Guid? id,RoleWriteRequest request,ISecurityStore store,CancellationToken ct)

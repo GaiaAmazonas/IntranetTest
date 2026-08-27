@@ -19,6 +19,9 @@ internal sealed class DataverseSecurityStore(
     private static readonly Action<ILogger, string, Exception?> LogPermissionResolutionFailure =
         LoggerMessage.Define<string>(LogLevel.Warning, new EventId(4601, "SecurityPermissionResolutionFailed"),
             "No fue posible resolver el permiso {Permission}.");
+    private static readonly Action<ILogger, Exception?> LogThirdPartyLinkNotResolved =
+        LoggerMessage.Define(LogLevel.Warning, new EventId(4602, "SecurityThirdPartyLinkNotResolved"),
+            "El Usuario Aplicación autenticado no tiene Tercero relacionado y no fue posible resolver uno de forma inequívoca por correo. El acceso continuará sin contexto de colaborador.");
     private const string ModuleTable = "gaia_modulo";
     private const string PermissionTable = "gaia_permiso";
     private const string RoleTable = "gaia_rol";
@@ -187,7 +190,7 @@ internal sealed class DataverseSecurityStore(
         string? document;
         if (rows.Count == 0)
         {
-            (thirdPartyId, document) = await MatchThirdPartyByEmailAsync(client, identity.Email, token);
+            (thirdPartyId, document) = await MatchThirdPartyAsync(client, identity.Email, identity.Name, token);
             if (!thirdPartyId.HasValue)
                 throw new InvalidOperationException("El correo autenticado no se relaciona inequívocamente con un Tercero activo y un único correo institucional.");
             var preprovisioned = await DataverseJson.ReadAllAsync(client,
@@ -232,6 +235,26 @@ internal sealed class DataverseSecurityStore(
             userId = GuidValue(row, userMeta.PrimaryIdAttribute);
             thirdPartyId = OptionalGuid(row, $"_{userMeta.Attribute("gaia_Tercero")}_value");
             document = thirdPartyId.HasValue ? await ReadDocumentAsync(client, thirdPartyId.Value, token) : null;
+            if (!thirdPartyId.HasValue)
+            {
+                (thirdPartyId, document) = await MatchThirdPartyAsync(client, identity.Email, identity.Name, token);
+                if (!thirdPartyId.HasValue)
+                {
+                    LogThirdPartyLinkNotResolved(logger, null);
+                }
+                else
+                {
+                    var thirdMeta = await DataverseMetadataResolver.TableAsync(client, ThirdPartyTable, token);
+                    var relation = userMeta.Relationship("gaia_Tercero", ThirdPartyTable);
+                    await Patch(client, $"{userMeta.EntitySetName}({userId:D})", new()
+                    {
+                        [$"{relation.NavigationProperty}@odata.bind"] = $"/{thirdMeta.EntitySetName}({thirdPartyId:D})",
+                        [userMeta.Attribute("gaia_Nombre")] = identity.Name,
+                        [userMeta.Attribute("gaia_Correo")] = identity.Email,
+                        [userMeta.Attribute("gaia_UltimoAcceso")] = DateTimeOffset.UtcNow
+                    }, token);
+                }
+            }
             await Patch(client, $"{userMeta.EntitySetName}({userId:D})", new() { [userMeta.Attribute("gaia_UltimoAcceso")] = DateTimeOffset.UtcNow }, token);
         }
         else
@@ -257,6 +280,7 @@ internal sealed class DataverseSecurityStore(
         var userRoleMeta = await DataverseMetadataResolver.TableAsync(client, UserRoleTable, token);
         var rolePermissionMeta = await DataverseMetadataResolver.TableAsync(client, RolePermissionTable, token);
         var permissionMeta = await DataverseMetadataResolver.TableAsync(client, PermissionTable, token);
+        var moduleMeta = await DataverseMetadataResolver.TableAsync(client, ModuleTable, token);
         var today = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         var userLookup = userRoleMeta.RelationshipTo(UserTable).ReferencingAttribute;
         var roleLookup = userRoleMeta.RelationshipTo(RoleTable).ReferencingAttribute;
@@ -277,7 +301,22 @@ internal sealed class DataverseSecurityStore(
         if (permissionIds.Length > 0)
         {
             var filter = string.Join(" or ", permissionIds.Select(x => $"{permissionMeta.PrimaryIdAttribute} eq {x:D}"));
-            permissions = (await DataverseJson.ReadAllAsync(client, $"{permissionMeta.EntitySetName}?$select={permissionMeta.Attribute("gaia_Codigo")}&$filter=statecode eq 0 and ({filter})", token))
+            var permissionModule = permissionMeta.Attribute("gaia_ModuloPermiso");
+            var assignedPermissions = await DataverseJson.ReadAllAsync(client,
+                $"{permissionMeta.EntitySetName}?$select={permissionMeta.Attribute("gaia_Codigo")},_{permissionModule}_value&$filter=statecode eq 0 and ({filter})", token);
+            var moduleParent = moduleMeta.Attribute("gaia_Modulopadre");
+            var moduleRows = await DataverseJson.ReadAllAsync(client,
+                $"{moduleMeta.EntitySetName}?$select={moduleMeta.PrimaryIdAttribute},_{moduleParent}_value,statecode", token);
+            var moduleParents = moduleRows.ToDictionary(
+                row => GuidValue(row, moduleMeta.PrimaryIdAttribute),
+                row => OptionalGuid(row, $"_{moduleParent}_value"));
+            var activeModuleIds = moduleRows
+                .Where(row => (DataverseJson.OptionalInt32(row, "statecode") ?? 0) == 0)
+                .Select(row => GuidValue(row, moduleMeta.PrimaryIdAttribute))
+                .ToHashSet();
+            var effectiveActiveModuleIds = SecurityModuleRules.EffectiveActiveIds(moduleParents, activeModuleIds);
+            permissions = assignedPermissions
+                .Where(row => OptionalGuid(row, $"_{permissionModule}_value") is Guid moduleId && effectiveActiveModuleIds.Contains(moduleId))
                 .Select(x => StringValue(x, permissionMeta.Attribute("gaia_Codigo"))).Where(x => !string.IsNullOrWhiteSpace(x)).Cast<string>().Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         }
         return new(new(userId, name, email, entraObjectId, thirdPartyId, document, DateTimeOffset.UtcNow, active),
@@ -685,14 +724,62 @@ internal sealed class DataverseSecurityStore(
         new("INV","Inventario","MÓDULO",null,"/inventario","inventory",40,true,"Inventario institucional."),
         new("INV.ASIGNAR","Asignar inventario","FUNCIONALIDAD","INV",null,null,41,false,"Asignación de elementos."),
         new("INV.IMPORTAR","Importar inventario","FUNCIONALIDAD","INV",null,null,42,false,"Carga administrativa de inventario."),
+        new("COM","Comunicaciones","MÓDULO",null,"/comunicaciones/eventos","communications",50,true,"Administración del contenido institucional visible en la Intranet."),
+        new("COM.EVENTOS","Eventos","SUBMÓDULO","COM","/comunicaciones/eventos","calendar",51,true,"Agenda y eventos institucionales."),
+        new("COM.TIPOS_EVENTO","Tipos de evento","SUBMÓDULO","COM","/comunicaciones/tipos-evento","tags",52,true,"Clasificación y presentación visual de eventos."),
+        new("COM.DESTACADOS","Destacados","SUBMÓDULO","COM","/comunicaciones/destacados","image",53,true,"Piezas destacadas y promociones visibles en la portada de la Intranet."),
         new("TI","Seguridad","MÓDULO",null,"/seguridad","security",90,true,"Administración de identidad, roles, permisos y recursos protegidos."),
         new("TI.USUARIOS","Usuarios","SUBMÓDULO","TI","/seguridad/usuarios","users",91,true,"Usuarios y roles."),
         new("TI.ROLES","Roles y permisos","SUBMÓDULO","TI","/seguridad/roles","roles",92,true,"Roles y permisos."),
         new("TI.MODULOS","Módulos","SUBMÓDULO","TI","/seguridad/modulos","modules",93,true,"Catálogo de recursos protegidos.")
     ];
 
-    private static async Task<(Guid? Id,string? Document)> MatchThirdPartyByEmailAsync(HttpClient client,string email,CancellationToken token)
-    { var e=await DataverseMetadataResolver.TableAsync(client,EmailTable,token); var parent=e.Attribute("gaia_Tercero"); var address=e.Attribute("gaia_Correoelectronico"); var rows=await DataverseJson.ReadAllAsync(client,$"{e.EntitySetName}?$select=_{parent}_value&$filter={address} eq '{Escape(email)}' and statecode eq 0&$top=2",token); var ids=rows.Select(x=>OptionalGuid(x,$"_{parent}_value")).Where(x=>x.HasValue).Select(x=>x!.Value).Distinct().ToArray(); if(ids.Length!=1)return(null,null); return(ids[0],await ReadDocumentAsync(client,ids[0],token)); }
+    private static async Task<(Guid? Id,string? Document)> MatchThirdPartyAsync(
+        HttpClient client, string email, string name, CancellationToken token)
+    {
+        var emailMeta = await DataverseMetadataResolver.TableAsync(client, EmailTable, token);
+        var parent = emailMeta.Attribute("gaia_Tercero");
+        var address = emailMeta.Attribute("gaia_Correoelectronico");
+        var normalizedEmail = email.Trim();
+        var exactRows = await DataverseJson.ReadAllAsync(client,
+            $"{emailMeta.EntitySetName}?$select=_{parent}_value&$filter={address} eq '{Escape(normalizedEmail)}' and statecode eq 0&$top=3", token);
+        var ids = DistinctThirdPartyIds(exactRows, parent);
+
+        // Some imported addresses contain harmless surrounding whitespace. Dataverse string
+        // equality does not normalize it, so resolve it locally before considering another key.
+        if (ids.Length == 0)
+        {
+            var activeEmails = await DataverseJson.ReadAllAsync(client,
+                $"{emailMeta.EntitySetName}?$select={address},_{parent}_value&$filter=statecode eq 0", token);
+            ids = DistinctThirdPartyIds(activeEmails
+                .Where(row => string.Equals(StringValue(row, address)?.Trim(), normalizedEmail,
+                    StringComparison.OrdinalIgnoreCase)), parent);
+        }
+
+        // Entra and the personnel workbook can contain different institutional aliases. A
+        // normalized full name is accepted only when it identifies exactly one active Tercero.
+        if (ids.Length == 0 && !string.IsNullOrWhiteSpace(name))
+        {
+            var thirdParty = await DataverseMetadataResolver.TableAsync(client, ThirdPartyTable, token);
+            var activePeople = await DataverseJson.ReadAllAsync(client,
+                $"{thirdParty.EntitySetName}?$select={thirdParty.PrimaryIdAttribute},{thirdParty.PrimaryNameAttribute}&$filter=statecode eq 0", token);
+            ids = activePeople
+                .Where(row => Normalize(StringValue(row, thirdParty.PrimaryNameAttribute) ?? string.Empty) == Normalize(name))
+                .Select(row => GuidValue(row, thirdParty.PrimaryIdAttribute))
+                .Distinct()
+                .ToArray();
+        }
+
+        if (ids.Length != 1) return (null, null);
+        return (ids[0], await ReadDocumentAsync(client, ids[0], token));
+    }
+
+    private static Guid[] DistinctThirdPartyIds(IEnumerable<JsonElement> rows, string parentAttribute) =>
+        rows.Select(row => OptionalGuid(row, $"_{parentAttribute}_value"))
+            .Where(id => id.HasValue)
+            .Select(id => id!.Value)
+            .Distinct()
+            .ToArray();
     private static async Task<string?> ReadDocumentAsync(HttpClient client,Guid id,CancellationToken token){var t=await DataverseMetadataResolver.TableAsync(client,ThirdPartyTable,token);var field=t.Attribute("gaia_NumeroDocumento");var row=await DataverseMetadataResolver.ReadOneAsync(client,$"{t.EntitySetName}({id:D})?$select={field}",token);return row is null?null:StringValue(row.Value,field);}
     private static async Task<Guid?> FindThirdPartyByDocumentAsync(HttpClient client,string document,CancellationToken token){var t=await DataverseMetadataResolver.TableAsync(client,ThirdPartyTable,token);var f=t.Attribute("gaia_NumeroDocumento");var rows=await DataverseJson.ReadAllAsync(client,$"{t.EntitySetName}?$select={t.PrimaryIdAttribute}&$filter={f} eq '{Escape(document)}' and statecode eq 0&$top=2",token);return rows.Count==1?GuidValue(rows[0],t.PrimaryIdAttribute):null;}
     private static async Task<Guid?> FindRoleId(HttpClient client,string code,CancellationToken token){var r=await DataverseMetadataResolver.TableAsync(client,RoleTable,token);var rows=await DataverseJson.ReadAllAsync(client,$"{r.EntitySetName}?$select={r.PrimaryIdAttribute}&$filter={r.Attribute("gaia_Codigo")} eq '{Escape(code)}' and statecode eq 0&$top=1",token);return rows.Count==1?GuidValue(rows[0],r.PrimaryIdAttribute):null;}

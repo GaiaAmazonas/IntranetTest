@@ -11,7 +11,7 @@ import type { SecurityModule } from "./security-roles-view";
 
 type ModuleForm = { id?: string; code: string; name: string; description: string; type: string; parentId: string; route: string; icon: string; order: number; visible: boolean; isActive: boolean };
 
-export function SecurityModulesView({ modules, onReload }: { modules: SecurityModule[]; onReload: () => Promise<void> }) {
+export function SecurityModulesView({ modules, onAccessChanged, onReload }: { modules: SecurityModule[]; onAccessChanged: () => Promise<void>; onReload: () => Promise<void> }) {
   const feedback = useFeedback();
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(modules[0]?.id ?? null);
@@ -56,7 +56,7 @@ export function SecurityModulesView({ modules, onReload }: { modules: SecurityMo
       const parent = form.parentId ? byId.get(form.parentId) : undefined;
       const code = form.id ? form.code : generateModuleCode(form.name, parent?.code);
       await apiRequest(form.id ? `/api/security/modules/${form.id}` : "/api/security/modules", { method: form.id ? "PUT" : "POST", body: JSON.stringify({ code, name: form.name, description: form.description || null, type: form.type, parentId: form.parentId || null, route: form.route || null, icon: form.icon || null, order: form.order, visible: form.visible, isActive: form.isActive }) });
-      feedback.notify({ tone: "success", title: form.id ? "Elemento actualizado" : "Elemento creado", description: `${form.name} quedó registrado en el catálogo de seguridad.` }); setForm(null); await onReload();
+      feedback.notify({ tone: "success", title: form.id ? "Elemento actualizado" : "Elemento creado", description: `${form.name} quedó registrado en el catálogo de seguridad.` }); setForm(null); await onReload(); await onAccessChanged();
     } catch (reason) { setFormError(reason instanceof Error ? reason.message : "No fue posible guardar el elemento."); }
     finally { setSaving(false); }
   }
@@ -65,7 +65,7 @@ export function SecurityModulesView({ modules, onReload }: { modules: SecurityMo
     if (!stateItem) return; setSaving(true);
     try {
       await apiRequest(`/api/security/modules/${stateItem.id}`, { method: "PUT", body: JSON.stringify({ code: stateItem.code, name: stateItem.name, description: stateItem.description, type: stateItem.type, parentId: stateItem.parentId, route: stateItem.route, icon: stateItem.icon, order: stateItem.order, visible: stateItem.visible, isActive: !stateItem.isActive }) });
-      feedback.notify({ tone: "success", title: stateItem.isActive ? "Elemento inactivado" : "Elemento activado" }); setStateItem(null); await onReload();
+      feedback.notify({ tone: "success", title: stateItem.isActive ? "Elemento inactivado" : "Elemento activado" }); setStateItem(null); await onReload(); await onAccessChanged();
     } catch (reason) { feedback.notify({ tone: "error", title: "No fue posible cambiar el estado", description: reason instanceof Error ? reason.message : undefined }); }
     finally { setSaving(false); }
   }

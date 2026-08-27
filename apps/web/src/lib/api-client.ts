@@ -11,10 +11,15 @@ export async function apiRequest<T>(path: string, options?: RequestInit): Promis
       if (problem?.code === "reauth_required") window.dispatchEvent(new CustomEvent("gaia:reauth-required"));
       else window.location.href = "/";
     }
-    throw new Error(problem?.detail ?? Object.values(problem?.errors ?? {}).flat()[0] ?? "No fue posible completar la operación.");
+    const fallback = response.status === 403
+      ? "Tu cuenta está autenticada, pero no está autorizada para ejecutar esta operación."
+      : "No fue posible completar la operación.";
+    throw new Error(problem?.detail ?? Object.values(problem?.errors ?? {}).flat()[0] ?? fallback);
   }
   if (response.status === 204) return undefined as T;
-  return await response.json() as T;
+  const body = await response.text();
+  if (!body.trim()) return undefined as T;
+  return JSON.parse(body) as T;
 }
 
 export function startLogin(returnUrl = window.location.href) {

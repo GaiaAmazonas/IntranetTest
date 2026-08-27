@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Building2, ChevronDown, ChevronLeft, ChevronRight, Home, LoaderCircle, LogOut, Menu, PackageSearch, Palette, PanelLeftClose, PanelLeftOpen, Settings, UserRound, Users, X } from "lucide-react";
+import { Building2, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Home, LoaderCircle, LogOut, Menu, PackageSearch, Palette, PanelLeftClose, PanelLeftOpen, Settings, UserRound, Users, X } from "lucide-react";
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { Avatar, IconButton } from "./ui";
 import { ConfirmDialog } from "./form-dialog";
@@ -25,6 +25,11 @@ const navigation = [
   { href: "/organizacion", label: "Organización", icon: Building2, permission: "ORG.UNIDADES.VER" },
   { label: "Talento Humano", icon: Users, permission: "TH.COLABORADORES.VER|TH.VINCULACIONES.VER", children: [{ href: "/talento-humano/colaboradores", aliases: ["/terceros"], label: "Colaboradores", permission: "TH.COLABORADORES.VER" },{ href: "/talento-humano/vinculaciones", aliases: [], label: "Vinculaciones", permission: "TH.VINCULACIONES.VER" }] },
   { href: "/inventario", label: "Inventario", icon: PackageSearch, permission: "INV.VER" },
+  { label: "Comunicaciones", icon: CalendarRange, permission: "COM.EVENTOS.VER|COM.TIPOS_EVENTO.VER|COM.DESTACADOS.VER", children: [
+    { href: "/comunicaciones/eventos", aliases: [], label: "Eventos", permission: "COM.EVENTOS.VER" },
+    { href: "/comunicaciones/tipos-evento", aliases: [], label: "Tipos de evento", permission: "COM.TIPOS_EVENTO.VER" },
+    { href: "/comunicaciones/destacados", aliases: [], label: "Destacados", permission: "COM.DESTACADOS.VER" },
+  ] },
   { label: "Seguridad", icon: Settings, permission: "TI.USUARIOS.VER|TI.ROLES.VER|TI.MODULOS.VER", children: [
     { href: "/seguridad/usuarios", aliases: [], label: "Usuarios", permission: "TI.USUARIOS.VER" },
     { href: "/seguridad/roles", aliases: [], label: "Roles y permisos", permission: "TI.ROLES.VER" },
@@ -48,6 +53,8 @@ export function AppShell({ title, user: suppliedUser }: { title: string; user?: 
   useEffect(() => { const close = (event: MouseEvent) => { if (!accountRef.current?.contains(event.target as Node)) setAccountOpen(false); }; document.addEventListener("mousedown", close); return () => document.removeEventListener("mousedown", close); }, []);
   useEffect(() => { const show = () => setReauthRequired(true); addEventListener("gaia:reauth-required", show); return () => removeEventListener("gaia:reauth-required", show); }, []);
   useEffect(() => { const original = window.fetch.bind(window); window.fetch = async (...args) => { const response = await original(...args); if (response.status === 401) { const problem = await response.clone().json().catch(() => null) as { code?: string } | null; if (problem?.code === "reauth_required") dispatchEvent(new CustomEvent("gaia:reauth-required")); } return response; }; return () => { window.fetch = original; }; }, []);
+  useEffect(() => { const frame = requestAnimationFrame(() => setNavigatingTo(null)); return () => cancelAnimationFrame(frame); }, [pathname]);
+  useEffect(() => { if (!navigatingTo) return; const timeout = window.setTimeout(() => setNavigatingTo(null), 8000); return () => window.clearTimeout(timeout); }, [navigatingTo]);
   const isActive = (href: string, exact?: boolean) => exact ? pathname === href : pathname.startsWith(href);
   const pendingNavigation = navigatingTo === pathname ? null : navigatingTo;
   const displayedUser = security.user ? { displayName: security.user.name, email: security.user.email } : user;

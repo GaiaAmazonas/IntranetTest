@@ -2,6 +2,8 @@ using Gaia.Api.Infrastructure.Dataverse.Organization;
 using Gaia.Api.Infrastructure.Dataverse.ThirdParties;
 using Gaia.Api.Infrastructure.Dataverse;
 using Gaia.Api.Infrastructure.Dataverse.Security;
+using Gaia.Api.Infrastructure.Dataverse.Communications;
+using Gaia.Modules.Communications;
 using Gaia.Modules.Identity;
 using Gaia.Modules.Inventory;
 using Gaia.Modules.Organization;
@@ -48,6 +50,7 @@ builder.Services.AddMemoryCache();
 builder.Services.AddScoped<DataverseSecurityStore>();
 builder.Services.AddScoped<ISecurityStore>(provider => provider.GetRequiredService<DataverseSecurityStore>());
 builder.Services.AddScoped<IAdminCoreAuthorization>(provider => provider.GetRequiredService<DataverseSecurityStore>());
+builder.Services.AddScoped<ICommunicationsStore, DataverseCommunicationsStore>();
 builder.Services.AddIdentityModule(
     builder.Configuration,
     builder.Environment.IsDevelopment());
@@ -158,6 +161,7 @@ app.MapOrganizationEndpoints();
 app.MapThirdPartiesEndpoints();
 app.MapInventoryEndpoints();
 app.MapSecurityEndpoints();
+app.MapCommunicationsEndpoints();
 
 app.Run();
 

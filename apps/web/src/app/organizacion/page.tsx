@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppHeader } from "@/components/app-header";
 import { Button, IconButton } from "@/components/ui";
 import { ConfirmDialog, FormDialog } from "@/components/form-dialog";
@@ -145,7 +145,7 @@ export default function OrganizationPage() {
   const { notify } = useFeedback();
   const { can } = useSecurity();
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
     try {
       const [loadedUnits, loadedTypes, loadedSites, loadedPositions] =
         await Promise.all([
@@ -159,6 +159,7 @@ export default function OrganizationPage() {
       setUnitTypes(loadedTypes);
       setSites(loadedSites);
       setPositions(loadedPositions);
+      setLoadedTabs(current => new Set([...current, "chart", "units", "positions", "catalogs"]));
       setUnitForm((current) => ({
         ...current,
         unitTypeId: current.unitTypeId || loadedTypes[0]?.id || "",
@@ -167,19 +168,9 @@ export default function OrganizationPage() {
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Error inesperado.");
     }
-  }
-
-  useEffect(() => {
-    void apiRequest<Unit[]>("/api/organization/units")
-      .then((loadedUnits) => {
-        setUnits(loadedUnits);
-        setExpandedUnits(current => current.size ? current : initialExpandedUnits(loadedUnits));
-        setLoadedTabs(current => new Set(current).add("chart"));
-      })
-      .catch((caught: unknown) => {
-        setError(caught instanceof Error ? caught.message : "Error inesperado.");
-      });
   }, []);
+
+  useEffect(() => { const timer = window.setTimeout(() => { void loadData(); }, 0); return () => window.clearTimeout(timer); }, [loadData]);
 
   useEffect(() => {
     if (loadedTabs.has(tab)) return;

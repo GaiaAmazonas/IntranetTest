@@ -1,6 +1,6 @@
 "use client";
 
-import { Mail, MapPin, Search, Users } from "lucide-react";
+import { Mail, MapPin, Phone, Search, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { apiRequest } from "@/lib/api-client";
 
@@ -25,7 +25,7 @@ export function IntranetPeople() {
     {error&&<div className="intranet-data-state is-error"><strong>No fue posible cargar Personas</strong><p>{error}</p></div>}
     {!error&&loading&&!result&&<div className="intranet-data-state"><strong>Cargando directorio…</strong></div>}
     {!error&&result?.items.length===0&&<div className="intranet-data-state"><strong>No encontramos personas</strong><p>Prueba con otro nombre.</p></div>}
-    {result&&result.items.length>0&&<div className="intranet-people-grid">{result.items.map(person=><article key={person.id}><div className="intranet-person-cover"/><span className="intranet-person-avatar">{initials(person.fullName)}</span><h2>{title(person.fullName)}</h2><p>{person.jobTitle??"Cargo pendiente de vinculación organizacional"}</p><div className="intranet-person-meta"><span><Users size={13}/>{person.organizationUnit??"Unidad no vinculada"}</span><span><MapPin size={13}/>{person.site??"Sede no vinculada"}</span></div><footer>{person.institutionalEmail?<a href={`mailto:${person.institutionalEmail}`}><Mail size={14}/>Correo institucional</a>:<span>Sin correo institucional visible</span>}</footer></article>)}</div>}
+    {result&&result.items.length>0&&<div className="intranet-people-grid">{result.items.map(person=><article key={person.id}><div className="intranet-person-cover"/><span className="intranet-person-avatar">{initials(person.fullName)}</span><h2>{title(person.fullName)}</h2><p>{person.jobTitle??"Cargo pendiente de vinculación organizacional"}</p><div className="intranet-person-meta"><span><Users size={13}/>{person.organizationUnit??"Unidad no vinculada"}</span><span><MapPin size={13}/>{person.site??"Sede no vinculada"}</span></div><footer>{person.institutionalEmail?<a href={`mailto:${person.institutionalEmail}`}><Mail size={14}/><span>{person.institutionalEmail}</span></a>:<small>Sin correo corporativo visible</small>}{person.visiblePhone?<a href={`tel:${person.visiblePhone}`}><Phone size={14}/><span>{person.visiblePhone}</span></a>:<small>Sin teléfono corporativo visible</small>}</footer></article>)}</div>}
     {result&&result.items.length<result.total&&<button className="intranet-load-more" disabled={loading} onClick={()=>void loadMore()} type="button">{loading?"Cargando…":"Mostrar más personas"}</button>}
   </section>;
 }

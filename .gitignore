@@ -36,6 +36,3 @@ npm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
-
-# Repositorio Git anidado
-/IntranetTest/

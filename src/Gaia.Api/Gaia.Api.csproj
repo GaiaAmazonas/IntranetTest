@@ -13,6 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Modules\Communications\Gaia.Modules.Communications\Gaia.Modules.Communications.csproj" />
     <ProjectReference Include="..\Modules\Identity\Gaia.Modules.Identity\Gaia.Modules.Identity.csproj" />
     <ProjectReference Include="..\Modules\Organization\Gaia.Modules.Organization\Gaia.Modules.Organization.csproj" />
     <ProjectReference Include="..\Modules\ThirdParties\Gaia.Modules.ThirdParties\Gaia.Modules.ThirdParties.csproj" />
