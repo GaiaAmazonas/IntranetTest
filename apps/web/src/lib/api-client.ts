@@ -1,4 +1,5 @@
 const apiUrl = process.env.NEXT_PUBLIC_GAIA_API_URL ?? "https://localhost:7168";
+export const loginTransitionKey = "gaia-login-transition";
 
 export async function apiRequest<T>(path: string, options?: RequestInit): Promise<T> {
   const headers = new Headers(options?.headers);
@@ -23,5 +24,10 @@ export async function apiRequest<T>(path: string, options?: RequestInit): Promis
 }
 
 export function startLogin(returnUrl = window.location.href) {
+  try {
+    window.sessionStorage.setItem(loginTransitionKey, Date.now().toString());
+  } catch {
+    // El inicio de sesión debe continuar aunque el almacenamiento del navegador no esté disponible.
+  }
   window.location.href = `${apiUrl}/api/auth/login?returnUrl=${encodeURIComponent(returnUrl)}`;
 }

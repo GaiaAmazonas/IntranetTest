@@ -1,23 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Building2, LockKeyhole, PackageSearch, ShieldCheck, Sparkles, Users } from "lucide-react";
+import { ArrowRight, Building2, Cake, CalendarDays, Grid2X2, LockKeyhole, Megaphone, PackageSearch, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { useSecurity } from "@/components/security-context";
+import { apiRequest } from "@/lib/api-client";
+import { useEffect, useState } from "react";
 
-const workspaceModules = [
-  { title:"Organización", description:"Estructura, cargos, sedes y asignaciones organizacionales.", href:"/organizacion", permission:"ORG.ORGANIGRAMA.VER|ORG.UNIDADES.VER|ORG.ASIGNACIONES.VER|ORG.CARGOS.VER|ORG.SEDES_TIPOS.VER", eyebrow:"Estructura institucional", icon:Building2, accent:"#317c87", surface:"from-[#e8f4f4] to-[#f8fbfa]" },
-  { title:"Talento Humano", description:"Colaboradores, información de contacto y vinculaciones.", href:"/talento-humano/colaboradores", permission:"TH.COLABORADORES.VER|TH.VINCULACIONES.VER", eyebrow:"Personas y relaciones", icon:Users, accent:"#8b3c72", surface:"from-[#f8edf4] to-[#fcf9fb]" },
-  { title:"Inventario", description:"Elementos institucionales, asignaciones y movimientos.", href:"/inventario", permission:"INV.VER", eyebrow:"Activos y custodia", icon:PackageSearch, accent:"#55754b", surface:"from-[#edf4e9] to-[#fafcf9]" },
-  { title:"Seguridad", description:"Usuarios, roles, permisos y catálogo de recursos protegidos.", href:"/seguridad/usuarios", permission:"TI.USUARIOS.VER|TI.ROLES.VER|TI.MODULOS.VER", eyebrow:"Identidad y acceso", icon:LockKeyhole, accent:"#9a384d", surface:"from-[#faecef] to-[#fcfaf9]" },
-] as const;
+type Birthday={id:string;fullName:string;day:number;month:number;photoUrl:string|null};
+const moduleIcons={organization:Building2,people:Users,inventory:PackageSearch,security:LockKeyhole,communications:Megaphone,calendar:CalendarDays} as const;
+const moduleAccents=["#317c87","#8b3c72","#55754b","#9a384d","#9b7736"];
 
 export default function AdminCoreHomePage() {
   const security = useSecurity();
   const { user } = security;
+  const availableModules = security.modules;
+  const [birthdays,setBirthdays]=useState<Birthday[]>([]),[birthdaysLoading,setBirthdaysLoading]=useState(true);
+  const firstName = user?.name.split(" ").filter(Boolean)[0] ?? "";
+  useEffect(()=>{const timer=window.setTimeout(()=>{const today=new Date(),month=today.getMonth()+1;void apiRequest<Birthday[]>(`/api/intranet/birthdays?month=${month}`).then(rows=>setBirthdays(rows.filter(item=>item.day===today.getDate()&&item.month===month))).catch(()=>setBirthdays([])).finally(()=>setBirthdaysLoading(false));},400);return()=>window.clearTimeout(timer);},[]);
   if (!user) return null;
-  const availableModules = workspaceModules.filter(module => security.can(module.permission));
-  const firstName = user.name.split(" ").filter(Boolean)[0] ?? "";
 
   return <main className="gaia-app-page gaia-admincore-home min-h-screen">
     <AppHeader title="AdminCore · Inicio" user={{ displayName:user.name, email:user.email }}/>
@@ -28,12 +29,20 @@ export default function AdminCoreHomePage() {
         <span className="pointer-events-none absolute -right-20 -top-32 size-80 rounded-full border-[55px] border-white/[.055]"/><span className="pointer-events-none absolute -bottom-36 right-40 size-60 rounded-full border-[42px] border-white/[.055]"/>
       </section>
 
+      <section className={`gaia-admincore-today${birthdays.length?" has-celebrations":""}`}>
+        <div className="gaia-admincore-date"><CalendarDays size={18}/><span><small>Hoy en Gaia</small><strong>{new Intl.DateTimeFormat("es-CO",{weekday:"long",day:"numeric",month:"long"}).format(new Date())}</strong></span></div>
+        <div className="gaia-admincore-celebration"><Cake size={18}/><span><small>Cumpleaños del equipo</small>{birthdaysLoading?<strong>Preparando las celebraciones de hoy…</strong>:birthdays.length?<><strong>{birthdays.length===1?"¡Hoy celebramos una vida que hace parte de Gaia!":`¡Hoy celebramos la vida de ${birthdays.length} integrantes de Gaia!`}</strong><p>Les deseamos un feliz cumpleaños, bienestar y muchos motivos para celebrar.</p><div>{birthdays.map(item=>{const name=properName(item.fullName);return <span className="gaia-admincore-birthday-person" key={item.id}><b>{initials(name)}</b><em>{name}</em></span>;})}</div></>:<><strong>Hoy no tenemos cumpleaños en el equipo</strong><p>La próxima celebración aparecerá aquí para que podamos acompañarla juntos.</p></>}</span></div>
+      </section>
+
       <section className="mt-9"><div className="flex flex-wrap items-end justify-between gap-3"><div><p className="gaia-admincore-eyebrow text-[10px] font-bold uppercase tracking-[.15em]">Tu espacio de trabajo</p><h2 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--gaia-ink-900)]">¿Qué necesitas gestionar hoy?</h2></div><p className="max-w-md text-xs leading-5 text-[var(--gaia-ink-500)]">Las opciones se muestran según los permisos asignados a tu cuenta en Seguridad.</p></div>
-        {availableModules.length ? <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">{availableModules.map((module,index)=>{const Icon=module.icon;return <Link className={`gaia-admincore-card group relative flex min-h-[255px] flex-col overflow-hidden rounded-[24px] border border-[var(--gaia-line)] bg-gradient-to-br ${module.surface} p-5 transition duration-200 hover:-translate-y-1`} href={module.href} key={module.href}>
-          <div className="flex items-start justify-between"><span className="grid size-12 place-items-center rounded-2xl border border-white/80 bg-white shadow-sm" style={{color:module.accent}}><Icon size={22}/></span><small className="text-[10px] font-bold tracking-[.14em] text-[#87948c]">{String(index+1).padStart(2,"0")}</small></div>
-          <p className="mt-7 text-[10px] font-bold uppercase tracking-[.13em]" style={{color:module.accent}}>{module.eyebrow}</p><h3 className="mt-2 text-xl font-semibold tracking-tight text-[var(--gaia-ink-900)]">{module.title}</h3><p className="mt-2 flex-1 text-xs leading-5 text-[var(--gaia-ink-500)]">{module.description}</p><span className="gaia-admincore-card-action mt-5 flex items-center gap-2 text-xs font-bold">Abrir módulo <ArrowRight className="transition group-hover:translate-x-1" size={15}/></span>
+        {availableModules.length ? <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">{availableModules.map((module,index)=>{const Icon=moduleIcons[(module.icon??"") as keyof typeof moduleIcons]??Grid2X2,accent=moduleAccents[index%moduleAccents.length];return <Link className="gaia-admincore-card group relative flex min-h-[235px] flex-col overflow-hidden rounded-[24px] border border-[var(--gaia-line)] bg-white p-5 transition duration-200 hover:-translate-y-1" href={module.route} key={module.id} style={{"--module-card-accent":accent} as React.CSSProperties}>
+          <div className="flex items-start justify-between"><span className="grid size-12 place-items-center rounded-2xl border border-white/80 bg-white shadow-sm" style={{color:accent}}><Icon size={22}/></span><small className="text-[10px] font-bold tracking-[.14em] text-[#87948c]">{String(index+1).padStart(2,"0")}</small></div>
+          <p className="mt-6 text-[10px] font-bold uppercase tracking-[.13em]" style={{color:accent}}>Módulo autorizado</p><h3 className="mt-2 text-xl font-semibold tracking-tight text-[var(--gaia-ink-900)]">{module.name}</h3><p className="mt-2 flex-1 text-xs leading-5 text-[var(--gaia-ink-500)]">{module.description||"Herramienta institucional disponible según tus permisos."}</p><span className="gaia-admincore-card-action mt-5 flex items-center gap-2 text-xs font-bold">Abrir módulo <ArrowRight className="transition group-hover:translate-x-1" size={15}/></span>
         </Link>;})}</div>:<div className="mt-5 grid min-h-52 place-items-center rounded-3xl border border-dashed border-[var(--gaia-line-strong)] bg-white text-center"><div><LockKeyhole className="gaia-admincore-empty-icon mx-auto"/><h3 className="mt-3 font-semibold">No tienes módulos habilitados</h3><p className="mt-1 text-xs text-[var(--gaia-ink-500)]">Solicita a un administrador la revisión de tus permisos.</p></div></div>}
       </section>
     </div>
   </main>;
 }
+
+function properName(value:string){return value.toLocaleLowerCase("es").replace(/(^|\s)\p{L}/gu,letter=>letter.toLocaleUpperCase("es"));}
+function initials(value:string){return value.split(/\s+/).filter(Boolean).slice(0,2).map(word=>word[0]).join("").toLocaleUpperCase("es");}

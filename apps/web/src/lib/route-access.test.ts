@@ -24,4 +24,9 @@ describe("routeRuleFor", () => {
   it("does not protect the public login route", () => {
     expect(routeRuleFor("/")).toBeNull();
   });
+
+  it("normalizes trailing slashes before resolving protected routes", () => {
+    expect(routeRuleFor("/intranet/")?.requirements).toEqual(["INTRANET.VER", "INT.INICIO.VER"]);
+    expect(routeRuleFor("/intranet/personas/")?.requirements).toEqual(["INTRANET.VER", "INT.PERSONAS.VER"]);
+  });
 });

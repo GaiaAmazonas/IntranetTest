@@ -55,7 +55,8 @@ public static class PermissionScope
 
 public sealed record SecurityUser(Guid Id,string Name,string Email,string EntraObjectId,Guid? ThirdPartyId,string? DocumentNumber,DateTimeOffset? LastAccess,bool IsActive);
 public sealed record SecurityUserListItem(Guid? Id,string Name,string Email,string? EntraObjectId,Guid? ThirdPartyId,string? DocumentNumber,DateTimeOffset? LastAccess,bool IsActive,string ProvisioningStatus);
-public sealed record SecurityContextResponse(SecurityUser User,IReadOnlyList<string> Roles,IReadOnlyList<string> Permissions);
+public sealed record SecurityContextResponse(SecurityUser User,IReadOnlyList<string> Roles,IReadOnlyList<string> Permissions,IReadOnlyList<SecurityNavigationModule> Modules);
+public sealed record SecurityNavigationModule(Guid Id,string Code,string Name,string? Description,string Route,string? Icon,int Order);
 public sealed record SecurityModuleItem(Guid Id,string Code,string Name,string? Description,string Type,Guid? ParentId,string? Route,string? Icon,int Order,bool Visible,bool SupportsVisibility,bool IsActive);
 public sealed record SecurityPermissionItem(Guid Id,string Code,string Name,string Action,Guid ModuleId,bool IsActive);
 public sealed record SecurityRoleItem(Guid Id,string Code,string Name,string? Description,bool IsSystem,bool IsActive,int AssignedUsers,IReadOnlyList<string> Permissions);

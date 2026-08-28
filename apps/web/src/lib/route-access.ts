@@ -26,7 +26,13 @@ export const routeAccessRules: RouteAccessRule[] = [
 ];
 
 export function routeRuleFor(pathname: string) {
+  const normalizedPathname = pathname.length > 1
+    ? pathname.replace(/\/+$/, "")
+    : pathname;
+
   return routeAccessRules
-    .filter(rule => rule.exact ? pathname === rule.prefix : pathname === rule.prefix || pathname.startsWith(`${rule.prefix}/`))
+    .filter(rule => rule.exact
+      ? normalizedPathname === rule.prefix
+      : normalizedPathname === rule.prefix || normalizedPathname.startsWith(`${rule.prefix}/`))
     .sort((first, second) => second.prefix.length - first.prefix.length)[0] ?? null;
 }

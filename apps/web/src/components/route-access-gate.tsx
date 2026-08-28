@@ -4,17 +4,34 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Building2, LockKeyhole, LogIn, RotateCcw, ShieldCheck } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { useSecurity } from "./security-context";
-import { startLogin } from "@/lib/api-client";
+import { loginTransitionKey, startLogin } from "@/lib/api-client";
 import { routeRuleFor } from "@/lib/route-access";
+
+const loginTransitionMinimumMs = 1500;
 
 export function RouteAccessGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const security = useSecurity();
   const rule = routeRuleFor(pathname);
+  const [finishingLogin, setFinishingLogin] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.sessionStorage.getItem(loginTransitionKey) !== null;
+  });
+
+  useEffect(() => {
+    if (!finishingLogin) return;
+    if (security.loading) return;
+    const timer = window.setTimeout(() => {
+      window.sessionStorage.removeItem(loginTransitionKey);
+      setFinishingLogin(false);
+    }, security.user ? loginTransitionMinimumMs : 0);
+    return () => window.clearTimeout(timer);
+  }, [finishingLogin, security.loading, security.user]);
 
   if (!rule) return children;
-  if (security.loading) return <AccessState icon="loading" title="Verificando tu acceso…" />;
+  if (security.loading || finishingLogin) return <AccessState icon="loading" title={security.user ? "Abriendo la Intranet Gaia…" : "Verificando tu acceso…"} />;
   if (!security.user) {
     return <AccessState action="Iniciar sesión" description="Ingresa con tu cuenta institucional para continuar." icon="login" onAction={() => startLogin(window.location.href)} title="Sesión requerida" />;
   }
@@ -48,7 +65,7 @@ export function AccessState({ action, description, href, icon, notice, onAction,
     return (
       <main className="gaia-access-portal">
         <section className="gaia-access-story">
-          <Image alt="Paisaje de la Amazonía colombiana junto a un río" fill priority sizes="(max-width: 820px) 100vw, 62vw" src="/brand/intranet/evento-amazonia-gaia.png" />
+          <Image alt="Paisaje de la Amazonía colombiana junto a un río" fill priority sizes="(max-width: 820px) 100vw, 62vw" src="/brand/intranet/evento-amazonia-gaia2.jpg" />
           <div className="gaia-access-story-shade" />
           <header><Image alt="Gaia Amazonas" height={48} src="/brand/logo-gaia.svg" width={88} /><span><strong>Fundación Gaia Amazonas</strong><small>Ecosistema digital institucional</small></span></header>
           <div className="gaia-access-story-copy">

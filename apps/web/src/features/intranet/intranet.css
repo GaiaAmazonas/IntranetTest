@@ -109,12 +109,12 @@
 @media (max-width:760px) { .intranet-event-spotlight,.intranet-event-copy { min-height:360px; }.intranet-event-copy { padding:30px 24px; }.intranet-event-shade { background:linear-gradient(90deg,rgb(9 31 31 / 86%),rgb(17 48 46 / 58%)); }.intranet-event-copy > div { align-items:flex-start; flex-direction:column; gap:12px; }.intranet-event-pagination { right:18px; bottom:16px; } }
 
 .intranet-personal-welcome { position:relative; display:grid; grid-template-columns:5px minmax(0,1fr); gap:0 17px; padding:8px 2px 24px; }.intranet-personal-welcome::before { grid-row:1 / 3; width:5px; height:100%; min-height:67px; border-radius:5px; background:linear-gradient(#287986,#6f3873,#b38b3c); content:""; }.intranet-personal-welcome > p { align-self:end; color:var(--intranet-teal); font-size:9px; font-weight:780; letter-spacing:.13em; text-transform:uppercase; }.intranet-personal-welcome > div { grid-column:2; }.intranet-personal-welcome h1 { max-width:900px; color:#183632; font-size:clamp(26px,3vw,38px); font-weight:670; letter-spacing:-.035em; line-height:1.08; }.intranet-personal-welcome h2 { margin-top:3px; color:#33554e; font-size:clamp(17px,1.8vw,23px); font-weight:580; letter-spacing:-.02em; }.intranet-personal-welcome span { display:block; max-width:720px; margin-top:7px; color:#6b7a74; font-size:12px; line-height:1.5; }
-.intranet-event-copy h2 { max-width:670px; margin-top:8px; font-size:clamp(33px,4.5vw,55px); font-weight:670; letter-spacing:-.045em; line-height:1.02; }.intranet-event-spotlight > img { animation:intranet-event-image-in 650ms ease-out; }.intranet-event-background{position:absolute;inset:0;background-position:center 48%;background-size:cover;animation:intranet-event-image-in 650ms ease-out}
+.intranet-event-copy h2 { max-width:670px; margin-top:8px; font-size:clamp(33px,4.5vw,55px); font-weight:670; letter-spacing:-.045em; line-height:1.02; }.intranet-event-spotlight > img { animation:intranet-event-image-in 650ms ease-out; }.intranet-event-background{position:absolute;inset:0;background-color:#173d3f;background-image:var(--banner-desktop);background-position:center;background-repeat:no-repeat;background-size:cover;animation:intranet-event-image-in 650ms ease-out}
 .intranet-event-spotlight-empty{display:grid;place-items:center;background:radial-gradient(circle at 82% 20%,rgb(96 153 126 / 35%),transparent 28%),linear-gradient(125deg,#123e3b,#245b48);padding:40px}.intranet-event-spotlight-empty>div{max-width:640px;text-align:center}.intranet-event-spotlight-empty p{color:#e5cd8d;font-size:10px;font-weight:780;letter-spacing:.13em;text-transform:uppercase}.intranet-event-spotlight-empty h2{margin-top:9px;font-size:clamp(28px,4vw,45px);letter-spacing:-.04em}.intranet-event-spotlight-empty span{display:block;margin-top:12px;color:#dbe8e2;font-size:14px;line-height:1.55}.intranet-agenda-empty{border:1px dashed #cad9d1;border-radius:12px;background:#f8fbf9;padding:24px!important;color:#687b72!important;text-align:center}
 .intranet-event-spotlight-loading{display:grid;place-items:center;background:linear-gradient(110deg,#173d3f 8%,#245a52 28%,#173d3f 48%);background-size:220% 100%;animation:intranet-banner-loading 1.4s ease-in-out infinite}.intranet-event-spotlight-loading span{color:rgb(255 255 255 / 78%);font-size:11px;font-weight:760;letter-spacing:.09em;text-transform:uppercase}.intranet-event-background{opacity:0;transition:opacity 240ms ease}.intranet-event-spotlight.is-ready .intranet-event-background{opacity:1}.intranet-event-spotlight.is-loading{background:linear-gradient(110deg,#173d3f 8%,#245a52 28%,#173d3f 48%);background-size:220% 100%;animation:intranet-banner-loading 1.4s ease-in-out infinite}@keyframes intranet-banner-loading{to{background-position:-220% 0}}
 .intranet-event-controls { position:absolute; z-index:4; right:22px; bottom:18px; display:flex; align-items:center; gap:8px; }.intranet-event-controls > button { display:grid; width:32px; height:32px; place-items:center; border:1px solid rgb(255 255 255 / 30%); border-radius:50%; background:rgb(12 32 31 / 42%); color:white; backdrop-filter:blur(5px); }.intranet-event-controls > button:hover { background:rgb(255 255 255 / 18%); }.intranet-event-controls .intranet-event-pagination { position:static; display:flex; gap:5px; }.intranet-event-controls .intranet-event-pagination button { width:17px; }.intranet-event-controls .intranet-event-pagination button[aria-current="true"] { width:34px; }
 @keyframes intranet-event-image-in { from { opacity:.35; transform:scale(1.025); } to { opacity:1; transform:scale(1); } }
-@media (max-width:760px) { .intranet-personal-welcome { gap:0 12px; padding-bottom:18px; }.intranet-personal-welcome h1 { font-size:27px; }.intranet-event-controls { right:14px; bottom:14px; }.intranet-event-controls > button { width:29px; height:29px; } }
+@media (max-width:760px) { .intranet-personal-welcome { gap:0 12px; padding-bottom:18px; }.intranet-personal-welcome h1 { font-size:27px; }.intranet-event-background{background-image:var(--banner-mobile);background-position:center}.intranet-event-controls { right:14px; bottom:14px; }.intranet-event-controls > button { width:29px; height:29px; } }
 
 /* Lenguaje editorial compartido para las páginas principales de la Intranet. */
 .intranet-section-hero { position:relative; overflow:hidden; border:1px solid #dde6e3; border-radius:17px; background:#fff; padding:30px 32px; box-shadow:0 12px 34px rgb(28 48 40 / 7%); }.intranet-section-hero::before { position:absolute; inset:0 auto 0 0; width:5px; background:linear-gradient(#287986,#6f3873,#b38b3c); content:""; }.intranet-section-hero::after { position:absolute; z-index:0; top:-85px; right:-65px; width:220px; height:220px; border:35px solid rgb(40 121 134 / 6%); border-radius:50%; content:""; }.intranet-section-hero > * { position:relative; z-index:1; }.intranet-section-hero > div > p { color:#287986 !important; font-size:10px !important; }.intranet-section-hero h1 { color:#183632; font-size:clamp(34px,4vw,48px) !important; }.intranet-section-hero > div > span { max-width:700px !important; color:#64756d !important; font-size:13px !important; }.intranet-section-hero label { min-height:48px !important; border-color:#d5e1dd !important; border-radius:11px; box-shadow:0 6px 18px rgb(30 55 45 / 6%); }.intranet-section-hero label:focus-within { border-color:#5b98a0 !important; box-shadow:0 0 0 4px rgb(40 121 134 / 10%); }.intranet-section-hero-calendar::before { background:linear-gradient(#6f3873,#a45160,#b38b3c); }.intranet-section-hero-calendar::after { border-color:rgb(111 56 115 / 6%); }.intranet-section-hero-applications::before { background:linear-gradient(#287986,#386f5a,#6f3873); }.intranet-section-hero-applications::after { border-color:rgb(111 56 115 / 6%); }
@@ -156,6 +156,173 @@
   .intranet-calendar-layout,.intranet-application-categories { margin-top:14px; }
 }
 
+/* Personas: tarjeta corporativa compacta y alineada con el directorio organizacional. */
+.intranet-directory-layout .intranet-people-grid {
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 14px;
+}
+.intranet-person-card {
+  display: grid;
+  min-width: 0;
+  min-height: 270px;
+  grid-template-rows: auto auto 1fr;
+  overflow: hidden;
+  border: 1px solid #dce6e1 !important;
+  border-top: 3px solid var(--intranet-teal) !important;
+  border-radius: 14px;
+  background: #fff;
+  padding: 17px;
+  text-align: left;
+  box-shadow: 0 7px 22px rgb(25 54 43 / 6%);
+  transition: border-color 160ms ease,box-shadow 160ms ease,transform 160ms ease;
+}
+.intranet-person-card:hover {
+  border-color: color-mix(in srgb,var(--intranet-teal) 42%,#dce6e1) !important;
+  box-shadow: 0 13px 30px rgb(25 54 43 / 11%);
+  transform: translateY(-2px);
+}
+.intranet-person-card > header {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 48px minmax(0,1fr);
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 15px;
+}
+.intranet-person-card .intranet-person-avatar {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  margin: 0;
+  place-items: center;
+  border: 1px solid color-mix(in srgb,var(--intranet-teal) 22%,white);
+  border-radius: 12px;
+  background: color-mix(in srgb,var(--intranet-teal) 12%,white);
+  color: var(--intranet-teal);
+  font-size: 12px;
+  font-weight: 800;
+  box-shadow: none;
+}
+.intranet-person-card > header > div { min-width: 0; }
+.intranet-person-card h2 {
+  margin: 0;
+  color: var(--intranet-ink);
+  font-size: 13px;
+  font-weight: 730;
+  letter-spacing: -.01em;
+  line-height: 1.25;
+  text-align: left;
+  white-space: normal;
+}
+.intranet-person-card > header p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin-top: 5px;
+  color: var(--intranet-muted);
+  font-size: 9px;
+  line-height: 1.4;
+  text-align: left;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.intranet-person-card .intranet-person-meta {
+  display: grid;
+  grid-template-columns: minmax(0,1.35fr) minmax(92px,.65fr);
+  gap: 7px;
+  border-top: 1px solid #e8eeeb;
+  border-bottom: 1px solid #e8eeeb;
+  padding: 11px 0;
+}
+.intranet-person-card .intranet-person-meta > span {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 18px minmax(0,1fr);
+  align-items: start;
+  gap: 5px;
+  color: var(--intranet-muted);
+}
+.intranet-person-card .intranet-person-meta svg { margin-top: 1px; color: var(--intranet-teal); }
+.intranet-person-card .intranet-person-meta strong,
+.intranet-person-card .intranet-person-meta small,
+.intranet-person-card footer strong,
+.intranet-person-card footer small { display: block; }
+.intranet-person-card .intranet-person-meta strong {
+  overflow: hidden;
+  color: #334d45;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.intranet-person-card .intranet-person-meta small {
+  margin-top: 2px;
+  color: #89968f;
+  font-size: 7px;
+}
+.intranet-person-card footer {
+  display: grid;
+  align-content: end;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+}
+.intranet-person-card footer > a,
+.intranet-person-card .intranet-person-contact-empty {
+  display: grid;
+  min-width: 0;
+  min-height: 42px;
+  grid-template-columns: 27px minmax(0,1fr);
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #e1e9e5;
+  border-radius: 9px;
+  background: #f8faf9;
+  padding: 7px 9px;
+  color: var(--intranet-ink);
+  text-align: left;
+  text-decoration: none;
+}
+.intranet-person-card footer > a:hover {
+  border-color: color-mix(in srgb,var(--intranet-teal) 40%,#e1e9e5);
+  background: color-mix(in srgb,var(--intranet-teal) 7%,white);
+}
+.intranet-person-card footer svg { color: var(--intranet-teal); }
+.intranet-person-card footer strong {
+  overflow: hidden;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.intranet-person-card footer small {
+  margin-top: 2px;
+  color: #84928b;
+  font-size: 7px;
+}
+.intranet-person-card .intranet-person-contact-empty { color: #829089; }
+.intranet-person-card .intranet-person-contact-empty svg { opacity: .55; }
+
+@media (max-width:1250px) {
+  .intranet-directory-layout .intranet-people-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media (max-width:760px) {
+  .intranet-person-card { min-height: 250px; }
+}
+@media (max-width:500px) {
+  .intranet-directory-layout .intranet-people-grid { grid-template-columns: 1fr; }
+  .intranet-person-card { min-height: 0; }
+  .intranet-person-card .intranet-person-meta { grid-template-columns: 1fr; }
+}
+
+/* Directorio organizacional de la Intranet */
+.intranet-directory-layout{display:grid;grid-template-columns:minmax(245px,285px) minmax(0,1fr);gap:18px;margin-top:14px;align-items:start}.intranet-directory-units{overflow:hidden;border:1px solid var(--intranet-line);border-radius:13px;background:#f7f9f8;box-shadow:0 5px 18px rgb(27 42 35 / 4%)}.intranet-directory-units>header{display:flex;align-items:flex-start;gap:9px;border-bottom:1px solid var(--intranet-line);background:white;padding:14px}.intranet-directory-units>header>svg{flex:0 0 auto;color:var(--intranet-teal)}.intranet-directory-units header span,.intranet-directory-units header strong,.intranet-directory-units header small{display:block}.intranet-directory-units header strong{color:var(--intranet-ink);font-size:11px}.intranet-directory-units header small{margin-top:2px;color:var(--intranet-muted);font-size:9px}.intranet-directory-units>div{max-height:630px;overflow-y:auto;padding:7px}.intranet-directory-tree-row{display:flex;align-items:stretch;padding-left:calc(var(--tree-depth) * 13px)}.intranet-directory-tree-toggle,.intranet-directory-tree-spacer{display:grid;width:27px;min-width:27px;place-items:center;border:0;background:transparent;color:var(--intranet-muted)}.intranet-directory-tree-toggle:hover{color:var(--intranet-teal)}.intranet-directory-unit{display:flex;min-width:0;min-height:42px;flex:1;align-items:center;gap:8px;border:0;border-radius:9px;background:transparent;padding:7px 9px;color:var(--intranet-ink);text-align:left}.intranet-directory-unit>span,.intranet-directory-unit strong,.intranet-directory-unit small{display:block;min-width:0}.intranet-directory-unit strong{overflow:hidden;text-overflow:ellipsis;font-size:10px;white-space:nowrap}.intranet-directory-unit small{margin-top:2px;color:var(--intranet-muted);font-size:8px}.intranet-directory-unit:hover{background:var(--intranet-soft)}.intranet-directory-unit[aria-current="true"]{background:#e4f0ee;color:#155e65;box-shadow:inset 3px 0 #287986}.intranet-directory-unit.is-all{width:100%;margin-bottom:3px}.intranet-directory-unit.is-all>svg{flex:0 0 auto}.intranet-directory-results{min-width:0}.intranet-directory-results>.intranet-directory-summary{margin-top:0}.intranet-directory-descendants{display:flex;width:max-content;max-width:100%;align-items:center;gap:9px;margin:0 0 13px auto;border:1px solid var(--intranet-line);border-radius:10px;background:white;padding:8px 11px;color:var(--intranet-ink)}.intranet-directory-descendants input{width:14px;height:14px;accent-color:var(--intranet-teal)}.intranet-directory-descendants span,.intranet-directory-descendants strong,.intranet-directory-descendants small{display:block}.intranet-directory-descendants strong{font-size:9px}.intranet-directory-descendants small{margin-top:1px;color:var(--intranet-muted);font-size:8px}
+@media(max-width:1100px){.intranet-directory-layout{grid-template-columns:235px minmax(0,1fr)}.intranet-directory-layout .intranet-people-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.intranet-directory-layout{grid-template-columns:1fr}.intranet-directory-units>div{max-height:310px}.intranet-directory-layout .intranet-people-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:500px){.intranet-directory-layout .intranet-people-grid{grid-template-columns:1fr}.intranet-directory-descendants{width:100%;margin-left:0}}
+
 /* Ajuste final de densidad: el saludo comparte línea y las páginas internas usan una cabecera menor que Inicio. */
 .intranet-personal-welcome h1,
 .intranet-personal-welcome h2 { display:inline; }
@@ -183,3 +350,295 @@
   .intranet-section-hero { padding:13px 16px; }
   .intranet-section-hero h1 { font-size:26px!important; }
 }
+
+/* Directorio humano: las tarjetas de la Intranet presentan personas, no registros administrativos. */
+.intranet-directory-layout .intranet-people-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
+.intranet-directory-layout .intranet-person-card {
+  position:relative;
+  display:flex;
+  min-height:258px;
+  flex-direction:column;
+  overflow:hidden;
+  border:1px solid #e0e8e4!important;
+  border-top:0!important;
+  border-radius:17px;
+  background:#fff;
+  padding:0 20px 18px;
+  box-shadow:0 9px 28px rgb(27 51 42 / 7%);
+  transform:none;
+}
+.intranet-directory-layout .intranet-person-card:hover { border-color:#cbdad3!important; box-shadow:0 16px 36px rgb(27 51 42 / 12%); transform:translateY(-3px); }
+.intranet-person-card-accent { height:68px; margin:0 -20px; background:linear-gradient(115deg,#dcebed,#eef3ec 52%,#ede6ee); }
+.intranet-person-card:nth-child(3n+2) .intranet-person-card-accent { background:linear-gradient(115deg,#eee9df,#f3ece6 50%,#ebe5ef); }
+.intranet-person-card:nth-child(3n+3) .intranet-person-card-accent { background:linear-gradient(115deg,#e2eee7,#e6eff1 48%,#eeeade); }
+.intranet-directory-layout .intranet-person-card > header {
+  display:grid;
+  grid-template-columns:58px minmax(0,1fr);
+  align-items:center;
+  gap:12px;
+  margin-top:-29px;
+  padding:0 0 15px;
+}
+.intranet-directory-layout .intranet-person-card .intranet-person-avatar {
+  width:58px;
+  height:58px;
+  border:4px solid #fff;
+  border-radius:50%;
+  background-color:#dcebdc;
+  background-position:center;
+  background-size:cover;
+  color:#205b42;
+  font-size:12px;
+  box-shadow:0 6px 18px rgb(31 65 51 / 13%);
+}
+.intranet-directory-layout .intranet-person-card h2 { margin-top:32px; font-size:13px; line-height:1.25; }
+.intranet-directory-layout .intranet-person-card > header p { margin-top:4px; font-size:9px; line-height:1.35; }
+.intranet-person-team {
+  display:grid;
+  grid-template-columns:20px minmax(0,1fr);
+  align-items:start;
+  gap:6px;
+  border-top:1px solid #edf1ef;
+  padding:13px 0;
+  color:#62746b;
+}
+.intranet-person-team > svg { margin-top:1px; color:var(--intranet-teal); }
+.intranet-person-team strong { display:block; overflow:hidden; color:#38534a; font-size:8px; font-weight:720; line-height:1.4; text-overflow:ellipsis; text-transform:uppercase; white-space:nowrap; }
+.intranet-person-team small { display:flex; align-items:center; gap:4px; margin-top:4px; color:#839088; font-size:8px; }
+.intranet-directory-layout .intranet-person-card footer { display:block; margin-top:auto; border-top:1px solid #edf1ef; padding-top:13px; }
+.intranet-directory-layout .intranet-person-card footer > span { display:block; color:#78877f; font-size:8px; }
+.intranet-directory-layout .intranet-person-card footer > div { display:flex; align-items:center; gap:7px; margin-top:8px; }
+.intranet-directory-layout .intranet-person-card footer a {
+  display:inline-flex;
+  min-width:0;
+  min-height:34px;
+  grid-template-columns:none;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  border:0;
+  border-radius:18px;
+  background:#edf5f3;
+  padding:7px 12px;
+  color:#1d666a;
+  font-size:8px;
+  font-weight:720;
+}
+.intranet-directory-layout .intranet-person-card footer a:hover { border:0; background:#dfeeea; }
+.intranet-directory-layout .intranet-person-card footer div > small { color:#89968f; font-size:8px; font-style:italic; }
+
+@media(max-width:1250px){.intranet-directory-layout .intranet-people-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.intranet-directory-layout .intranet-person-card{min-height:240px}}
+@media(max-width:500px){.intranet-directory-layout .intranet-people-grid{grid-template-columns:1fr}}
+
+/* Legibilidad del directorio: información completa sin abreviaturas administrativas. */
+.intranet-directory-layout .intranet-person-card h2 { font-size:15px; line-height:1.28; }
+.intranet-directory-layout .intranet-person-card > header p { margin-top:5px; font-size:11px; line-height:1.4; }
+.intranet-person-team strong { font-size:10px; white-space:normal; }
+.intranet-person-team small { margin-top:5px; font-size:10px; }
+.intranet-directory-layout .intranet-person-card footer > span { font-size:9px; font-weight:680; letter-spacing:.04em; text-transform:uppercase; }
+.intranet-directory-layout .intranet-person-card footer > div { align-items:stretch; flex-direction:column; }
+.intranet-directory-layout .intranet-person-card footer a {
+  width:100%;
+  min-height:38px;
+  justify-content:flex-start;
+  border-radius:9px;
+  padding:8px 11px;
+  font-size:10px;
+  line-height:1.35;
+}
+.intranet-directory-layout .intranet-person-card footer a span { min-width:0; overflow-wrap:anywhere; }
+.intranet-directory-layout .intranet-person-card footer div > small { font-size:10px; }
+
+/* Directorio refinado: cada espacio tiene función y el filtro gana presencia. */
+.intranet-directory-layout { grid-template-columns:minmax(290px,320px) minmax(0,1fr); gap:22px; }
+.intranet-directory-units > header { gap:11px; padding:17px 16px; }
+.intranet-directory-units header strong { font-size:13px; }
+.intranet-directory-units header small { margin-top:4px; font-size:10px; line-height:1.4; }
+.intranet-directory-units > div { padding:10px; }
+.intranet-directory-unit { min-height:48px; padding:9px 11px; }
+.intranet-directory-unit strong { font-size:11px; line-height:1.3; }
+.intranet-directory-unit small { margin-top:3px; font-size:9px; }
+.intranet-directory-descendants { padding:10px 13px; }
+.intranet-directory-descendants input { width:17px; height:17px; }
+.intranet-directory-descendants strong { font-size:10px; }
+.intranet-directory-descendants small { margin-top:3px; font-size:9px; }
+.intranet-directory-layout .intranet-person-card {
+  min-height:264px;
+  padding:0 18px 17px;
+  text-align:left;
+}
+.intranet-directory-layout .intranet-person-card > .intranet-person-identity {
+  display:grid;
+  min-height:102px;
+  grid-template-columns:58px minmax(0,1fr);
+  align-items:center;
+  gap:13px;
+  margin:0 -18px;
+  padding:18px;
+  border-bottom:1px solid #e3ebe7;
+  background:linear-gradient(120deg,#edf5f3,#f7f8f5);
+}
+.intranet-directory-layout .intranet-person-card > .intranet-person-identity::before {
+  position:absolute;
+  top:0;
+  right:0;
+  left:0;
+  height:3px;
+  background:linear-gradient(90deg,var(--intranet-teal),#b38b3c);
+  content:"";
+}
+.intranet-directory-layout .intranet-person-card .intranet-person-avatar {
+  width:58px;
+  height:58px;
+  margin:0;
+  border:3px solid #fff;
+  border-radius:50%;
+}
+.intranet-directory-layout .intranet-person-card > .intranet-person-identity h2 { margin:0; font-size:15px; line-height:1.25; text-align:left; }
+.intranet-directory-layout .intranet-person-card > .intranet-person-identity p { margin-top:5px; font-size:11px; line-height:1.4; text-align:left; }
+.intranet-person-team { width:100%; padding:14px 0; text-align:left; }
+.intranet-person-team > span { min-width:0; text-align:left; }
+.intranet-person-team strong { text-align:left; }
+.intranet-person-team small { justify-content:flex-start; text-align:left; }
+.intranet-directory-layout .intranet-person-card footer { width:100%; text-align:left; }
+
+@media(max-width:1100px){.intranet-directory-layout{grid-template-columns:270px minmax(0,1fr)}}
+@media(max-width:760px){.intranet-directory-layout{grid-template-columns:1fr}.intranet-directory-units>div{max-height:340px}}
+
+/* Calendario informativo: cada fecha permite reconocer sus eventos sin abrir el detalle. */
+.intranet-days > span,.intranet-days > button { min-height:104px; }
+.intranet-days > button { overflow:visible; padding:8px 7px; }
+.intranet-days > button > strong { display:block; margin-bottom:6px; }
+.intranet-calendar-entries { position:relative; display:grid; gap:3px; }
+.intranet-calendar-event-chip,
+.intranet-calendar-birthday {
+  position:relative;
+  display:grid;
+  min-width:0;
+  grid-template-columns:5px minmax(0,1fr);
+  align-items:center;
+  gap:5px;
+  border-radius:4px;
+  background:#eef3f1;
+  padding:4px 5px;
+  color:#314c43;
+  text-align:left;
+}
+.intranet-calendar-event-chip > i { position:static!important; width:5px!important; height:16px!important; border-radius:4px!important; background:var(--event-color)!important; }
+.intranet-calendar-event-chip > b,
+.intranet-calendar-birthday > b { overflow:hidden; font-size:8px; font-weight:680; line-height:1.2; text-overflow:ellipsis; white-space:nowrap; }
+.intranet-calendar-event-chip:hover,
+.intranet-calendar-event-chip:focus-within { z-index:12; background:#e4edE9; }
+.intranet-calendar-event-chip::after,
+.intranet-calendar-birthday::after {
+  position:absolute;
+  z-index:20;
+  bottom:calc(100% + 7px);
+  left:0;
+  width:max-content;
+  max-width:260px;
+  visibility:hidden;
+  border-radius:8px;
+  background:#173e36;
+  padding:8px 10px;
+  color:#fff;
+  content:attr(data-tooltip);
+  font-size:9px;
+  font-weight:560;
+  line-height:1.4;
+  opacity:0;
+  pointer-events:none;
+  text-align:left;
+  white-space:normal;
+  box-shadow:0 10px 24px rgb(15 42 34 / 22%);
+  transform:translateY(3px);
+  transition:opacity 130ms ease,transform 130ms ease,visibility 130ms ease;
+}
+.intranet-calendar-event-chip:hover::after,
+.intranet-calendar-birthday:hover::after { visibility:visible; opacity:1; transform:translateY(0); }
+.intranet-calendar-more { color:#687a72; font-size:8px; font-weight:720; text-align:left; }
+.intranet-calendar-birthday { grid-template-columns:12px minmax(0,1fr); background:#f3ebf3; color:#735079; }
+.intranet-calendar-birthday > svg { width:10px; height:10px; }
+.intranet-days > button.is-selected .intranet-calendar-event-chip { background:rgb(255 255 255 / 90%); color:#25443b; }
+.intranet-days > button.is-selected .intranet-calendar-more { color:rgb(255 255 255 / 85%); }
+.intranet-days > button.is-selected .intranet-calendar-birthday { background:#fff4f9; color:#704e75; }
+
+@media(max-width:760px){
+  .intranet-days > span,.intranet-days > button{min-height:76px;padding:6px 4px}
+  .intranet-calendar-event-chip{grid-template-columns:4px minmax(0,1fr);gap:3px;padding:3px}
+  .intranet-calendar-event-chip>i{width:4px!important;height:12px!important}
+  .intranet-calendar-event-chip>b{font-size:7px}
+  .intranet-calendar-event-chip:nth-of-type(n+2){display:none}
+  .intranet-calendar-birthday>b{display:none}
+}
+
+/* Agenda del día: tarjetas con respuesta visual y profundidad editorial. */
+.intranet-event-day-list > button {
+  position:relative;
+  overflow:hidden;
+  border-top:1px solid #e8eeeb;
+  border-right:1px solid #e8eeeb;
+  border-bottom:1px solid #e8eeeb;
+  background:linear-gradient(105deg,#f7faf8,#fbfcfb);
+  box-shadow:0 3px 10px rgb(26 52 42 / 4%);
+  cursor:pointer;
+  transition:background 150ms ease,border-color 150ms ease,box-shadow 150ms ease,transform 150ms ease;
+}
+.intranet-event-day-list > button::after {
+  position:absolute;
+  top:50%;
+  right:14px;
+  width:6px;
+  height:6px;
+  border-top:1.5px solid #6e8178;
+  border-right:1.5px solid #6e8178;
+  content:"";
+  opacity:0;
+  transform:translate(-5px,-50%) rotate(45deg);
+  transition:opacity 150ms ease,transform 150ms ease;
+}
+.intranet-event-day-list > button:hover,
+.intranet-event-day-list > button:focus-visible {
+  border-color:#d5e2dc;
+  background:#fff;
+  outline:0;
+  box-shadow:0 10px 24px rgb(26 52 42 / 10%);
+  transform:translateX(4px);
+}
+.intranet-event-day-list > button:hover::after,
+.intranet-event-day-list > button:focus-visible::after { opacity:1; transform:translate(0,-50%) rotate(45deg); }
+.intranet-event-day-list > button small { width:max-content; border-radius:10px; background:#edf3f0; padding:3px 7px; letter-spacing:.05em; }
+.intranet-event-day-list > button strong { padding-right:22px; font-size:12px; }
+.intranet-event-day-list > button span { font-size:10px; }
+
+/* Agenda adaptable: vistas Día, Semana y Mes. */
+.intranet-calendar-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:18px;border:1px solid #dfe7e3;border-radius:13px;background:#fff;padding:8px 10px;box-shadow:0 6px 20px rgb(27 51 42 / 5%)}
+.intranet-calendar-view-switch{display:flex;align-items:center;gap:4px;border-radius:9px;background:#f1f5f3;padding:4px}.intranet-calendar-view-switch button{min-width:72px;border:0;border-radius:7px;background:transparent;padding:8px 13px;color:#64766e;font-size:10px;font-weight:720}.intranet-calendar-view-switch button:hover{background:#fff}.intranet-calendar-view-switch button[aria-pressed="true"]{background:#fff;color:var(--intranet-teal);box-shadow:0 3px 10px rgb(29 65 53 / 10%)}
+.intranet-calendar-period{display:grid;min-width:300px;grid-template-columns:34px minmax(0,1fr) 34px;align-items:center;gap:7px}.intranet-calendar-period button{display:grid;width:34px;height:34px;place-items:center;border:0;border-radius:8px;background:#edf4f2;color:var(--intranet-teal)}.intranet-calendar-period button:hover{background:#deebe7}.intranet-calendar-period strong{font-size:11px;text-align:center;text-transform:capitalize}
+.intranet-calendar-toolbar+.intranet-calendar-layout{margin-top:14px}
+.intranet-calendar-layout>.intranet-week-view,.intranet-calendar-layout>.intranet-day-view{min-width:0;margin-top:0}
+.intranet-week-view{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));overflow:hidden;margin-top:14px;border:1px solid #dfe7e3;border-radius:15px;background:#fff;box-shadow:0 10px 28px rgb(28 48 40 / 6%)}.intranet-week-view>section{min-width:0;min-height:310px;border-right:1px solid #e7ece9}.intranet-week-view>section:last-child{border-right:0}.intranet-week-view>section.is-selected{background:#f5f9f7;box-shadow:inset 0 3px var(--intranet-teal)}.intranet-week-day{display:flex;width:100%;min-height:68px;align-items:center;justify-content:center;flex-direction:column;border:0;border-bottom:1px solid #e7ece9;background:transparent}.intranet-week-day:hover{background:#f4f8f6}.intranet-week-day small{color:#718179;font-size:9px;font-weight:720;text-transform:capitalize}.intranet-week-day strong{margin-top:4px;color:#1a3a33;font-size:19px}.intranet-week-view>section>div{display:grid;gap:7px;padding:9px}.intranet-week-view>section>div>p{padding:18px 4px;color:#97a29d;font-size:8px;text-align:center}.intranet-week-event{position:relative;display:grid;min-width:0;gap:3px;overflow:hidden;border:0;border-left:3px solid var(--event-color);border-radius:7px;background:#f5f8f6;padding:9px 8px;text-align:left;transition:background 140ms ease,box-shadow 140ms ease,transform 140ms ease}.intranet-week-event:hover{z-index:2;background:#fff;box-shadow:0 8px 18px rgb(26 52 42 / 11%);transform:translateY(-2px)}.intranet-week-event small{color:#73827b;font-size:7px}.intranet-week-event strong{overflow:hidden;color:#24453d;font-size:9px;line-height:1.35;text-overflow:ellipsis;white-space:nowrap}.intranet-week-event span{overflow:hidden;color:#74847c;font-size:7px;text-overflow:ellipsis;white-space:nowrap}.intranet-week-birthday{display:flex;align-items:center;gap:6px;border-radius:7px;background:#f4ecf4;padding:8px;color:#745078}.intranet-week-birthday small,.intranet-week-birthday strong{display:block}.intranet-week-birthday small{font-size:7px}.intranet-week-birthday strong{overflow:hidden;margin-top:2px;font-size:8px;text-overflow:ellipsis;white-space:nowrap}
+
+/* Semana: tarjetas internas más legibles sin aumentar el ancho del calendario. */
+.intranet-week-event{gap:5px;border:1px solid #e3ebe7;border-left:4px solid var(--event-color);border-radius:9px;background:linear-gradient(145deg,#fff,#f4f8f6);padding:10px 9px;box-shadow:0 3px 10px rgb(28 52 42 / 5%)}
+.intranet-week-event small{font-size:8px;font-weight:680}.intranet-week-event strong{font-size:10px;line-height:1.4;white-space:normal}.intranet-week-event span{font-size:8px;font-weight:650}.intranet-week-birthday{border:1px solid #eaddec;border-left:4px solid #7b4b80;border-radius:9px;background:linear-gradient(145deg,#fbf7fb,#f3eaf4);padding:9px}.intranet-week-birthday small{font-size:8px}.intranet-week-birthday strong{font-size:9px}
+
+/* Catálogo compacto: preparado para crecer sin convertir cada aplicación en un bloque sobredimensionado. */
+.intranet-application-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.intranet-application-grid article{min-height:184px;grid-template-columns:42px minmax(0,1fr);grid-template-rows:1fr auto;gap:0 13px;padding:16px}.intranet-application-icon{width:42px;height:42px;border-radius:12px;font-size:11px}.intranet-application-copy{min-width:0;margin-top:0}.intranet-application-copy h2{margin-top:4px;font-size:16px}.intranet-application-copy p{display:-webkit-box;overflow:hidden;margin-top:6px;font-size:9px;-webkit-box-orient:vertical;-webkit-line-clamp:2}.intranet-application-grid footer{grid-column:1 / -1;margin-top:14px;padding-top:11px}.intranet-application-grid footer span,.intranet-application-grid footer a{font-size:9px}.intranet-application-grid footer a{padding:7px 9px}.intranet-birthday.has-celebrations{border-color:#d9c9df;background:linear-gradient(120deg,#f5edf6,#fff)}.intranet-birthday.is-empty{border-color:#dce6e0;background:linear-gradient(120deg,#f4f8f5,#fbfcfb)}
+@media(max-width:1180px){.intranet-application-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:900px){.intranet-application-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:560px){.intranet-application-grid{grid-template-columns:1fr}}
+.intranet-day-view{margin-top:14px;overflow:hidden;border:1px solid #dfe7e3;border-radius:15px;background:#fff;box-shadow:0 10px 28px rgb(28 48 40 / 6%)}.intranet-day-view>header{display:flex;align-items:center;gap:12px;border-bottom:1px solid #e6ece9;background:linear-gradient(110deg,#edf5f2,#fafbf9);padding:18px 22px}.intranet-day-view>header>svg{color:var(--intranet-teal)}.intranet-day-view>header small{color:var(--intranet-teal);font-size:8px;font-weight:780;letter-spacing:.08em;text-transform:uppercase}.intranet-day-view>header h2{margin-top:3px;font-size:19px;text-transform:capitalize}.intranet-day-view-list{display:grid;gap:8px;padding:18px}.intranet-day-view-list>button{display:grid;min-height:74px;grid-template-columns:90px 5px minmax(0,1fr);align-items:center;gap:13px;border:1px solid #e4ebe7;border-radius:11px;background:#fafcfb;padding:12px;text-align:left;transition:background 140ms ease,box-shadow 140ms ease,transform 140ms ease}.intranet-day-view-list>button:hover{background:#fff;box-shadow:0 9px 22px rgb(26 52 42 / 9%);transform:translateX(3px)}.intranet-day-view-list>button time{color:#4e665d;font-size:10px;font-weight:720}.intranet-day-view-list>button>i{width:5px;height:42px;border-radius:5px;background:var(--event-color)}.intranet-day-view-list>button span>*{display:block}.intranet-day-view-list>button small{font-size:8px;font-weight:760;text-transform:uppercase}.intranet-day-view-list>button strong{margin-top:4px;font-size:12px}.intranet-day-view-list>button em{margin-top:4px;color:#74827c;font-size:9px;font-style:normal}
+@media(max-width:1000px){.intranet-week-view{grid-template-columns:repeat(4,minmax(0,1fr))}.intranet-week-view>section{min-height:220px;border-bottom:1px solid #e7ece9}.intranet-week-view>section:nth-child(4){border-right:0}}
+@media(max-width:760px){.intranet-calendar-toolbar{align-items:stretch;flex-direction:column}.intranet-calendar-view-switch button{min-width:0;flex:1}.intranet-calendar-period{min-width:0}.intranet-week-view{grid-template-columns:repeat(2,minmax(0,1fr))}.intranet-week-view>section:nth-child(2n){border-right:0}.intranet-day-view-list>button{grid-template-columns:70px 4px minmax(0,1fr);gap:9px}.intranet-events-list{padding:16px}}
+@media(max-width:480px){.intranet-week-view{grid-template-columns:1fr}.intranet-week-view>section{border-right:0}.intranet-calendar-period strong{font-size:9px}.intranet-day-view-list>button{grid-template-columns:1fr}.intranet-day-view-list>button>i{width:100%;height:4px}.intranet-day-view-list>button time{font-size:9px}}
+
+/* Celebración institucional: cada persona tiene presencia propia y no se reduce a una lista de nombres. */
+.intranet-birthday-content{min-width:0;flex:1}.intranet-birthday-content>p{max-width:560px;margin-top:6px;color:#685f69;font-size:10px;line-height:1.55}.intranet-birthday-people{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:12px}.intranet-birthday-people article{display:grid;grid-template-columns:34px minmax(0,1fr);grid-template-rows:auto auto;column-gap:9px;align-items:center;border:1px solid #eadfec;border-radius:10px;background:rgb(255 255 255 / 78%);padding:8px}.intranet-birthday-people article>span{display:grid;grid-row:1 / 3;width:34px;height:34px;place-items:center;border-radius:50%;background:#76517d;color:#fff;font-size:9px;font-weight:800}.intranet-birthday-people article>b{overflow:hidden;color:#253d36;font-size:10px;line-height:1.25;text-overflow:ellipsis;white-space:nowrap}.intranet-birthday-people article>i{margin-top:2px;color:#805d85;font-size:8px;font-style:normal;font-weight:680}@media(max-width:520px){.intranet-birthday-people{grid-template-columns:1fr}}
+
+.intranet-birthday.has-celebrations{animation:intranet-celebration-arrival 900ms cubic-bezier(.2,.75,.25,1) both}.intranet-birthday-content>header{display:flex;align-items:center;justify-content:space-between;gap:8px}.intranet-birthday-content>header>button{display:flex;align-items:center;gap:4px;border:1px solid #ddcfe1;border-radius:999px;background:#fff;padding:5px 8px;color:#76517d;font-size:8px;font-weight:730}.intranet-birthday-content>header>button:hover{background:#76517d;color:#fff;transform:translateY(-1px)}.intranet-birthday-people{position:relative}.intranet-birthday-people article{position:relative;z-index:1;transition:transform 180ms ease,box-shadow 180ms ease,background 180ms ease}.intranet-birthday-people article:hover,.intranet-birthday-people article:focus-within{z-index:5;background:#fff;box-shadow:0 15px 34px rgb(68 43 74 / 20%);transform:scale(1.07)}.intranet-birthday-people article:hover>b,.intranet-birthday-people article:focus-within>b{overflow:visible;white-space:normal}.intranet-next-birthdays{margin-top:12px;border-top:1px solid #e5d9e8;padding-top:10px}.intranet-next-birthdays-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}.intranet-next-birthdays-heading>span{display:flex;align-items:center;gap:5px;color:#76517d}.intranet-next-birthdays-heading b{font-size:9px}.intranet-next-birthdays-heading button{display:grid;width:24px;height:24px;place-items:center;border:1px solid #dfd2e2;border-radius:50%;background:white;color:#76517d}.intranet-next-birthdays-heading button:hover{background:#76517d;color:#fff}.intranet-next-birthday{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:9px;margin-top:8px;border-radius:10px;background:linear-gradient(105deg,#fff,#f8f2f8);padding:8px;animation:intranet-next-birthday 300ms ease both}.intranet-next-birthday>span{display:grid;width:34px;height:34px;place-items:center;border-radius:50%;background:#efe2f0;color:#76517d;font-size:9px;font-weight:800}.intranet-next-birthday strong,.intranet-next-birthday small{display:block}.intranet-next-birthday strong{overflow:hidden;margin:0;color:#263e37;font-size:10px;text-overflow:ellipsis;white-space:nowrap}.intranet-next-birthday small{margin-top:2px;color:#766d78;font-size:8px;text-transform:capitalize}.intranet-next-birthday>i{color:#8c7c8f;font-size:7px;font-style:normal}@keyframes intranet-celebration-arrival{0%{opacity:.4;transform:translateY(10px) scale(.98)}55%{transform:translateY(-2px) scale(1.01)}100%{opacity:1;transform:none}}@keyframes intranet-next-birthday{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:none}}@media(prefers-reduced-motion:reduce){.intranet-birthday.has-celebrations,.intranet-next-birthday{animation:none}.intranet-birthday-people article{transition:none}}
+
+.intranet-birthday.has-celebrations{position:relative;overflow:hidden}.intranet-birthday.has-celebrations>.intranet-birthday-avatar,.intranet-birthday.has-celebrations>.intranet-birthday-content{position:relative;z-index:2}.intranet-birthday-confetti{position:absolute;z-index:1;inset:0;overflow:hidden;pointer-events:none}.intranet-birthday-confetti i{position:absolute;top:-18px;left:var(--confetti-left);width:6px;height:13px;border-radius:2px;background:var(--confetti-color);opacity:0;animation:intranet-confetti-fall var(--confetti-duration) cubic-bezier(.18,.68,.35,1) var(--confetti-delay) 1 both}.intranet-birthday-confetti i:nth-child(1){--confetti-left:4%;--confetti-color:#287986;--confetti-delay:.02s;--confetti-duration:1.6s}.intranet-birthday-confetti i:nth-child(2){--confetti-left:10%;--confetti-color:#b38b3c;--confetti-delay:.18s;--confetti-duration:1.9s}.intranet-birthday-confetti i:nth-child(3){--confetti-left:17%;--confetti-color:#8b3c72;--confetti-delay:.08s;--confetti-duration:1.75s}.intranet-birthday-confetti i:nth-child(4){--confetti-left:23%;--confetti-color:#55754b;--confetti-delay:.32s;--confetti-duration:1.55s}.intranet-birthday-confetti i:nth-child(5){--confetti-left:30%;--confetti-color:#9a384d;--confetti-delay:.15s;--confetti-duration:2s}.intranet-birthday-confetti i:nth-child(6){--confetti-left:36%;--confetti-color:#287986;--confetti-delay:.4s;--confetti-duration:1.7s}.intranet-birthday-confetti i:nth-child(7){--confetti-left:42%;--confetti-color:#b38b3c;--confetti-delay:.1s;--confetti-duration:1.8s}.intranet-birthday-confetti i:nth-child(8){--confetti-left:48%;--confetti-color:#8b3c72;--confetti-delay:.28s;--confetti-duration:1.6s}.intranet-birthday-confetti i:nth-child(9){--confetti-left:54%;--confetti-color:#55754b;--confetti-delay:.04s;--confetti-duration:1.95s}.intranet-birthday-confetti i:nth-child(10){--confetti-left:60%;--confetti-color:#9a384d;--confetti-delay:.36s;--confetti-duration:1.65s}.intranet-birthday-confetti i:nth-child(11){--confetti-left:66%;--confetti-color:#287986;--confetti-delay:.2s;--confetti-duration:1.85s}.intranet-birthday-confetti i:nth-child(12){--confetti-left:71%;--confetti-color:#b38b3c;--confetti-delay:.06s;--confetti-duration:1.7s}.intranet-birthday-confetti i:nth-child(13){--confetti-left:76%;--confetti-color:#8b3c72;--confetti-delay:.44s;--confetti-duration:1.6s}.intranet-birthday-confetti i:nth-child(14){--confetti-left:81%;--confetti-color:#55754b;--confetti-delay:.12s;--confetti-duration:1.9s}.intranet-birthday-confetti i:nth-child(15){--confetti-left:86%;--confetti-color:#9a384d;--confetti-delay:.3s;--confetti-duration:1.7s}.intranet-birthday-confetti i:nth-child(16){--confetti-left:90%;--confetti-color:#287986;--confetti-delay:.03s;--confetti-duration:2s}.intranet-birthday-confetti i:nth-child(17){--confetti-left:94%;--confetti-color:#b38b3c;--confetti-delay:.24s;--confetti-duration:1.75s}.intranet-birthday-confetti i:nth-child(18){--confetti-left:98%;--confetti-color:#8b3c72;--confetti-delay:.14s;--confetti-duration:1.6s}@keyframes intranet-confetti-fall{0%{opacity:0;transform:translate3d(0,-12px,0) rotate(0)}12%{opacity:.95}55%{transform:translate3d(15px,95px,0) rotate(190deg)}100%{opacity:0;transform:translate3d(-10px,235px,0) rotate(420deg)}}@media(prefers-reduced-motion:reduce){.intranet-birthday-confetti{display:none}}
+
+/* Cumpleaños agrupados por fecha: un bloque por día, con todas las personas. */
+.intranet-next-birthday-group{margin-top:8px;border:1px solid #eadfec;border-radius:11px;background:linear-gradient(105deg,#fff,#f8f2f8);padding:9px;animation:intranet-next-birthday 300ms ease both}.intranet-next-birthday-group>header{display:flex;align-items:center;justify-content:space-between;gap:8px}.intranet-next-birthday-group>header strong{margin:0;color:#76517d;font-size:10px;text-transform:capitalize}.intranet-next-birthday-group>header i{color:#8c7c8f;font-size:7px;font-style:normal}.intranet-next-birthday-group>div{display:grid;gap:5px;margin-top:7px}.intranet-next-birthday-group>div>span{display:grid;min-width:0;grid-template-columns:27px minmax(0,1fr);align-items:center;gap:7px;border-radius:8px;background:#fff;padding:5px 7px}.intranet-next-birthday-group>div b{display:grid;width:27px;height:27px;place-items:center;border-radius:50%;background:#efe2f0;color:#76517d;font-size:8px}.intranet-next-birthday-group>div em{overflow-wrap:anywhere;color:#263e37;font-size:9px;font-style:normal;font-weight:700;line-height:1.25}
+.intranet-birthday-group{display:grid;min-width:0;grid-template-columns:34px minmax(0,1fr);align-items:start;gap:10px;border:1px solid #eaddec;border-left:4px solid #7b4b80;border-radius:10px;background:linear-gradient(145deg,#fbf7fb,#f3eaf4);padding:11px;color:#745078}.intranet-birthday-group>svg{margin-top:2px}.intranet-birthday-group>div{min-width:0}.intranet-birthday-group small{display:block;color:#76547d;font-size:8px;font-weight:760;text-transform:uppercase}.intranet-birthday-group ul{display:grid;gap:4px;margin:6px 0 0;padding:0;list-style:none}.intranet-birthday-group li{max-width:100%;overflow-wrap:anywhere;color:#263e37;font-size:10px;font-weight:700;line-height:1.3}.intranet-birthday-group.is-compact{width:100%;grid-template-columns:18px minmax(0,1fr);gap:6px;padding:8px 7px}.intranet-birthday-group.is-compact small{font-size:7px}.intranet-birthday-group.is-compact ul{gap:3px;margin-top:5px}.intranet-birthday-group.is-compact li{font-size:8px;line-height:1.25}.intranet-week-view>section>div>.intranet-birthday-group{box-sizing:border-box;min-width:0;max-width:100%;overflow:hidden}.intranet-day-view-list>.intranet-birthday-group{width:100%;box-sizing:border-box}.intranet-event-day-list>.intranet-birthday-group{width:100%;box-sizing:border-box}

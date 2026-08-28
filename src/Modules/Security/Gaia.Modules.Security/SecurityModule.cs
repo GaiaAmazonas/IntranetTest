@@ -37,6 +37,8 @@ public static class SecurityModuleExtensions
                 policy.AddRequirements(new AdminCorePermissionRequirement(permission));
             });
         }
+        authorization.AddPolicy("IntranetBirthdays", policy => policy.AddRequirements(
+            new AnyAdminCorePermissionRequirement([AdminCorePermissions.IntranetInicioVer, AdminCorePermissions.IntranetCalendarioVer])));
         authorization.AddPolicy(AssignmentAuthorizationPolicies.Read,policy=>policy.AddRequirements(new AdminCorePermissionRequirement(AdminCorePermissions.IntranetAdminCoreVer),new AnyAdminCorePermissionRequirement([AdminCorePermissions.OrgAsignacionesVer,AdminCorePermissions.ThVinculacionesVer])));
         authorization.AddPolicy(AssignmentAuthorizationPolicies.Create,policy=>policy.AddRequirements(new AdminCorePermissionRequirement(AdminCorePermissions.IntranetAdminCoreVer),new AnyAdminCorePermissionRequirement([AdminCorePermissions.OrgAsignacionesCrear,AdminCorePermissions.ThVinculacionesCrear])));
         authorization.AddPolicy(AssignmentAuthorizationPolicies.Update,policy=>policy.AddRequirements(new AdminCorePermissionRequirement(AdminCorePermissions.IntranetAdminCoreVer),new AnyAdminCorePermissionRequirement([AdminCorePermissions.OrgAsignacionesActualizar,AdminCorePermissions.ThVinculacionesActualizar])));

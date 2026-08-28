@@ -16,8 +16,10 @@ internal static class ThirdPartiesEndpoints
             .RequireAuthorization();
         intranet.MapGet("/people", ListIntranetPeopleAsync)
             .RequireAuthorization(AdminCorePermissions.IntranetPersonasVer);
+        intranet.MapGet("/people/organization-units", ListIntranetOrganizationUnitsAsync)
+            .RequireAuthorization(AdminCorePermissions.IntranetPersonasVer);
         intranet.MapGet("/birthdays", ListIntranetBirthdaysAsync)
-            .RequireAuthorization(AdminCorePermissions.IntranetCalendarioVer);
+            .RequireAuthorization("IntranetBirthdays");
 
         var group = endpoints.MapGroup("/api/third-parties")
             .WithTags("Third parties")
@@ -58,11 +60,19 @@ internal static class ThirdPartiesEndpoints
 
     private static async Task<IResult> ListIntranetPeopleAsync(
         string? search,
+        Guid? organizationUnitId,
+        bool? includeDescendants,
         int page,
         int pageSize,
         IIntranetDirectoryReader reader,
         CancellationToken cancellationToken) =>
-        Results.Ok(await reader.ListPeopleAsync(search, page == 0 ? 1 : page, pageSize == 0 ? 24 : pageSize, cancellationToken));
+        Results.Ok(await reader.ListPeopleAsync(search, organizationUnitId, includeDescendants ?? false,
+            page == 0 ? 1 : page, pageSize == 0 ? 24 : pageSize, cancellationToken));
+
+    private static async Task<IResult> ListIntranetOrganizationUnitsAsync(
+        IIntranetDirectoryReader reader,
+        CancellationToken cancellationToken) =>
+        Results.Ok(await reader.ListOrganizationUnitsAsync(cancellationToken));
 
     private static async Task<IResult> ListIntranetBirthdaysAsync(
         int month,

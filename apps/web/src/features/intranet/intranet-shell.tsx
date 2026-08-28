@@ -9,12 +9,12 @@ import {
   ExternalLink,
   LogOut,
   Menu,
-  ShieldCheck,
   UserRound,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { startLogin } from "@/lib/api-client";
+import { AccessState } from "@/components/route-access-gate";
 import { useSecurity } from "@/components/security-context";
 import {
   intranetNavigation,
@@ -56,18 +56,17 @@ export function IntranetShell({ children }: { children: React.ReactNode }) {
   }
 
   if (security.loading) {
-    return <IntranetStatus title="Preparando tu espacio Gaia…" />;
+    return <AccessState icon="loading" title="Preparando tu espacio Gaia…" />;
   }
 
   if (!security.user) {
-    return (
-      <IntranetStatus
-        action="Iniciar sesión"
-        description={security.error ?? "Tu sesión institucional no está disponible."}
-        onAction={() => startLogin(`${location.origin}/intranet`)}
-        title="Necesitas iniciar sesión"
-      />
-    );
+    return <AccessState
+      action="Iniciar sesión"
+      description="Ingresa con tu cuenta institucional para continuar."
+      icon="login"
+      onAction={() => startLogin(`${location.origin}/intranet`)}
+      title="Sesión requerida"
+    />;
   }
 
   const initials = security.user.name
@@ -174,26 +173,5 @@ export function IntranetShell({ children }: { children: React.ReactNode }) {
       <main className="intranet-main">{children}</main>
       <footer className="intranet-footer"><span>Fundación Gaia Amazonas</span><span>Espacio institucional protegido</span></footer>
     </div>
-  );
-}
-
-function IntranetStatus({
-  action,
-  description,
-  onAction,
-  title,
-}: {
-  action?: string;
-  description?: string;
-  onAction?: () => void;
-  title: string;
-}) {
-  return (
-    <main className="intranet-status">
-      <span><ShieldCheck size={26} /></span>
-      <h1>{title}</h1>
-      {description && <p>{description}</p>}
-      {action && <button onClick={onAction} type="button">{action}</button>}
-    </main>
   );
 }
