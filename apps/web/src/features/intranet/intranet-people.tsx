@@ -1,7 +1,7 @@
 "use client";
 
-import { Building2, ChevronDown, ChevronRight, Mail, MapPin, Phone, Search, Users } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Building2, ChevronDown, ChevronLeft, ChevronRight, Mail, MapPin, Phone, Search, Users } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { apiRequest } from "@/lib/api-client";
 
 type Person = { id:string; fullName:string; jobTitle:string|null; organizationUnitId:string|null; organizationUnit:string|null; organizationUnitCode:string|null; site:string|null; institutionalEmail:string|null; visiblePhone:string|null; photoUrl:string|null };
@@ -12,36 +12,39 @@ export function IntranetPeople() {
   const [search,setSearch]=useState("");
   const [query,setQuery]=useState("");
   const [allPeople,setAllPeople]=useState<Person[]>([]);
-  const [visibleCount,setVisibleCount]=useState(24);
+  const [page,setPage]=useState(1);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState("");
   const [units,setUnits]=useState<OrganizationUnit[]>([]);
   const [selectedUnitId,setSelectedUnitId]=useState("");
   const [includeDescendants,setIncludeDescendants]=useState(false);
   const [collapsed,setCollapsed]=useState(()=>new Set<string>());
+  const resultsRef=useRef<HTMLDivElement>(null);
+  const pageSize=12;
 
   const unitById=useMemo(()=>new Map(units.map(unit=>[unit.id,unit])),[units]);
   const tree=useMemo(()=>organizationTree(units,collapsed),[units,collapsed]);
   const selectedUnit=unitById.get(selectedUnitId);
-  const result=useMemo<PeoplePage>(()=>{const scope=selectedUnitId?new Set([selectedUnitId,...(includeDescendants?descendantsOf(selectedUnitId,units):[])]):null;const term=normalize(query);const filtered=allPeople.filter(person=>(!scope||(person.organizationUnitId&&scope.has(person.organizationUnitId)))&&(!term||[person.fullName,person.jobTitle,person.organizationUnit,person.organizationUnitCode,person.site,person.institutionalEmail,person.visiblePhone].some(value=>normalize(value).includes(term))));return{items:filtered.slice(0,visibleCount),page:1,pageSize:visibleCount,total:filtered.length};},[allPeople,includeDescendants,query,selectedUnitId,units,visibleCount]);
+  const result=useMemo<PeoplePage>(()=>{const scope=selectedUnitId?new Set([selectedUnitId,...(includeDescendants?descendantsOf(selectedUnitId,units):[])]):null;const term=normalize(query);const filtered=allPeople.filter(person=>(!scope||(person.organizationUnitId&&scope.has(person.organizationUnitId)))&&(!term||[person.fullName,person.jobTitle,person.organizationUnit,person.organizationUnitCode,person.site,person.institutionalEmail,person.visiblePhone].some(value=>normalize(value).includes(term))));const start=(page-1)*pageSize;return{items:filtered.slice(start,start+pageSize),page,pageSize,total:filtered.length};},[allPeople,includeDescendants,page,query,selectedUnitId,units]);
+  const pageCount=Math.max(1,Math.ceil(result.total/pageSize));
 
-  useEffect(()=>{const timer=window.setTimeout(()=>{setQuery(search.trim());setVisibleCount(24);},250);return()=>window.clearTimeout(timer);},[search]);
+  useEffect(()=>{const timer=window.setTimeout(()=>{setQuery(search.trim());setPage(1);},250);return()=>window.clearTimeout(timer);},[search]);
   useEffect(()=>{let active=true;Promise.all([apiRequest<PeoplePage>(peoplePath(1,500,"","",false)),apiRequest<OrganizationUnit[]>("/api/intranet/people/organization-units")]).then(([people,data])=>{if(!active)return;setAllPeople(people.items);setUnits(data);setCollapsed(new Set(data.filter(candidate=>data.some(unit=>unit.parentId===candidate.id)).map(unit=>unit.id)));}).catch(reason=>{if(active)setError(reason instanceof Error?reason.message:"No fue posible cargar Personas.");}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[]);
 
-  function loadMore(){setVisibleCount(current=>current+24);}
+  function goToPage(next:number){setPage(Math.min(pageCount,Math.max(1,next)));resultsRef.current?.scrollIntoView({behavior:"smooth",block:"start"});}
 
   return <section className="intranet-directory">
     <header className="intranet-section-hero intranet-section-hero-people"><div><p>Nuestro equipo</p><h1>Personas</h1><span>Encuentra y conecta con quienes hacen posible el trabajo de Fundación Gaia Amazonas.</span></div><label><Search aria-hidden="true" size={18}/><input aria-label="Buscar por persona, cargo o unidad" onChange={event=>setSearch(event.target.value)} placeholder="Buscar persona, cargo, unidad, sede…" value={search}/></label></header>
     <div className="intranet-directory-layout">
-      <aside className="intranet-directory-units"><header><Building2 size={17}/><span><strong>Unidades organizacionales</strong><small>Explora las personas de cada equipo.</small></span></header><div role="tree"><button aria-current={!selectedUnitId?"true":undefined} className="intranet-directory-unit is-all" onClick={()=>{setSelectedUnitId("");setVisibleCount(24);}} type="button"><Users size={15}/><span><strong>Toda la organización</strong><small>Directorio completo</small></span></button>{tree.map(({unit,depth,hasChildren})=><div className="intranet-directory-tree-row" key={unit.id} style={{"--tree-depth":depth} as React.CSSProperties}>{hasChildren?<button aria-label={`${collapsed.has(unit.id)?"Expandir":"Contraer"} ${unit.name}`} className="intranet-directory-tree-toggle" onClick={()=>setCollapsed(current=>toggle(current,unit.id))} type="button">{collapsed.has(unit.id)?<ChevronRight size={14}/>:<ChevronDown size={14}/>}</button>:<span className="intranet-directory-tree-spacer"/>}<button aria-current={selectedUnitId===unit.id?"true":undefined} className="intranet-directory-unit" onClick={()=>{setSelectedUnitId(unit.id);setVisibleCount(24);}} type="button"><span><strong>{unit.name}</strong><small>{unit.code}</small></span></button></div>)}</div></aside>
-      <div className="intranet-directory-results">
+      <aside className="intranet-directory-units"><header><Building2 size={17}/><span><strong>Unidades organizacionales</strong><small>Explora las personas de cada equipo.</small></span></header><div role="tree"><button aria-current={!selectedUnitId?"true":undefined} className="intranet-directory-unit is-all" onClick={()=>{setSelectedUnitId("");setPage(1);}} type="button"><Users size={15}/><span><strong>Toda la organización</strong><small>Directorio completo</small></span></button>{tree.map(({unit,depth,hasChildren})=><div className="intranet-directory-tree-row" key={unit.id} style={{"--tree-depth":depth} as React.CSSProperties}>{hasChildren?<button aria-label={`${collapsed.has(unit.id)?"Expandir":"Contraer"} ${unit.name}`} className="intranet-directory-tree-toggle" onClick={()=>setCollapsed(current=>toggle(current,unit.id))} type="button">{collapsed.has(unit.id)?<ChevronRight size={14}/>:<ChevronDown size={14}/>}</button>:<span className="intranet-directory-tree-spacer"/>}<button aria-current={selectedUnitId===unit.id?"true":undefined} className="intranet-directory-unit" onClick={()=>{setSelectedUnitId(unit.id);setPage(1);}} type="button"><span><strong>{unit.name}</strong><small>{unit.code}</small></span></button></div>)}</div></aside>
+      <div className="intranet-directory-results" ref={resultsRef}>
         <div className="intranet-directory-summary"><span><Users size={16}/><strong>{result?.total??0}</strong> {selectedUnit?`personas en ${selectedUnit.name}`:"colaboradores activos"}</span><small>Solo se muestran datos institucionales autorizados.</small></div>
-        {selectedUnit&&<label className="intranet-directory-descendants"><input checked={includeDescendants} onChange={event=>{setIncludeDescendants(event.target.checked);setVisibleCount(24);}} type="checkbox"/><span><strong>Incluir unidades descendientes</strong><small>Agrega los equipos que dependen de esta unidad.</small></span></label>}
+        {selectedUnit&&<label className="intranet-directory-descendants"><input checked={includeDescendants} onChange={event=>{setIncludeDescendants(event.target.checked);setPage(1);}} type="checkbox"/><span><strong>Incluir unidades descendientes</strong><small>Agrega los equipos que dependen de esta unidad.</small></span></label>}
         {error&&<div className="intranet-data-state is-error"><strong>No fue posible cargar Personas</strong><p>{error}</p></div>}
         {!error&&loading&&<div className="intranet-data-state"><strong>Cargando directorio…</strong></div>}
         {!error&&!loading&&result.items.length===0&&<div className="intranet-data-state"><strong>No encontramos personas</strong><p>Prueba con otro nombre, cargo, unidad, código, sede, correo o teléfono.</p></div>}
         {!loading&&result.items.length>0&&<div className="intranet-people-grid">{result.items.map(person=><PersonCard key={person.id} person={person}/>)}</div>}
-        {result.items.length<result.total&&<button className="intranet-load-more" disabled={loading} onClick={loadMore} type="button">Mostrar más personas</button>}
+        {!loading&&result.total>pageSize&&<nav aria-label="Paginación del directorio" className="intranet-directory-pagination"><button aria-label="Página anterior" disabled={page===1} onClick={()=>goToPage(page-1)} type="button"><ChevronLeft size={16}/><span>Anterior</span></button><span><strong>{page}</strong> de {pageCount}</span><button aria-label="Página siguiente" disabled={page===pageCount} onClick={()=>goToPage(page+1)} type="button"><span>Siguiente</span><ChevronRight size={16}/></button></nav>}
       </div>
     </div>
   </section>;

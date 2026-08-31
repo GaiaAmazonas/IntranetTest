@@ -12,7 +12,7 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { startLogin } from "@/lib/api-client";
 import { AccessState } from "@/components/route-access-gate";
 import { useSecurity } from "@/components/security-context";
@@ -20,8 +20,19 @@ import {
   intranetNavigation,
   isIntranetRouteActive,
 } from "./intranet-navigation";
+import { applicationsFromModules } from "./intranet-applications";
 
 const apiUrl = process.env.NEXT_PUBLIC_GAIA_API_URL ?? "https://localhost:7168";
+const gaiaSocialNetworks = [
+  { label: "Página web", mark: "G", href: "https://gaiaamazonas.org/" },
+  { label: "X", mark: "X", href: "https://x.com/gaiaamazonas" },
+  { label: "Facebook", mark: "f", href: "https://www.facebook.com/gaiaamazonas/" },
+  { label: "Instagram", mark: "◎", href: "https://www.instagram.com/gaiaamazonas/" },
+  { label: "YouTube", mark: "▶", href: "https://www.youtube.com/user/gaiaamazonas" },
+  { label: "Vimeo", mark: "v", href: "https://vimeo.com/gaiaamazonas" },
+  { label: "Spotify", mark: "≋", href: "https://open.spotify.com/show/37hXfsGxzUDK0PZFnO0Rm3" },
+  { label: "TikTok", mark: "♪", href: "https://www.tiktok.com/@gaiaamazonas" },
+] as const;
 
 export function IntranetShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -30,6 +41,7 @@ export function IntranetShell({ children }: { children: React.ReactNode }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
+  const configuredApplications = useMemo(() => applicationsFromModules(security.modules), [security.modules]);
 
   useEffect(() => {
     const close = (event: MouseEvent) => {
@@ -65,7 +77,7 @@ export function IntranetShell({ children }: { children: React.ReactNode }) {
       description="Ingresa con tu cuenta institucional para continuar."
       icon="login"
       onAction={() => startLogin(`${location.origin}/intranet`)}
-      title="Sesión requerida"
+      title=""
     />;
   }
 
@@ -106,14 +118,6 @@ export function IntranetShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        {security.can("INT.APP.ADMINCORE.VER") && (
-          <Link className="intranet-product-switch" href="/admincore" rel="noopener noreferrer" target="_blank">
-            <AppWindow aria-hidden="true" size={17} />
-            <span><small>Plataforma empresarial</small><strong>AdminCore</strong></span>
-            <ExternalLink aria-hidden="true" size={13} />
-          </Link>
-        )}
-
         <div className="intranet-profile" ref={profileRef}>
           <button
             aria-expanded={profileOpen}
@@ -132,6 +136,13 @@ export function IntranetShell({ children }: { children: React.ReactNode }) {
                 <span><strong>{security.user.name}</strong><small>{security.user.email}</small></span>
               </div>
               <Link href="/intranet/perfil" role="menuitem"><UserRound size={16} /> Mi perfil</Link>
+              {configuredApplications.map(application => (
+                <Link href={application.href} key={application.code} onClick={() => setProfileOpen(false)} rel="noopener noreferrer" role="menuitem" target="_blank">
+                  <AppWindow aria-hidden="true" size={16} />
+                  <span>{application.name}</span>
+                  <ExternalLink aria-hidden="true" className="intranet-profile-app-external" size={12} />
+                </Link>
+              ))}
               <button disabled={loggingOut} onClick={logout} role="menuitem" type="button">
                 <LogOut size={16} /> {loggingOut ? "Cerrando sesión…" : "Cerrar sesión"}
               </button>
@@ -171,7 +182,26 @@ export function IntranetShell({ children }: { children: React.ReactNode }) {
       )}
 
       <main className="intranet-main">{children}</main>
-      <footer className="intranet-footer"><span>Fundación Gaia Amazonas</span><span>Espacio institucional protegido</span></footer>
+      <footer className="intranet-footer">
+        <div className="intranet-footer-grid">
+          <section className="intranet-footer-identity">
+            <Image alt="Gaia Amazonas" height={50} src="/brand/logo-gaia.svg" width={90} />
+            <address><strong>Fundación Gaia Amazonas</strong><span>Calle 70A # 11 – 30</span><span>Bogotá, Colombia</span><a href="mailto:contacto@gaiaamazonas.org" target="_blank">contacto@gaiaamazonas.org</a></address>
+          </section>
+          <section className="intranet-footer-legal">
+            <h2>Documentos legales</h2>
+            <a href="https://gaiaamazonas.org/terminos-y-condiciones/" rel="noopener noreferrer" target="_blank">Términos y condiciones</a>
+            <a href="https://gaiaamazonas.org/aviso-legal/" rel="noopener noreferrer" target="_blank">Aviso legal</a>
+            <a href="https://gaiaamazonas.org/politica-de-datos/" rel="noopener noreferrer" target="_blank">Política de datos</a>
+          </section>
+          <section className="intranet-footer-connect">
+            <h2>Gaia en el mundo</h2>
+            <p>Sigamos conectados</p>
+            <nav aria-label="Sitio web y redes sociales de Fundación Gaia Amazonas">{gaiaSocialNetworks.map(network => <a aria-label={network.label} href={network.href} key={network.label} rel="noopener noreferrer" target="_blank"><i aria-hidden="true">{network.mark}</i><span>{network.label}</span></a>)}</nav>
+          </section>
+        </div>
+        <div className="intranet-footer-bottom"><span>© 2026 Fundación Gaia Amazonas. Todos los derechos reservados.</span><span>Espacio institucional protegido</span></div>
+      </footer>
     </div>
   );
 }

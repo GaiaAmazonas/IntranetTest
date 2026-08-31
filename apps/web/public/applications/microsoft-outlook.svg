@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Microsoft Outlook">
+  <rect width="64" height="64" rx="14" fill="#eaf5ff"/>
+  <path d="M25 14h29a4 4 0 0 1 4 4v31a4 4 0 0 1-4 4H25V14Z" fill="#1473e6"/>
+  <path d="m27 24 14 11 15-11v-3H27v3Z" fill="#fff" opacity=".95"/>
+  <path d="m27 27 14 11 15-11v21H27V27Z" fill="#c7e5ff"/>
+  <rect x="7" y="19" width="30" height="36" rx="5" fill="#0866c6"/>
+  <path d="M22 28c7 0 11 4 11 10s-4 10-11 10-11-4-11-10 4-10 11-10Zm0 5c-3 0-5 2-5 5s2 5 5 5 5-2 5-5-2-5-5-5Z" fill="#fff"/>
+</svg>

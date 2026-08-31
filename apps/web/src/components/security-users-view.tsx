@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, ChevronRight, Clock3, Fingerprint, KeyRound, Link2, LoaderCircle, Mail, Search, ShieldCheck, SlidersHorizontal, UserRoundCheck, X } from "lucide-react";
+import { CalendarDays, ChevronRight, Clock3, Fingerprint, KeyRound, Link2, LoaderCircle, Mail, Search, ShieldCheck, SlidersHorizontal, UserRoundCheck, Users, X } from "lucide-react";
 import { apiRequest } from "@/lib/api-client";
 import { ConfirmDialog } from "./form-dialog";
 import { useFeedback } from "./feedback";
@@ -55,6 +55,16 @@ export function SecurityUsersView({ users, roles, audit, onReload }: { users: Se
   }, [query, roleFilter, status, users]);
 
   const availableRoles = selected ? roles.filter(role => role.isActive && !selected.roles.some(assignment => isCurrent(assignment) && assignment.roleId === role.id)) : [];
+  const accessDashboard = useMemo(() => ({
+    assigned: users.filter(item => item.roles.some(isCurrent)).length,
+    pending: users.filter(item => item.user.provisioningStatus === "PENDING_FIRST_ACCESS").length,
+    withoutRole: users.filter(item => !item.roles.some(isCurrent)).length,
+    activeAccess: users.filter(item => item.user.isActive && item.user.provisioningStatus === "PROVISIONED").length,
+    inactiveAccess: users.filter(item => !item.user.isActive).length,
+    withAccessHistory: users.filter(item => Boolean(item.user.lastAccess)).length,
+    withoutAccessHistory: users.filter(item => !item.user.lastAccess).length,
+    roleDistribution: roles.filter(role => role.isActive).sort((left, right) => right.assignedUsers - left.assignedUsers || left.name.localeCompare(right.name, "es")),
+  }), [roles, users]);
 
   async function assignRole() {
     if (!selected?.user.id || !roleId || !startDate) return;
@@ -80,10 +90,12 @@ export function SecurityUsersView({ users, roles, audit, onReload }: { users: Se
   }
 
   return <>
-    {audit && <details className="gaia-security-preprovision-audit">
-      <summary>Diagnóstico de preparación de accesos</summary>
-      <div><span><strong>{audit.eligible}</strong> colaboradores elegibles</span><span><strong>{audit.existingApplicationUsers}</strong> usuarios existentes</span><span><strong>{audit.toPreprovision}</strong> pendientes de preaprovisionar</span><span><strong>{audit.issues.length}</strong> incidencias</span></div>
-      <p>{audit.entraObjectIdAllowsNull ? "Modelo compatible con preaprovisionamiento." : "Ejecución bloqueada: Dataverse exige Entra Object ID y debe configurarse como opcional."} Este diagnóstico es solo lectura.</p>
+    {audit && <details className="gaia-security-preprovision-audit gaia-security-users-dashboard">
+      <summary><span><strong>Resumen de usuarios y accesos</strong><small>Indicadores de preparación, asignación y roles vigentes</small></span><ChevronRight size={17}/></summary>
+      <div className="gaia-security-dashboard-metrics"><article><Users size={18}/><span><strong>{users.length}</strong><small>Usuarios registrados</small></span></article><article><UserRoundCheck size={18}/><span><strong>{accessDashboard.assigned}</strong><small>Con rol vigente</small></span></article><article><Clock3 size={18}/><span><strong>{accessDashboard.pending}</strong><small>Pendientes de ingreso</small></span></article><article><KeyRound size={18}/><span><strong>{accessDashboard.withoutRole}</strong><small>Sin rol vigente</small></span></article></div>
+      <section className="gaia-security-dashboard-roles"><header><span><strong>Distribución por rol</strong><small>Usuarios con asignación vigente por perfil</small></span><b>{accessDashboard.roleDistribution.length} roles activos</b></header><div>{accessDashboard.roleDistribution.map(role=><span key={role.id}><i>{role.name}</i><strong>{role.assignedUsers}</strong></span>)}</div></section>
+      <section className="gaia-security-dashboard-access"><header><strong>Estado operativo de los accesos</strong><small>Disponibilidad y uso registrado de las cuentas</small></header><div><span><i>Accesos activos</i><strong>{accessDashboard.activeAccess}</strong></span><span><i>Accesos inactivos</i><strong>{accessDashboard.inactiveAccess}</strong></span><span><i>Ya ingresaron</i><strong>{accessDashboard.withAccessHistory}</strong></span><span><i>Sin ingreso registrado</i><strong>{accessDashboard.withoutAccessHistory}</strong></span></div></section>
+      <p><strong>{audit.eligible}</strong> colaboradores elegibles · <strong>{audit.toPreprovision}</strong> pendientes de preaprovisionar · <strong>{audit.issues.length}</strong> incidencias. {audit.entraObjectIdAllowsNull ? "El modelo admite preaprovisionamiento." : "Dataverse exige Entra Object ID; la preparación está bloqueada."}</p>
     </details>}
     <section aria-label="Filtros de usuarios" className="gaia-security-filters">
       <label className="gaia-security-search"><Search size={17} /><span className="sr-only">Buscar usuarios</span><input onChange={event => setQuery(event.target.value)} placeholder="Buscar por nombre, correo o documento…" type="search" value={query} /></label>

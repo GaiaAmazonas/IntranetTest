@@ -1,18 +1,40 @@
 export type IntranetApplication = {
   code: string; name: string; description: string; category: string; href: string;
-  permission: string; external: boolean; initials: string;
+  permission?: string; external: boolean; initials: string; logoUrl?: string;
   tone: "green" | "blue" | "purple" | "coral";
 };
 
 export const intranetApplications: readonly IntranetApplication[] = [{
-  code: "ADMINCORE", name: "AdminCore",
-  description: "Administración de organización, talento humano, inventario y seguridad.",
-  category: "Administración", href: "/admincore", permission: "INT.APP.ADMINCORE.VER",
-  external: true, initials: "AC", tone: "green",
+  code: "MICROSOFT_TEAMS", name: "Microsoft Teams",
+  description: "Reuniones, conversaciones y colaboración institucional.",
+  category: "Microsoft 365", href: "msteams://", external: false,
+  initials: "T", logoUrl: "/applications/microsoft-teams.svg", tone: "purple",
+}, {
+  code: "MICROSOFT_OUTLOOK", name: "Microsoft Outlook",
+  description: "Correo y calendario institucional de Microsoft 365.",
+  category: "Microsoft 365", href: "mailto:", external: false,
+  initials: "O", logoUrl: "/applications/microsoft-outlook.svg", tone: "blue",
 }] as const;
 
+type ApplicationModule = { code: string; name: string; description?: string | null; route: string; icon?: string | null; order: number };
+const tones: IntranetApplication["tone"][] = ["green", "blue", "purple", "coral"];
+
+export function applicationsFromModules(modules: readonly ApplicationModule[]): IntranetApplication[] {
+  return modules
+    .filter(module => module.code.toUpperCase().startsWith("INT.APP.") && Boolean(module.route?.trim()))
+    .sort((left, right) => left.order - right.order || left.name.localeCompare(right.name, "es"))
+    .map((module, index) => ({
+      code: module.code, name: module.name,
+      description: module.description?.trim() || "Aplicación institucional autorizada.",
+      category: "Aplicaciones institucionales", href: module.route.trim(),
+      external: /^https?:\/\//i.test(module.route),
+      initials: module.name.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join("").toUpperCase(),
+      tone: tones[index % tones.length],
+    }));
+}
+
 export function authorizedApplications(applications: readonly IntranetApplication[], can: (permission: string) => boolean) {
-  return applications.filter(application => can(application.permission));
+  return applications.filter(application => !application.permission || can(application.permission));
 }
 
 export function filterApplications(applications: readonly IntranetApplication[], search: string, category: string) {

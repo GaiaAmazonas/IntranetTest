@@ -22,5 +22,5 @@ function HomeContent() {
 
   if (security.loading || security.user) return <AccessState icon="loading" title={security.user ? "Abriendo la Intranet Gaia…" : "Verificando tu acceso…"} />;
 
-  return <AccessState action="Iniciar sesión" description="Ingresa con tu cuenta institucional para continuar." icon="login" notice={logoutSuccess ? "Sesión cerrada correctamente." : undefined} onAction={() => startLogin(`${window.location.origin}/intranet`)} title="Sesión requerida" />;
+  return <AccessState action="Iniciar sesión" description="Ingresa con tu cuenta institucional para continuar." icon="login" notice={logoutSuccess ? "Sesión cerrada correctamente." : undefined} onAction={() => startLogin(`${window.location.origin}/intranet`)} title="" />;
 }

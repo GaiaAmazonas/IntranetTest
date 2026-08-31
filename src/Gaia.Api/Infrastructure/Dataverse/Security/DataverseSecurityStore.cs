@@ -344,8 +344,13 @@ internal sealed class DataverseSecurityStore(
                 while (moduleParents.TryGetValue(current, out var parent) && parent.HasValue) current = parent.Value;
                 authorizedRootIds.Add(current);
             }
+            var authorizedApplicationIds = moduleRows
+                .Where(row => (StringValue(row, moduleMeta.Attribute("gaia_Codigo")) ?? "").StartsWith("INT.APP.", StringComparison.OrdinalIgnoreCase))
+                .Select(row => GuidValue(row, moduleMeta.PrimaryIdAttribute))
+                .Where(assignedModuleIds.Contains)
+                .ToHashSet();
             navigationModules = moduleRows
-                .Where(row => authorizedRootIds.Contains(GuidValue(row, moduleMeta.PrimaryIdAttribute)))
+                .Where(row => authorizedRootIds.Contains(GuidValue(row, moduleMeta.PrimaryIdAttribute)) || authorizedApplicationIds.Contains(GuidValue(row, moduleMeta.PrimaryIdAttribute)))
                 .Where(row => effectiveActiveModuleIds.Contains(GuidValue(row, moduleMeta.PrimaryIdAttribute)))
                 .Where(row => moduleVisible is null || BoolValue(row, moduleVisible))
                 .Select(row => new SecurityNavigationModule(
@@ -356,7 +361,8 @@ internal sealed class DataverseSecurityStore(
                     StringValue(row, moduleMeta.Attribute("gaia_Ruta")) ?? "",
                     StringValue(row, moduleMeta.Attribute("gaia_Icono")),
                     DataverseJson.OptionalInt32(row, moduleMeta.Attribute("gaia_Orden")) ?? 0))
-                .Where(module => !string.IsNullOrWhiteSpace(module.Route) && module.Route != "/admincore" && module.Route != "/intranet")
+                .Where(module => !string.IsNullOrWhiteSpace(module.Route) &&
+                    (module.Code.StartsWith("INT.APP.", StringComparison.OrdinalIgnoreCase) || (module.Route != "/admincore" && module.Route != "/intranet")))
                 .OrderBy(module => module.Order)
                 .ToArray();
         }
@@ -700,7 +706,16 @@ internal sealed class DataverseSecurityStore(
             ?? throw new SecurityAssignmentValidationException("La asignación no contiene una fecha inicial válida.");
         SecurityAssignmentRules.ValidatePeriod(startDate, endDate);
         await Patch(client, $"{ur.EntitySetName}({assignmentId:D})",
-            new() { { ur.Attribute("gaia_FechaFin"), endDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) } }, token);
+            new()
+            {
+                { ur.Attribute("gaia_FechaFin"), endDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) },
+                { "statecode", 1 },
+                { "statuscode", 2 }
+            }, token);
+        var updated = await DataverseMetadataResolver.ReadOneAsync(client,
+            $"{ur.EntitySetName}({assignmentId:D})?$select={ur.Attribute("gaia_FechaFin")},statecode,statuscode", token);
+        if (updated is null || (DataverseJson.OptionalInt32(updated.Value, "statecode") ?? 0) == 0)
+            throw new SecurityAssignmentValidationException("Dataverse no confirmó la finalización de la asignación. El rol continúa vigente.");
         InvalidateAll();
     }
     public async Task<Guid> UpsertModuleAsync(Guid? id, ModuleWriteRequest request, CancellationToken token)
@@ -709,6 +724,10 @@ internal sealed class DataverseSecurityStore(
         if(string.IsNullOrWhiteSpace(code))throw new SecurityModuleValidationException("El identificador técnico no pudo generarse.");
         if(string.IsNullOrWhiteSpace(name))throw new SecurityModuleValidationException("El nombre funcional es obligatorio.");
         if(request.Order<0)throw new SecurityModuleValidationException("El orden visual no puede ser negativo.");
+        var route=string.IsNullOrWhiteSpace(request.Route)?null:request.Route.Trim();
+        if(route is { Length: > 3000 })throw new SecurityModuleValidationException("La ruta no puede superar 3000 caracteres.");
+        if(route is not null&&!IsValidModuleRoute(route))throw new SecurityModuleValidationException("La ruta debe comenzar por / o ser un enlace completo HTTP/HTTPS.");
+        if(code.StartsWith("INT.APP.",StringComparison.OrdinalIgnoreCase)&&route is null)throw new SecurityModuleValidationException("Las aplicaciones deben tener una ruta o enlace configurado.");
         var isRoot=Normalize(request.Type)==Normalize("MÓDULO");
         if(isRoot&&request.ParentId.HasValue)throw new SecurityModuleValidationException("Un módulo principal no puede depender de otro elemento.");
         if(!isRoot&&!request.ParentId.HasValue)throw new SecurityModuleValidationException("Los submódulos y funcionalidades deben tener un elemento padre.");
@@ -733,10 +752,16 @@ internal sealed class DataverseSecurityStore(
         var parents=rows.ToDictionary(row=>GuidValue(row,m.PrimaryIdAttribute),row=>OptionalGuid(row,$"_{parentField}_value"));
         SecurityModuleRules.ValidateHierarchy(id,request.ParentId,parents);
 
-        var payload=new Dictionary<string,object?>{{codeField,code},{m.Attribute("gaia_Nombre"),name},{m.Attribute("gaia_Descripcion"),request.Description},{typeField,typeValue},{m.Attribute("gaia_Ruta"),string.IsNullOrWhiteSpace(request.Route)?null:request.Route.Trim()},{m.Attribute("gaia_Icono"),string.IsNullOrWhiteSpace(request.Icon)?null:request.Icon.Trim()},{m.Attribute("gaia_Orden"),request.Order},{"statecode",request.IsActive?0:1}};
+        var payload=new Dictionary<string,object?>{{codeField,code},{m.Attribute("gaia_Nombre"),name},{m.Attribute("gaia_Descripcion"),request.Description},{typeField,typeValue},{m.Attribute("gaia_Ruta"),route},{m.Attribute("gaia_Icono"),string.IsNullOrWhiteSpace(request.Icon)?null:request.Icon.Trim()},{m.Attribute("gaia_Orden"),request.Order},{"statecode",request.IsActive?0:1}};
         var visible=m.OptionalAttribute("gaia_Visiblenavegacion");if(visible is not null)payload[visible]=request.Visible;
         var relation=m.Relationship("gaia_Modulopadre",ModuleTable);payload[$"{relation.NavigationProperty}@odata.bind"]=request.ParentId.HasValue?$"/{m.EntitySetName}({request.ParentId:D})":null;
         var result=id.HasValue?await PatchReturn(client,m.EntitySetName,id.Value,payload,token):await Post(client,m.EntitySetName,payload,token); InvalidateAll(); return result;
+    }
+
+    private static bool IsValidModuleRoute(string route)
+    {
+        if(route.StartsWith('/')&&!route.StartsWith("//",StringComparison.Ordinal))return true;
+        return Uri.TryCreate(route,UriKind.Absolute,out var uri)&&(uri.Scheme==Uri.UriSchemeHttp||uri.Scheme==Uri.UriSchemeHttps);
     }
 
     private static IReadOnlyList<ModuleSeed> ModuleSeeds() =>

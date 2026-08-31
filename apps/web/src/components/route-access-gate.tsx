@@ -33,7 +33,7 @@ export function RouteAccessGate({ children }: { children: React.ReactNode }) {
   if (!rule) return children;
   if (security.loading || finishingLogin) return <AccessState icon="loading" title={security.user ? "Abriendo la Intranet Gaia…" : "Verificando tu acceso…"} />;
   if (!security.user) {
-    return <AccessState action="Iniciar sesión" description="Ingresa con tu cuenta institucional para continuar." icon="login" onAction={() => startLogin(window.location.href)} title="Sesión requerida" />;
+    return <AccessState action="Iniciar sesión" description="Ingresa con tu cuenta institucional para continuar." icon="login" onAction={() => startLogin(window.location.href)} title="" />;
   }
 
   const allowed = rule.requirements.every(requirement => security.can(requirement));
@@ -47,6 +47,7 @@ export function RouteAccessGate({ children }: { children: React.ReactNode }) {
 }
 
 const gaiaSocialNetworks = [
+  { label: "Página web", mark: "G", href: "https://gaiaamazonas.org/" },
   { label: "X", mark: "X", href: "https://x.com/gaiaamazonas" },
   { label: "Facebook", mark: "f", href: "https://www.facebook.com/gaiaamazonas/" },
   { label: "Instagram", mark: "◎", href: "https://www.instagram.com/gaiaamazonas/" },
@@ -75,20 +76,23 @@ export function AccessState({ action, description, href, icon, notice, onAction,
           </div>
           <div className="gaia-access-capabilities">
             <span><Building2 size={17} /><strong>Intranet</strong><small>Información que nos conecta</small></span>
-            <nav aria-label="Redes sociales de Gaia Amazonas" className="gaia-access-socials">
+            <nav aria-label="Redes sociales de Gaia Amazonas" className="gaia-access-socials gaia-access-socials-story">
               {gaiaSocialNetworks.map(network => <a aria-label={`Gaia Amazonas en ${network.label}`} href={network.href} key={network.label} rel="noopener noreferrer" target="_blank"><i aria-hidden="true">{network.mark}</i><span>{network.label}</span></a>)}
             </nav>
           </div>
         </section>
         <section className="gaia-access-entry">
           <div className="gaia-access-entry-card">
-            <span className="gaia-access-entry-icon"><LogIn size={23} /></span>
-            <p>{title}</p>
+            <button aria-label={action ?? "Iniciar sesión"} className="gaia-access-entry-icon" onClick={onAction} type="button"><LogIn size={23} /></button>
+            {title && <p>{title}</p>}
             <h2>Tu espacio institucional te espera.</h2>
             <span>{description}</span>
             {notice && <div className="gaia-access-notice" role="status"><ShieldCheck size={16} />{notice}</div>}
-            {action && <button onClick={onAction} type="button"><i aria-hidden="true"><b /><b /><b /><b /></i>{action}<ArrowRight size={17} /></button>}
+            {action && <button className="gaia-access-primary-action" onClick={onAction} type="button"><i aria-hidden="true"><b /><b /><b /><b /></i>{action}<ArrowRight size={17} /></button>}
             <div className="gaia-access-security"><ShieldCheck size={17} /><span><strong>Acceso protegido por Microsoft</strong><small>Utiliza tu cuenta institucional autorizada.</small></span></div>
+            <nav aria-label="Redes sociales de Gaia Amazonas" className="gaia-access-socials gaia-access-socials-mobile">
+              {gaiaSocialNetworks.map(network => <a aria-label={`Gaia Amazonas en ${network.label}`} href={network.href} key={network.label} rel="noopener noreferrer" target="_blank"><i aria-hidden="true">{network.mark}</i><span>{network.label}</span></a>)}
+            </nav>
           </div>
           <footer><span>GAIA ENTERPRISE PLATFORM</span><small>Una plataforma creada para evolucionar con Gaia.</small></footer>
         </section>

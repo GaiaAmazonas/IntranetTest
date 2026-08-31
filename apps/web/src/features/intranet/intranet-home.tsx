@@ -163,6 +163,7 @@ export function IntranetHome() {
         <span><strong>Todo Gaia en un solo lugar</strong><small>Las opciones y aplicaciones visibles dependerán de tus permisos institucionales.</small></span>
         <Link href="/intranet/aplicaciones">Explorar aplicaciones <ArrowRight size={14} /></Link>
       </section>
+
     </div>
   );
 }
