@@ -14,6 +14,11 @@ export const intranetApplications: readonly IntranetApplication[] = [{
   description: "Correo y calendario institucional de Microsoft 365.",
   category: "Microsoft 365", href: "mailto:", external: false,
   initials: "O", logoUrl: "/applications/microsoft-outlook.svg", tone: "blue",
+}, {
+  code: "GOOGLE_DRIVE", name: "Drive Gaia",
+  description: "Acceso directo a tu unidad personal de Google Drive.",
+  category: "Productividad", href: "https://drive.google.com/drive/my-drive", external: true,
+  initials: "D", logoUrl: "/applications/google-drive.svg", tone: "green",
 }] as const;
 
 type ApplicationModule = { code: string; name: string; description?: string | null; route: string; icon?: string | null; order: number };
@@ -29,8 +34,16 @@ export function applicationsFromModules(modules: readonly ApplicationModule[]): 
       category: "Aplicaciones institucionales", href: module.route.trim(),
       external: /^https?:\/\//i.test(module.route),
       initials: module.name.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join("").toUpperCase(),
+      logoUrl: temporaryApplicationLogo(module.code, module.name),
       tone: tones[index % tones.length],
     }));
+}
+
+function temporaryApplicationLogo(code: string, name: string) {
+  const key = `${code} ${name}`.toLocaleLowerCase("es");
+  if (key.includes("admincore")) return "/applications/admincore-temporary.svg";
+  if (key.includes("plan view") || key.includes("planview")) return "/applications/planview-temporary.svg";
+  return undefined;
 }
 
 export function authorizedApplications(applications: readonly IntranetApplication[], can: (permission: string) => boolean) {

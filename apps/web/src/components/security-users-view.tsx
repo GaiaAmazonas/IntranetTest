@@ -14,7 +14,7 @@ export type SecurityPreprovisionAudit = { activeThirdParties: number; withInstit
 
 type StatusFilter = "all" | "active" | "pending" | "inactive";
 
-export function SecurityUsersView({ users, roles, audit, onReload }: { users: SecurityUserDetail[]; roles: SecurityRole[]; audit: SecurityPreprovisionAudit | null; onReload: () => Promise<void> }) {
+export function SecurityUsersView({ users, roles, audit, onAssignmentsChanged, onReload }: { users: SecurityUserDetail[]; roles: SecurityRole[]; audit: SecurityPreprovisionAudit | null; onAssignmentsChanged: (userId: string, update: (assignments: RoleAssignment[]) => RoleAssignment[]) => void; onReload: () => Promise<void> }) {
   const feedback = useFeedback();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
@@ -33,10 +33,10 @@ export function SecurityUsersView({ users, roles, audit, onReload }: { users: Se
     if (!selectedUserId) return;
     const previous = document.activeElement as HTMLElement | null;
     const frame = requestAnimationFrame(() => panelRef.current?.focus());
-    const close = (event: KeyboardEvent) => { if (event.key === "Escape" && !saving) setSelectedUserId(null); };
+    const close = (event: KeyboardEvent) => { if (event.key === "Escape") setSelectedUserId(null); };
     document.addEventListener("keydown", close); document.body.style.overflow = "hidden";
     return () => { cancelAnimationFrame(frame); document.removeEventListener("keydown", close); document.body.style.overflow = ""; previous?.focus(); };
-  }, [saving, selectedUserId]);
+  }, [selectedUserId]);
 
   function setSelectedUserId(userId: string | null) {
     if (userId) { setRoleId(""); setStartDate(today()); setEndDate(""); setTechnicalOpen(false); }
@@ -70,9 +70,12 @@ export function SecurityUsersView({ users, roles, audit, onReload }: { users: Se
     if (!selected?.user.id || !roleId || !startDate) return;
     setSaving(true);
     try {
-      await apiRequest(`/api/security/users/${selected.user.id}/roles`, { method: "POST", body: JSON.stringify({ roleId, startDate, endDate: endDate || null, observations: "Asignación administrativa" }) });
+      const assignmentId = await apiRequest<string>(`/api/security/users/${selected.user.id}/roles`, { method: "POST", body: JSON.stringify({ roleId, startDate, endDate: endDate || null, observations: "Asignación administrativa" }) });
+      const assignedRole = roles.find(role => role.id === roleId);
+      if (assignedRole) onAssignmentsChanged(selected.user.id, assignments => [...assignments, { id: assignmentId, roleId: assignedRole.id, roleCode: assignedRole.code, roleName: assignedRole.name, startDate, endDate: endDate || null, isActive: true }]);
       feedback.notify({ tone: "success", title: "Rol asignado", description: "La vigencia quedó registrada correctamente." });
-      setRoleId(""); setStartDate(today()); setEndDate(""); await onReload();
+      setRoleId(""); setStartDate(today()); setEndDate("");
+      void onReload().catch(reason => feedback.notify({ tone: "error", title: "No fue posible sincronizar el listado", description: reason instanceof Error ? reason.message : undefined }));
     } catch (reason) { feedback.notify({ tone: "error", title: "No fue posible asignar el rol", description: reason instanceof Error ? reason.message : undefined }); }
     finally { setSaving(false); }
   }
@@ -83,8 +86,10 @@ export function SecurityUsersView({ users, roles, audit, onReload }: { users: Se
     const effectiveEnd = ending.startDate > today() ? ending.startDate : today();
     try {
       await apiRequest(`/api/security/users/${selected.user.id}/roles/${ending.id}/end?endDate=${effectiveEnd}`, { method: "PUT" });
+      onAssignmentsChanged(selected.user.id, assignments => assignments.map(assignment => assignment.id === ending.id ? { ...assignment, endDate: effectiveEnd, isActive: false } : assignment));
       feedback.notify({ tone: "success", title: "Asignación finalizada", description: `El rol ${ending.roleName} dejó de estar vigente.` });
-      setEnding(null); await onReload();
+      setEnding(null);
+      void onReload().catch(reason => feedback.notify({ tone: "error", title: "No fue posible sincronizar el listado", description: reason instanceof Error ? reason.message : undefined }));
     } catch (reason) { feedback.notify({ tone: "error", title: "No fue posible retirar el rol", description: reason instanceof Error ? reason.message : undefined }); }
     finally { setSaving(false); }
   }

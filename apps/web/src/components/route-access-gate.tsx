@@ -9,7 +9,7 @@ import { useSecurity } from "./security-context";
 import { loginTransitionKey, startLogin } from "@/lib/api-client";
 import { routeRuleFor } from "@/lib/route-access";
 
-const loginTransitionMinimumMs = 1500;
+const loginTransitionMinimumMs = 300;
 
 export function RouteAccessGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -68,11 +68,11 @@ export function AccessState({ action, description, href, icon, notice, onAction,
         <section className="gaia-access-story">
           <Image alt="Paisaje de la Amazonía colombiana junto a un río" fill priority sizes="(max-width: 820px) 100vw, 62vw" src="/brand/intranet/evento-amazonia-gaia2.jpg" />
           <div className="gaia-access-story-shade" />
-          <header><Image alt="Gaia Amazonas" height={48} src="/brand/logo-gaia.svg" width={88} /><span><strong>Fundación Gaia Amazonas</strong><small>Ecosistema digital institucional</small></span></header>
+          <header><Image alt="Gaia Amazonas" height={48} src="/brand/logo-gaia.svg" width={88} /><span><small>Ecosistema digital institucional</small></span></header>
           <div className="gaia-access-story-copy">
             <p>Territorio · conocimiento · futuro</p>
             <h1>Todo Gaia,<br />en un solo lugar</h1>
-            <span>Información, personas y herramientas conectadas para acompañar nuestro trabajo en la Amazonía.</span>
+            <span>Información, personas y herramientas conectadas para facilitar nuestro trabajo en la Amazonía.</span>
           </div>
           <div className="gaia-access-capabilities">
             <span><Building2 size={17} /><strong>Intranet</strong><small>Información que nos conecta</small></span>
@@ -85,7 +85,7 @@ export function AccessState({ action, description, href, icon, notice, onAction,
           <div className="gaia-access-entry-card">
             <button aria-label={action ?? "Iniciar sesión"} className="gaia-access-entry-icon" onClick={onAction} type="button"><LogIn size={23} /></button>
             {title && <p>{title}</p>}
-            <h2>Tu espacio institucional te espera.</h2>
+            <h2>Tu espacio institucional te espera</h2>
             <span>{description}</span>
             {notice && <div className="gaia-access-notice" role="status"><ShieldCheck size={16} />{notice}</div>}
             {action && <button className="gaia-access-primary-action" onClick={onAction} type="button"><i aria-hidden="true"><b /><b /><b /><b /></i>{action}<ArrowRight size={17} /></button>}

@@ -182,7 +182,7 @@ app.MapGet("/api/intranet/home", async (ICommunicationsStore communications, IIn
     return Results.Ok(new
     {
         banners = await bannersTask,
-        upcomingEvents = (await eventsTask).Take(3),
+        upcomingEvents = (await eventsTask).Take(12),
         birthdays
     });
 }).RequireAuthorization(AdminCorePermissions.IntranetInicioVer).WithTags("Intranet");

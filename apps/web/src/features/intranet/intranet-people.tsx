@@ -7,6 +7,8 @@ import { apiRequest } from "@/lib/api-client";
 type Person = { id:string; fullName:string; jobTitle:string|null; organizationUnitId:string|null; organizationUnit:string|null; organizationUnitCode:string|null; site:string|null; institutionalEmail:string|null; visiblePhone:string|null; photoUrl:string|null };
 type PeoplePage = { items:Person[]; page:number; pageSize:number; total:number };
 type OrganizationUnit = { id:string; code:string; name:string; parentId:string|null; level:number; visualOrder:number };
+const peopleCache=new Map<string,PeoplePage>();
+let organizationUnitsCache:OrganizationUnit[]|null=null;
 
 export function IntranetPeople() {
   const [search,setSearch]=useState("");
@@ -28,8 +30,8 @@ export function IntranetPeople() {
   const pageCount=Math.max(1,Math.ceil(result.total/pageSize));
 
   useEffect(()=>{const timer=window.setTimeout(()=>{setQuery(search.trim());setPage(1);},250);return()=>window.clearTimeout(timer);},[search]);
-  useEffect(()=>{let active=true;apiRequest<OrganizationUnit[]>("/api/intranet/people/organization-units").then(data=>{if(!active)return;setUnits(data);setCollapsed(new Set(data.filter(candidate=>data.some(unit=>unit.parentId===candidate.id)).map(unit=>unit.id)));}).catch(()=>{});return()=>{active=false;};},[]);
-  useEffect(()=>{let active=true;setLoading(true);setError("");apiRequest<PeoplePage>(peoplePath(page,pageSize,query,selectedUnitId,includeDescendants)).then(data=>{if(active)setResult(data);}).catch(reason=>{if(active)setError(reason instanceof Error?reason.message:"No fue posible cargar Personas.");}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[includeDescendants,page,query,selectedUnitId]);
+  useEffect(()=>{let active=true;const apply=(data:OrganizationUnit[])=>{setUnits(data);setCollapsed(new Set(data.filter(candidate=>data.some(unit=>unit.parentId===candidate.id)).map(unit=>unit.id)));};if(organizationUnitsCache)apply(organizationUnitsCache);apiRequest<OrganizationUnit[]>("/api/intranet/people/organization-units").then(data=>{organizationUnitsCache=data;if(active)apply(data);}).catch(()=>{});return()=>{active=false;};},[]);
+  useEffect(()=>{let active=true;const path=peoplePath(page,pageSize,query,selectedUnitId,includeDescendants),cached=peopleCache.get(path);if(cached){setResult(cached);setLoading(false);}else setLoading(true);setError("");apiRequest<PeoplePage>(path).then(data=>{peopleCache.set(path,data);if(active)setResult(data);}).catch(reason=>{if(active&&!cached)setError(reason instanceof Error?reason.message:"No fue posible cargar Personas.");}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[includeDescendants,page,query,selectedUnitId]);
 
   function goToPage(next:number){setPage(Math.min(pageCount,Math.max(1,next)));resultsRef.current?.scrollIntoView({behavior:"smooth",block:"start"});}
 
@@ -41,7 +43,7 @@ export function IntranetPeople() {
         <div className="intranet-directory-summary"><span><Users size={16}/><strong>{result?.total??0}</strong> {selectedUnit?`personas en ${selectedUnit.name}`:"colaboradores activos"}</span><small>Solo se muestran datos institucionales autorizados.</small></div>
         {selectedUnit&&<label className="intranet-directory-descendants"><input checked={includeDescendants} onChange={event=>{setIncludeDescendants(event.target.checked);setPage(1);}} type="checkbox"/><span><strong>Incluir unidades descendientes</strong><small>Agrega los equipos que dependen de esta unidad.</small></span></label>}
         {error&&<div className="intranet-data-state is-error"><strong>No fue posible cargar Personas</strong><p>{error}</p></div>}
-        {!error&&loading&&<div className="intranet-data-state"><strong>Cargando directorio…</strong></div>}
+        {!error&&loading&&<div aria-label="Cargando directorio" className="intranet-people-skeleton">{Array.from({length:6},(_,index)=><article aria-hidden="true" key={index}><i/><span/><b/><small/></article>)}</div>}
         {!error&&!loading&&result.items.length===0&&<div className="intranet-data-state"><strong>No encontramos personas</strong><p>Prueba con otro nombre, cargo, unidad, código, sede, correo o teléfono.</p></div>}
         {!loading&&result.items.length>0&&<div className="intranet-people-grid">{result.items.map(person=><PersonCard key={person.id} person={person}/>)}</div>}
         {!loading&&result.total>pageSize&&<nav aria-label="Paginación del directorio" className="intranet-directory-pagination"><button aria-label="Página anterior" disabled={page===1} onClick={()=>goToPage(page-1)} type="button"><ChevronLeft size={16}/><span>Anterior</span></button><span><strong>{page}</strong> de {pageCount}</span><button aria-label="Página siguiente" disabled={page===pageCount} onClick={()=>goToPage(page+1)} type="button"><span>Siguiente</span><ChevronRight size={16}/></button></nav>}

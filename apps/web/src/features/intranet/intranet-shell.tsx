@@ -21,18 +21,9 @@ import {
   isIntranetRouteActive,
 } from "./intranet-navigation";
 import { applicationsFromModules } from "./intranet-applications";
+import { IntranetFooter } from "./intranet-footer";
 
 const apiUrl = process.env.NEXT_PUBLIC_GAIA_API_URL ?? "https://localhost:7168";
-const gaiaSocialNetworks = [
-  { label: "Página web", mark: "G", href: "https://gaiaamazonas.org/" },
-  { label: "X", mark: "X", href: "https://x.com/gaiaamazonas" },
-  { label: "Facebook", mark: "f", href: "https://www.facebook.com/gaiaamazonas/" },
-  { label: "Instagram", mark: "◎", href: "https://www.instagram.com/gaiaamazonas/" },
-  { label: "YouTube", mark: "▶", href: "https://www.youtube.com/user/gaiaamazonas" },
-  { label: "Vimeo", mark: "v", href: "https://vimeo.com/gaiaamazonas" },
-  { label: "Spotify", mark: "≋", href: "https://open.spotify.com/show/37hXfsGxzUDK0PZFnO0Rm3?si=a86be126facb4562&nd=1&dlsi=299e7b66ffae45c8" },
-  { label: "TikTok", mark: "♪", href: "https://www.tiktok.com/@gaiaamazonas" },
-] as const;
 export function IntranetShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const security = useSecurity();
@@ -181,12 +172,7 @@ export function IntranetShell({ children }: { children: React.ReactNode }) {
       )}
 
       <main className="intranet-main">{children}</main>
-      <footer className="intranet-footer">
-        <strong>Gaia Amazonas · Intranet institucional</strong>
-        <nav aria-label="Enlaces de la Intranet">{intranetNavigation.filter(item=>security.can(item.permission)).map(item=><Link href={item.href} key={item.href}>{item.label}</Link>)}</nav>
-        <nav aria-label="Redes sociales de Gaia Amazonas" className="intranet-footer-social">{gaiaSocialNetworks.map(network=><a aria-label={network.label} href={network.href} key={network.label} rel="noopener noreferrer" target="_blank"><i aria-hidden="true">{network.mark}</i><span>{network.label}</span></a>)}</nav>
-        <span><a href="https://gaiaamazonas.org/politica-de-datos/" rel="noopener noreferrer" target="_blank">Política de tratamiento de datos</a><Link href="/intranet/helpdesk">Ayuda técnica</Link><small>© Fundación Gaia Amazonas</small></span>
-      </footer>
+      <IntranetFooter />
     </div>
   );
 }

@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { applicationsFromModules, authorizedApplications, filterApplications, intranetApplications } from "./intranet-applications";
 
 describe("intranet application catalog", () => {
-  it("keeps the Microsoft institutional shortcuts fixed", () => {
-    expect(authorizedApplications(intranetApplications, () => false).map(item => item.code)).toEqual(["MICROSOFT_TEAMS", "MICROSOFT_OUTLOOK"]);
+  it("keeps the institutional productivity shortcuts fixed", () => {
+    expect(authorizedApplications(intranetApplications, () => false).map(item => item.code)).toEqual(["MICROSOFT_TEAMS", "MICROSOFT_OUTLOOK", "GOOGLE_DRIVE"]);
   });
   it("filters by search and category without changing authorization", () => {
     expect(filterApplications(intranetApplications, "correo", "Todas")).toHaveLength(1);
