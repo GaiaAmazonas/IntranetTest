@@ -14,7 +14,10 @@ function HomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const security = useSecurity();
-  const logoutSuccess = searchParams.get("logout") === "success";
+  const logoutReason = searchParams.get("logout");
+  const logoutNotice = logoutReason === "inactivity"
+    ? "Cerramos tu sesión después de 40 minutos sin actividad para proteger tu cuenta."
+    : logoutReason === "success" ? "Sesión cerrada correctamente." : undefined;
 
   useEffect(() => {
     if (!security.loading && security.user) router.replace("/intranet");
@@ -22,5 +25,5 @@ function HomeContent() {
 
   if (security.loading || security.user) return <AccessState icon="loading" title={security.user ? "Abriendo la Intranet Gaia…" : "Verificando tu acceso…"} />;
 
-  return <AccessState action="Iniciar sesión" description="Ingresa con tu cuenta institucional para continuar." icon="login" notice={logoutSuccess ? "Sesión cerrada correctamente." : undefined} onAction={() => startLogin(`${window.location.origin}/intranet`)} title="" />;
+  return <AccessState action="Iniciar sesión" description="Ingresa con tu cuenta institucional para continuar." icon="login" notice={logoutNotice} onAction={() => startLogin(`${window.location.origin}/intranet`)} title="" />;
 }

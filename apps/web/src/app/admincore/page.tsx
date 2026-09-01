@@ -5,7 +5,7 @@ import { ArrowRight, Building2, Cake, CalendarDays, Grid2X2, LockKeyhole, Megaph
 import { AppHeader } from "@/components/app-header";
 import { useSecurity } from "@/components/security-context";
 import { apiRequest } from "@/lib/api-client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Birthday={id:string;fullName:string;day:number;month:number;photoUrl:string|null};
 const moduleIcons={organization:Building2,people:Users,inventory:PackageSearch,security:LockKeyhole,communications:Megaphone,calendar:CalendarDays} as const;
@@ -14,7 +14,10 @@ const moduleAccents=["#317c87","#8b3c72","#55754b","#9a384d","#9b7736"];
 export default function AdminCoreHomePage() {
   const security = useSecurity();
   const { user } = security;
-  const availableModules = security.modules;
+  const availableModules = useMemo(() => security.modules.filter(module => {
+    const route = module.route.replace(/\/$/, "").toLocaleLowerCase();
+    return route !== "/admincore" && module.code.toLocaleUpperCase() !== "INT.APP.ADMINCORE";
+  }), [security.modules]);
   const [birthdays,setBirthdays]=useState<Birthday[]>([]),[birthdaysLoading,setBirthdaysLoading]=useState(true);
   const firstName = user?.name.split(" ").filter(Boolean)[0] ?? "";
   useEffect(()=>{const timer=window.setTimeout(()=>{const today=new Date(),month=today.getMonth()+1;void apiRequest<Birthday[]>(`/api/intranet/birthdays?month=${month}`).then(rows=>setBirthdays(rows.filter(item=>item.day===today.getDate()&&item.month===month))).catch(()=>setBirthdays([])).finally(()=>setBirthdaysLoading(false));},400);return()=>window.clearTimeout(timer);},[]);

@@ -1,9 +1,11 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { hasPermission } from "@/lib/security-permissions";
 
 const apiUrl = process.env.NEXT_PUBLIC_GAIA_API_URL ?? "https://localhost:7168";
+const inactivityTimeoutMs = 40 * 60 * 1000;
+const lastActivityStorageKey = "gaia:last-user-activity";
 
 export type SecurityUser = {
   id: string;
@@ -45,6 +47,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
   const [modules, setModules] = useState<SecurityNavigationModule[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const inactivityLogoutStarted = useRef(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -74,6 +77,58 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => { const timer = window.setTimeout(() => { void refresh(); }, 0); return () => window.clearTimeout(timer); }, [refresh]);
+  useEffect(() => {
+    if (!user) {
+      inactivityLogoutStarted.current = false;
+      return;
+    }
+
+    let timer: number | undefined;
+    let lastActivity = Date.now();
+
+    const logoutForInactivity = () => {
+      if (inactivityLogoutStarted.current) return;
+      inactivityLogoutStarted.current = true;
+      window.location.assign(`${apiUrl}/api/auth/logout?returnUrl=${encodeURIComponent(`${window.location.origin}/?logout=inactivity`)}`);
+    };
+    const schedule = () => {
+      if (timer) window.clearTimeout(timer);
+      const remaining = inactivityTimeoutMs - (Date.now() - lastActivity);
+      if (remaining <= 0) logoutForInactivity();
+      else timer = window.setTimeout(logoutForInactivity, remaining);
+    };
+    const registerActivity = () => {
+      lastActivity = Date.now();
+      window.localStorage.setItem(lastActivityStorageKey, String(lastActivity));
+      schedule();
+    };
+    const synchronizeActivity = (event: StorageEvent) => {
+      if (event.key !== lastActivityStorageKey || !event.newValue) return;
+      const synchronized = Number(event.newValue);
+      if (Number.isFinite(synchronized) && synchronized > lastActivity) {
+        lastActivity = synchronized;
+        schedule();
+      }
+    };
+    const verifyWhenVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      const synchronized = Number(window.localStorage.getItem(lastActivityStorageKey));
+      if (Number.isFinite(synchronized) && synchronized > lastActivity) lastActivity = synchronized;
+      schedule();
+    };
+
+    registerActivity();
+    const activityEvents: (keyof WindowEventMap)[] = ["pointerdown", "keydown", "scroll", "touchstart"];
+    activityEvents.forEach(eventName => window.addEventListener(eventName, registerActivity, { passive: true }));
+    window.addEventListener("storage", synchronizeActivity);
+    document.addEventListener("visibilitychange", verifyWhenVisible);
+    return () => {
+      if (timer) window.clearTimeout(timer);
+      activityEvents.forEach(eventName => window.removeEventListener(eventName, registerActivity));
+      window.removeEventListener("storage", synchronizeActivity);
+      document.removeEventListener("visibilitychange", verifyWhenVisible);
+    };
+  }, [user]);
   const permissionSet = useMemo(() => new Set(permissions.map(value => value.toUpperCase())), [permissions]);
   const value = useMemo<SecurityContextValue>(() => ({
     user, roles, permissions, modules, loading, error,

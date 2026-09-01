@@ -11,7 +11,7 @@ type OrganizationUnit = { id:string; code:string; name:string; parentId:string|n
 export function IntranetPeople() {
   const [search,setSearch]=useState("");
   const [query,setQuery]=useState("");
-  const [allPeople,setAllPeople]=useState<Person[]>([]);
+  const [result,setResult]=useState<PeoplePage>({items:[],page:1,pageSize:12,total:0});
   const [page,setPage]=useState(1);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState("");
@@ -25,11 +25,11 @@ export function IntranetPeople() {
   const unitById=useMemo(()=>new Map(units.map(unit=>[unit.id,unit])),[units]);
   const tree=useMemo(()=>organizationTree(units,collapsed),[units,collapsed]);
   const selectedUnit=unitById.get(selectedUnitId);
-  const result=useMemo<PeoplePage>(()=>{const scope=selectedUnitId?new Set([selectedUnitId,...(includeDescendants?descendantsOf(selectedUnitId,units):[])]):null;const term=normalize(query);const filtered=allPeople.filter(person=>(!scope||(person.organizationUnitId&&scope.has(person.organizationUnitId)))&&(!term||[person.fullName,person.jobTitle,person.organizationUnit,person.organizationUnitCode,person.site,person.institutionalEmail,person.visiblePhone].some(value=>normalize(value).includes(term))));const start=(page-1)*pageSize;return{items:filtered.slice(start,start+pageSize),page,pageSize,total:filtered.length};},[allPeople,includeDescendants,page,query,selectedUnitId,units]);
   const pageCount=Math.max(1,Math.ceil(result.total/pageSize));
 
   useEffect(()=>{const timer=window.setTimeout(()=>{setQuery(search.trim());setPage(1);},250);return()=>window.clearTimeout(timer);},[search]);
-  useEffect(()=>{let active=true;Promise.all([apiRequest<PeoplePage>(peoplePath(1,500,"","",false)),apiRequest<OrganizationUnit[]>("/api/intranet/people/organization-units")]).then(([people,data])=>{if(!active)return;setAllPeople(people.items);setUnits(data);setCollapsed(new Set(data.filter(candidate=>data.some(unit=>unit.parentId===candidate.id)).map(unit=>unit.id)));}).catch(reason=>{if(active)setError(reason instanceof Error?reason.message:"No fue posible cargar Personas.");}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[]);
+  useEffect(()=>{let active=true;apiRequest<OrganizationUnit[]>("/api/intranet/people/organization-units").then(data=>{if(!active)return;setUnits(data);setCollapsed(new Set(data.filter(candidate=>data.some(unit=>unit.parentId===candidate.id)).map(unit=>unit.id)));}).catch(()=>{});return()=>{active=false;};},[]);
+  useEffect(()=>{let active=true;setLoading(true);setError("");apiRequest<PeoplePage>(peoplePath(page,pageSize,query,selectedUnitId,includeDescendants)).then(data=>{if(active)setResult(data);}).catch(reason=>{if(active)setError(reason instanceof Error?reason.message:"No fue posible cargar Personas.");}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[includeDescendants,page,query,selectedUnitId]);
 
   function goToPage(next:number){setPage(Math.min(pageCount,Math.max(1,next)));resultsRef.current?.scrollIntoView({behavior:"smooth",block:"start"});}
 

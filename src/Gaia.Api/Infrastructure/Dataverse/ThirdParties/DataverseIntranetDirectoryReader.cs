@@ -31,8 +31,23 @@ internal sealed class DataverseIntranetDirectoryReader(IDataverseDelegatedClient
         var email = await emailTask;
         var phone = await phoneTask;
         var name = thirdParty.Attribute("gaia_Nombretercero");
-        var rows = await DataverseJson.ReadAllAsync(client,
-            $"{thirdParty.EntitySetName}?$select={thirdParty.PrimaryIdAttribute},{name}&$filter=statecode eq 0&$orderby={name}", token);
+        var canPageAtSource = string.IsNullOrWhiteSpace(search) && !organizationUnitId.HasValue;
+        IReadOnlyList<JsonElement> rows;
+        int? sourceTotal = null;
+        if (canPageAtSource)
+        {
+            var sourcePage = await DataverseJson.ReadPageAsync(client,
+                $"{thirdParty.EntitySetName}?$select={thirdParty.PrimaryIdAttribute},{name}&$filter=statecode eq 0&$orderby={name}&$count=true&$top={pageSize}", token);
+            for (var currentPage = 1; currentPage < page && sourcePage.NextLink is not null; currentPage++)
+                sourcePage = await DataverseJson.ReadPageAsync(client, sourcePage.NextLink, token);
+            rows = sourcePage.Items;
+            sourceTotal = sourcePage.Total;
+        }
+        else
+        {
+            rows = await DataverseJson.ReadAllAsync(client,
+                $"{thirdParty.EntitySetName}?$select={thirdParty.PrimaryIdAttribute},{name}&$filter=statecode eq 0&$orderby={name}", token);
+        }
         var ids = rows.Select(row => GuidValue(row, thirdParty.PrimaryIdAttribute)).ToArray();
         var emailRows = ReadInstitutionalEmails(client, email, ids, token);
         var phoneRows = ReadCorporatePhones(client, phone, ids, token);
@@ -65,8 +80,8 @@ internal sealed class DataverseIntranetDirectoryReader(IDataverseDelegatedClient
                     person.OrganizationUnitCode, person.Site, person.InstitutionalEmail, person.VisiblePhone }
                 .Any(value => Normalize(value).Contains(term, StringComparison.Ordinal))).ToArray();
 
-        var total = people.Length;
-        var selected = people.Skip((page - 1) * pageSize).Take(pageSize).ToArray();
+        var total = sourceTotal ?? people.Length;
+        var selected = sourceTotal.HasValue ? people : people.Skip((page - 1) * pageSize).Take(pageSize).ToArray();
         return new(selected, page, pageSize, total);
     }
 

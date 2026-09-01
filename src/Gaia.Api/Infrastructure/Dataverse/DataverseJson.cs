@@ -4,7 +4,7 @@ namespace Gaia.Api.Infrastructure.Dataverse;
 
 internal static class DataverseJson
 {
-    internal sealed record Page(IReadOnlyList<JsonElement> Items, int Total);
+    internal sealed record Page(IReadOnlyList<JsonElement> Items, int Total, string? NextLink);
 
     public static int? OptionalInt32(JsonElement item, string property)
     {
@@ -75,7 +75,10 @@ internal static class DataverseJson
             && count.TryGetInt32(out var number)
                 ? number
                 : items.Length;
-        return new Page(items, total);
+        var nextLink = document.RootElement.TryGetProperty("@odata.nextLink", out var next)
+            ? next.GetString()
+            : null;
+        return new Page(items, total, nextLink);
     }
 
     private static string ReadError(string content)

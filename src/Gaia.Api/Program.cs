@@ -162,6 +162,30 @@ app.MapThirdPartiesEndpoints();
 app.MapInventoryEndpoints();
 app.MapSecurityEndpoints();
 app.MapCommunicationsEndpoints();
+app.MapGet("/api/intranet/home", async (ICommunicationsStore communications, IIntranetDirectoryReader directory,
+    CancellationToken token) =>
+{
+    var now = DateTimeOffset.UtcNow;
+    var bogotaTimeZone = TimeZoneInfo.FindSystemTimeZoneById(OperatingSystem.IsWindows()
+        ? "SA Pacific Standard Time"
+        : "America/Bogota");
+    var localToday = TimeZoneInfo.ConvertTime(now, bogotaTimeZone);
+    var until = now.AddMonths(6);
+    var nextMonth = localToday.Month == 12 ? 1 : localToday.Month + 1;
+    var bannersTask = communications.ListPublicBannersAsync(now, token);
+    var eventsTask = communications.ListPublicEventsAsync(now.Date, until, token);
+    var currentBirthdaysTask = directory.ListBirthdaysAsync(localToday.Month, token);
+    var nextBirthdaysTask = directory.ListBirthdaysAsync(nextMonth, token);
+    await Task.WhenAll(bannersTask, eventsTask, currentBirthdaysTask, nextBirthdaysTask);
+    var birthdays = (await currentBirthdaysTask).Concat(await nextBirthdaysTask)
+        .DistinctBy(item => new { item.Id, item.Day, item.Month }).ToArray();
+    return Results.Ok(new
+    {
+        banners = await bannersTask,
+        upcomingEvents = (await eventsTask).Take(3),
+        birthdays
+    });
+}).RequireAuthorization(AdminCorePermissions.IntranetInicioVer).WithTags("Intranet");
 
 app.Run();
 

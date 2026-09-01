@@ -71,7 +71,7 @@ export function AccessState({ action, description, href, icon, notice, onAction,
           <header><Image alt="Gaia Amazonas" height={48} src="/brand/logo-gaia.svg" width={88} /><span><strong>Fundación Gaia Amazonas</strong><small>Ecosistema digital institucional</small></span></header>
           <div className="gaia-access-story-copy">
             <p>Territorio · conocimiento · futuro</p>
-            <h1>Todo Gaia,<br />en un solo lugar.</h1>
+            <h1>Todo Gaia,<br />en un solo lugar</h1>
             <span>Información, personas y herramientas conectadas para acompañar nuestro trabajo en la Amazonía.</span>
           </div>
           <div className="gaia-access-capabilities">

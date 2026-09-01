@@ -39,8 +39,9 @@ export function SecurityModulesView({ modules, onAccessChanged, onReload }: { mo
     return ids;
   }, [byId, modules, normalizedQuery]);
   const types = [...new Set(modules.map(item => item.type).filter(Boolean))];
-  const descendants = selected ? collectDescendants(selected.id, children) : new Set<string>();
-  const availableParents = modules.filter(item => item.id !== selected?.id && !descendants.has(item.id) && item.isActive && !normalize(item.type).includes("FUNCIONALIDAD"));
+  const editedItem = form?.id ? byId.get(form.id) : undefined;
+  const unavailableDescendants = editedItem ? collectDescendants(editedItem.id, children) : new Set<string>();
+  const availableParents = modules.filter(item => item.id !== editedItem?.id && !unavailableDescendants.has(item.id) && item.isActive && !normalize(item.type).includes("FUNCIONALIDAD"));
 
   function openNew(parent?: SecurityModule) {
     if (parent && normalize(parent.type).includes("FUNCIONALIDAD")) { feedback.notify({ tone: "info", title: "La funcionalidad es un nivel final", description: "Selecciona un módulo o submódulo para agregar un elemento hijo." }); return; }
@@ -95,7 +96,7 @@ function isRootType(type: string) { return normalize(type) === "MODULO"; }
 function friendlyType(type: string) { const value = normalize(type); if (value === "MODULO") return "Módulo principal"; if (value === "SUBMODULO") return "Submódulo"; if (value === "FUNCIONALIDAD") return "Funcionalidad"; return type; }
 function findType(types: string[], desired: string) { return types.find(type => normalize(type) === normalize(desired)) ?? desired; }
 function codeSegment(name: string) { return name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_|_$/g, ""); }
-function generateModuleCode(name: string, parentCode?: string) { const segment = codeSegment(name); return parentCode ? `${parentCode}.${segment}` : segment; }
+function generateModuleCode(name: string, parentCode?: string) { const segment = codeSegment(name); if (parentCode?.toUpperCase() === "INT.APLICACIONES") return `INT.APP.${segment}`; return parentCode ? `${parentCode}.${segment}` : segment; }
 function isValidRoute(route: string) { if (route.startsWith("/") && !route.startsWith("//")) return true; try { const url = new URL(route); return url.protocol === "http:" || url.protocol === "https:"; } catch { return false; } }
 function nextOrder(parentId: string | null, children: Map<string | null, SecurityModule[]>) { const rows = children.get(parentId) ?? []; return rows.length ? Math.max(...rows.map(item => item.order)) + 1 : 10; }
 function collectDescendants(id: string, children: Map<string | null, SecurityModule[]>) { const result = new Set<string>(); const pending = [...(children.get(id) ?? [])]; while (pending.length) { const item = pending.pop()!; if (result.has(item.id)) continue; result.add(item.id); pending.push(...(children.get(item.id) ?? [])); } return result; }

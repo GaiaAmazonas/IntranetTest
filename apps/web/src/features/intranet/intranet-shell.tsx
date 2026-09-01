@@ -30,10 +30,9 @@ const gaiaSocialNetworks = [
   { label: "Instagram", mark: "◎", href: "https://www.instagram.com/gaiaamazonas/" },
   { label: "YouTube", mark: "▶", href: "https://www.youtube.com/user/gaiaamazonas" },
   { label: "Vimeo", mark: "v", href: "https://vimeo.com/gaiaamazonas" },
-  { label: "Spotify", mark: "≋", href: "https://open.spotify.com/show/37hXfsGxzUDK0PZFnO0Rm3" },
+  { label: "Spotify", mark: "≋", href: "https://open.spotify.com/show/37hXfsGxzUDK0PZFnO0Rm3?si=a86be126facb4562&nd=1&dlsi=299e7b66ffae45c8" },
   { label: "TikTok", mark: "♪", href: "https://www.tiktok.com/@gaiaamazonas" },
 ] as const;
-
 export function IntranetShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const security = useSecurity();
@@ -183,24 +182,10 @@ export function IntranetShell({ children }: { children: React.ReactNode }) {
 
       <main className="intranet-main">{children}</main>
       <footer className="intranet-footer">
-        <div className="intranet-footer-grid">
-          <section className="intranet-footer-identity">
-            <Image alt="Gaia Amazonas" height={50} src="/brand/logo-gaia.svg" width={90} />
-            <address><strong>Fundación Gaia Amazonas</strong><span>Calle 70A # 11 – 30</span><span>Bogotá, Colombia</span><a href="mailto:contacto@gaiaamazonas.org" target="_blank">contacto@gaiaamazonas.org</a></address>
-          </section>
-          <section className="intranet-footer-legal">
-            <h2>Documentos legales</h2>
-            <a href="https://gaiaamazonas.org/terminos-y-condiciones/" rel="noopener noreferrer" target="_blank">Términos y condiciones</a>
-            <a href="https://gaiaamazonas.org/aviso-legal/" rel="noopener noreferrer" target="_blank">Aviso legal</a>
-            <a href="https://gaiaamazonas.org/politica-de-datos/" rel="noopener noreferrer" target="_blank">Política de datos</a>
-          </section>
-          <section className="intranet-footer-connect">
-            <h2>Gaia en el mundo</h2>
-            <p>Sigamos conectados</p>
-            <nav aria-label="Sitio web y redes sociales de Fundación Gaia Amazonas">{gaiaSocialNetworks.map(network => <a aria-label={network.label} href={network.href} key={network.label} rel="noopener noreferrer" target="_blank"><i aria-hidden="true">{network.mark}</i><span>{network.label}</span></a>)}</nav>
-          </section>
-        </div>
-        <div className="intranet-footer-bottom"><span>© 2026 Fundación Gaia Amazonas. Todos los derechos reservados.</span><span>Espacio institucional protegido</span></div>
+        <strong>Gaia Amazonas · Intranet institucional</strong>
+        <nav aria-label="Enlaces de la Intranet">{intranetNavigation.filter(item=>security.can(item.permission)).map(item=><Link href={item.href} key={item.href}>{item.label}</Link>)}</nav>
+        <nav aria-label="Redes sociales de Gaia Amazonas" className="intranet-footer-social">{gaiaSocialNetworks.map(network=><a aria-label={network.label} href={network.href} key={network.label} rel="noopener noreferrer" target="_blank"><i aria-hidden="true">{network.mark}</i><span>{network.label}</span></a>)}</nav>
+        <span><a href="https://gaiaamazonas.org/politica-de-datos/" rel="noopener noreferrer" target="_blank">Política de tratamiento de datos</a><Link href="/intranet/helpdesk">Ayuda técnica</Link><small>© Fundación Gaia Amazonas</small></span>
       </footer>
     </div>
   );
