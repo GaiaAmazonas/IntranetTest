@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/document-link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Building2, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Home, LoaderCircle, LogOut, Menu, PackageSearch, Palette, PanelLeftClose, PanelLeftOpen, Settings, UserRound, Users, X } from "lucide-react";
