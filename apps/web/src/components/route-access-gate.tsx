@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/components/document-link";
 import { ArrowRight, Building2, LockKeyhole, LogIn, RotateCcw, ShieldCheck } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";

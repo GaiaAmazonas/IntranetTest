@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { AccessState } from "@/components/route-access-gate";
 import { useSecurity } from "@/components/security-context";
 import { startLogin } from "@/lib/api-client";
@@ -11,7 +11,6 @@ export default function Home() {
 }
 
 function HomeContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const security = useSecurity();
   const logoutReason = searchParams.get("logout");
@@ -20,8 +19,8 @@ function HomeContent() {
     : logoutReason === "success" ? "Sesión cerrada correctamente." : undefined;
 
   useEffect(() => {
-    if (!security.loading && security.user) router.replace("/intranet");
-  }, [router, security.loading, security.user]);
+    if (!security.loading && security.user) window.location.replace("/intranet/");
+  }, [security.loading, security.user]);
 
   if (security.loading || security.user) return <AccessState icon="loading" title={security.user ? "Abriendo la Intranet Gaia…" : "Verificando tu acceso…"} />;
 

@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+import Link from "@/components/document-link";
 import {ArrowRight,Cake,CalendarDays,ChevronLeft,ChevronRight,Grid2X2,LifeBuoy,PartyPopper,RotateCcw,Search} from "lucide-react";
 import {useEffect,useMemo,useState,type CSSProperties} from "react";
 import {useSecurity} from "@/components/security-context";

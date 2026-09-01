@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/document-link";
 import { ArrowRight, Building2, Cake, CalendarDays, Grid2X2, LockKeyhole, Megaphone, PackageSearch, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { useSecurity } from "@/components/security-context";

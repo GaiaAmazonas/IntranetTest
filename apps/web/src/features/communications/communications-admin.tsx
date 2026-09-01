@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/set-state-in-effect, react-hooks/exhaustive-deps, @next/next/no-img-element */
 import { useEffect,useMemo,useState,type FormEvent } from "react";
-import Link from "next/link";
+import Link from "@/components/document-link";
 import { CalendarClock,CalendarDays,ImageIcon,Layers3,LoaderCircle,MapPin,Pencil,Plus,Search,Send,Sparkles,Upload } from "lucide-react";
 import { apiRequest } from "@/lib/api-client";
 import { useFeedback } from "@/components/feedback";

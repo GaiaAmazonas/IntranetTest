@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/document-link";
 import { BriefcaseBusiness, ChevronDown, ChevronRight, Download, List, Pencil, Search, Users, X } from "lucide-react";
 import { Button, IconButton } from "@/components/ui";
 import { useFeedback } from "@/components/feedback";

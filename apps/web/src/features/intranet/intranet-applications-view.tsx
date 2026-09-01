@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/document-link";
 import Image from "next/image";
 import { ArrowRight, Grid2X2, Search, ShieldCheck } from "lucide-react";
 import { useMemo, useState } from "react";
