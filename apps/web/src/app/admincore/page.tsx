@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "@/components/document-link";
-import { ArrowRight, Building2, Cake, CalendarDays, Grid2X2, LockKeyhole, Megaphone, PackageSearch, ShieldCheck, Sparkles, Users } from "lucide-react";
+import { ArrowRight, Building2, Cake, CalendarDays, GraduationCap, Grid2X2, Headphones, LockKeyhole, Megaphone, PackageSearch, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { useSecurity } from "@/components/security-context";
 import { apiRequest } from "@/lib/api-client";
 import { useEffect, useMemo, useState } from "react";
 
 type Birthday={id:string;fullName:string;day:number;month:number;photoUrl:string|null};
-const moduleIcons={organization:Building2,people:Users,inventory:PackageSearch,security:LockKeyhole,communications:Megaphone,calendar:CalendarDays} as const;
+const moduleIcons={organization:Building2,people:Users,inventory:PackageSearch,security:LockKeyhole,communications:Megaphone,calendar:CalendarDays,helpdesk:Headphones,training:GraduationCap} as const;
 const moduleAccents=["#317c87","#8b3c72","#55754b","#9a384d","#9b7736"];
 
 export default function AdminCoreHomePage() {

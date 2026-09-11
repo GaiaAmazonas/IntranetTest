@@ -133,8 +133,8 @@ internal sealed class DataverseOrganizationUnitReader(
         return new UnitResponse(
             RequiredGuid(item, "gaia_organizacionid"),
             RequiredString(item, "gaia_codigo"),
-            OptionalString(item, "gaia_nombrecorto") ?? name,
             name,
+            OptionalString(item, "gaia_nombrecorto") ?? name,
             typeId,
             type.Name,
             type.ColorToken,

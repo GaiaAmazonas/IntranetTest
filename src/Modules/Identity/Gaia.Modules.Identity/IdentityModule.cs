@@ -35,6 +35,8 @@ public static class IdentityModuleExtensions
                 configuration.GetSection("MicrosoftEntra"),
                 openIdConnectScheme: OpenIdConnectDefaults.AuthenticationScheme,
                 cookieScheme: CookieAuthenticationDefaults.AuthenticationScheme)
+            // El canje inicial de OpenID Connect solo puede solicitar scopes de un recurso.
+            // Graph se adquiere de forma delegada y separada al consultar una fotografía.
             .EnableTokenAcquisitionToCallDownstreamApi([dataverseScope])
             .AddInMemoryTokenCaches();
 

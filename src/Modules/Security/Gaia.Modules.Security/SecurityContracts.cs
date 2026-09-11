@@ -10,7 +10,16 @@ public static class AdminCorePermissions
     public const string IntranetCalendarioVer="INT.CALENDARIO.VER";
     public const string IntranetAplicacionesVer="INT.APLICACIONES.VER";
     public const string IntranetHelpdeskVer="INT.HELPDESK.VER";
+    public const string IntranetTrainingVer="INT.CAPACITACIONES.VER";
     public const string IntranetAdminCoreVer="INT.APP.ADMINCORE.VER";
+    public const string HelpdeskSolicitudesVer="HD.SOLICITUDES.VER"; public const string HelpdeskSolicitudesReasignar="HD.SOLICITUDES.REASIGNAR";
+    public const string HelpdeskCatalogosVer="HD.CATALOGOS.VER"; public const string HelpdeskCatalogosAdministrar="HD.CATALOGOS.ADMINISTRAR";
+    public const string TrainingCatalogRead="CAP.CATALOGO.VER"; public const string TrainingCatalogManage="CAP.CATALOGO.ADMINISTRAR";
+    public const string TrainingContentRead="CAP.CONTENIDO.VER"; public const string TrainingContentManage="CAP.CONTENIDO.ADMINISTRAR";
+    public const string TrainingReview="CAP.REVISAR"; public const string TrainingPublish="CAP.PUBLICAR"; public const string TrainingArchive="CAP.ARCHIVAR";
+    public const string TrainingAudiencesRead="CAP.AUDIENCIAS.VER"; public const string TrainingAudiencesManage="CAP.AUDIENCIAS.ADMINISTRAR";
+    public const string TrainingTrackingRead="CAP.SEGUIMIENTO.VER"; public const string TrainingAssignmentsManage="CAP.SEGUIMIENTO.ADMINISTRAR";
+    public const string TrainingResultsRead="CAP.RESULTADOS.VER"; public const string TrainingResultsExport="CAP.RESULTADOS.EXPORTAR";
     public const string InicioVer="INICIO.VER";
     public const string OrgOrganigramaVer="ORG.ORGANIGRAMA.VER"; public const string OrgOrganigramaExportar="ORG.ORGANIGRAMA.EXPORTAR";
     public const string OrgUnidadesVer="ORG.UNIDADES.VER"; public const string OrgUnidadesCrear="ORG.UNIDADES.CREAR"; public const string OrgUnidadesActualizar="ORG.UNIDADES.ACTUALIZAR"; public const string OrgUnidadesActivar="ORG.UNIDADES.ACTIVAR"; public const string OrgUnidadesInactivar="ORG.UNIDADES.INACTIVAR"; public const string OrgUnidadesExportar="ORG.UNIDADES.EXPORTAR";

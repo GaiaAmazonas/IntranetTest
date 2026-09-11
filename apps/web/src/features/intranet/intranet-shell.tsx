@@ -16,6 +16,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { startLogin } from "@/lib/api-client";
 import { AccessState } from "@/components/route-access-gate";
 import { useSecurity } from "@/components/security-context";
+import { PersonAvatar } from "@/components/person-avatar";
 import {
   intranetNavigation,
   isIntranetRouteActive,
@@ -71,14 +72,6 @@ export function IntranetShell({ children }: { children: React.ReactNode }) {
     />;
   }
 
-  const initials = security.user.name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map(part => part[0])
-    .join("")
-    .toUpperCase();
-
   return (
     <div className="intranet-frame">
       <header className="intranet-header">
@@ -115,7 +108,7 @@ export function IntranetShell({ children }: { children: React.ReactNode }) {
             onClick={() => setProfileOpen(value => !value)}
             type="button"
           >
-            <span className="intranet-avatar">{initials || "GA"}</span>
+            <PersonAvatar className="intranet-avatar" currentUser name={security.user.name} size={34} />
             <span className="intranet-profile-name">{security.user.name}</span>
             <ChevronDown aria-hidden="true" size={15} />
           </button>
@@ -166,7 +159,7 @@ export function IntranetShell({ children }: { children: React.ReactNode }) {
                 return <Link aria-current={active ? "page" : undefined} className={active ? "is-active" : undefined} href={item.href} key={item.href} onClick={() => setMobileOpen(false)}><Icon size={19} />{item.label}</Link>;
               })}
             </nav>
-            <div className="intranet-mobile-user"><span className="intranet-avatar">{initials || "GA"}</span><span><strong>{security.user.name}</strong><small>{security.user.email}</small></span></div>
+            <div className="intranet-mobile-user"><PersonAvatar className="intranet-avatar" currentUser name={security.user.name} size={34} /><span><strong>{security.user.name}</strong><small>{security.user.email}</small></span></div>
           </aside>
         </>
       )}

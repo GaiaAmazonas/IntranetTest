@@ -131,7 +131,7 @@ internal sealed class DataverseSecurityStore(
                 [permissionMeta.Attribute("gaia_Codigo")] = code,
                 [permissionMeta.Attribute("gaia_Nombre")] = $"{action} · {modules.First(x => x.Code.Equals(moduleCode, StringComparison.OrdinalIgnoreCase)).Name}",
                 [permissionMeta.Attribute("gaia_Descripcion")] = $"Permite {action.ToLowerInvariant()} el recurso {moduleCode}.",
-                [permissionMeta.Attribute("gaia_Accion")] = Choice(actions, action),
+                [permissionMeta.Attribute("gaia_Accion")] = Choice(actions, PermissionActionChoice(action)),
                 [$"{relation.NavigationProperty}@odata.bind"] = $"/{moduleMeta.EntitySetName}({moduleId:D})",
                 ["statecode"] = 0
             };
@@ -834,7 +834,20 @@ internal sealed class DataverseSecurityStore(
         new("INT.CALENDARIO","Calendario","SUBMÓDULO","INTRANET","/intranet/calendario","calendar",8,true,"Agenda y actividades institucionales."),
         new("INT.APLICACIONES","Aplicaciones","SUBMÓDULO","INTRANET","/intranet/aplicaciones","applications",9,true,"Catálogo de aplicaciones autorizadas."),
         new("INT.HELPDESK","Helpdesk","SUBMÓDULO","INTRANET","/intranet/helpdesk","helpdesk",10,true,"Autoservicio del colaborador."),
+        new("INT.CAPACITACIONES","Mis capacitaciones","SUBMÓDULO","INTRANET","/intranet/capacitaciones","training",11,true,"Aprendizaje y capacitaciones asignadas al colaborador."),
         new("INT.APP.ADMINCORE","AdminCore","FUNCIONALIDAD","INT.APLICACIONES","/admincore","admincore",11,true,"Espacio de administración de la plataforma Gaia."),
+        new("HD","Helpdesk","MÓDULO",null,"/helpdesk","helpdesk",60,true,"Gestión operativa y configuración de solicitudes."),
+        new("HD.SOLICITUDES","Bandeja Helpdesk","SUBMÓDULO","HD","/helpdesk/solicitudes","helpdesk",61,true,"Bandeja global de solicitudes."),
+        new("HD.CATALOGOS","Configuración Helpdesk","SUBMÓDULO","HD","/helpdesk/catalogos","catalog",62,true,"Servicios, estados y formularios de Helpdesk."),
+        new("CAP","Capacitaciones","MÓDULO",null,"/capacitaciones/catalogo","training",70,true,"Diseño, publicación y seguimiento de capacitaciones."),
+        new("CAP.CATALOGO","Catálogo","SUBMÓDULO","CAP","/capacitaciones/catalogo","catalog",71,true,"Categorías y capacitaciones."),
+        new("CAP.CONTENIDO","Contenido y versiones","SUBMÓDULO","CAP","/capacitaciones/contenido","content",72,true,"Versiones, secciones, bloques, recursos y evaluaciones."),
+        new("CAP.AUDIENCIAS","Audiencias","SUBMÓDULO","CAP","/capacitaciones/audiencias","people",73,true,"Destinatarios y vista previa de alcance."),
+        new("CAP.SEGUIMIENTO","Seguimiento","SUBMÓDULO","CAP","/capacitaciones/seguimiento","tracking",74,true,"Asignaciones, progreso e intentos."),
+        new("CAP.RESULTADOS","Resultados","SUBMÓDULO","CAP","/capacitaciones/resultados","results",75,true,"Resultados, métricas y exportación."),
+        new("CAP.REVISAR","Revisar capacitaciones","FUNCIONALIDAD","CAP.CONTENIDO",null,"review",76,false,"Devolver versiones que están en revisión."),
+        new("CAP.PUBLICAR","Publicar capacitaciones","FUNCIONALIDAD","CAP.CONTENIDO",null,"publish",77,false,"Aprobar y publicar versiones revisadas."),
+        new("CAP.ARCHIVAR","Cerrar y archivar","FUNCIONALIDAD","CAP.CONTENIDO",null,"archive",78,false,"Cerrar o archivar versiones publicadas."),
         new("INICIO","Inicio","MÓDULO",null,"/admincore","home",10,true,"Página inicial de la plataforma."),
         new("ORG","Organización","MÓDULO",null,"/organizacion","organization",20,true,"Estructura organizacional."),
         new("ORG.ORGANIGRAMA","Organigrama","SUBMÓDULO","ORG","/organizacion?tab=organigrama","hierarchy",21,true,"Diagrama organizacional."),
@@ -975,6 +988,12 @@ internal sealed class DataverseSecurityStore(
     private static async Task Patch(HttpClient client,string path,Dictionary<string,object?> payload,CancellationToken token){using var request=new HttpRequestMessage(HttpMethod.Patch,path){Content=JsonContent.Create(payload)};request.Headers.TryAddWithoutValidation("If-Match","*");using var response=await client.SendAsync(request,token);await Ensure(response,token);}
     private static async Task Ensure(HttpResponseMessage response,CancellationToken token){if(response.IsSuccessStatusCode)return;var body=await response.Content.ReadAsStringAsync(token);throw new InvalidOperationException($"Dataverse rechazó Seguridad ({(int)response.StatusCode}): {body}");}
     private static (string Oid,string Email,string Name) IdentityFrom(ClaimsPrincipal p){var oid=p.FindFirstValue("oid")??p.FindFirstValue("http://schemas.microsoft.com/identity/claims/objectidentifier");var email=(p.FindFirstValue("preferred_username")??p.FindFirstValue(ClaimTypes.Email))?.Trim().ToLowerInvariant();var name=p.FindFirstValue("name")??p.Identity?.Name;if(string.IsNullOrWhiteSpace(oid)||!Guid.TryParse(oid,out _))throw new InvalidOperationException("Microsoft Entra no entregó un Object ID válido.");if(string.IsNullOrWhiteSpace(email)||!email.EndsWith("@gaiaamazonas.org",StringComparison.OrdinalIgnoreCase))throw new InvalidOperationException("Solo se permiten cuentas corporativas @gaiaamazonas.org.");return(oid,email,string.IsNullOrWhiteSpace(name)?email:name);}
+    private static string PermissionActionChoice(string action)=>action.ToUpperInvariant() switch
+    {
+        "REASIGNAR"=>"ACTUALIZAR",
+        "REVISAR" or "PUBLICAR" or "ARCHIVAR"=>"ADMINISTRAR",
+        _=>action
+    };
     private static int Choice(IReadOnlyDictionary<string,int> choices,string label){var normalized=Normalize(label);var match=choices.FirstOrDefault(x=>Normalize(x.Key)==normalized);if(string.IsNullOrEmpty(match.Key))throw new InvalidOperationException($"Dataverse no contiene la opción {label}.");return match.Value;}
     private static string Normalize(string value){var text=value.Normalize(NormalizationForm.FormD);var chars=text.Where(c=>CharUnicodeInfo.GetUnicodeCategory(c)!=UnicodeCategory.NonSpacingMark).ToArray();return new string(chars).Normalize(NormalizationForm.FormC).Replace("_","",StringComparison.Ordinal).Replace(" ","",StringComparison.Ordinal).ToUpperInvariant();}
     private static string PermissionModuleCode(string code) => code switch

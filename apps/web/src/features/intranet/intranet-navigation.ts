@@ -1,6 +1,7 @@
 import {
   CalendarDays,
   Grid2X2,
+  GraduationCap,
   Home,
   LifeBuoy,
   Users,
@@ -21,6 +22,7 @@ export const intranetNavigation: IntranetNavigationItem[] = [
   { href: "/intranet/calendario", label: "Calendario", icon: CalendarDays, permission: "INT.CALENDARIO.VER" },
   { href: "/intranet/aplicaciones", label: "Aplicaciones", icon: Grid2X2, permission: "INT.APLICACIONES.VER" },
   { href: "/intranet/helpdesk", label: "Helpdesk", icon: LifeBuoy, permission: "INT.HELPDESK.VER" },
+  { href: "/intranet/capacitaciones", label: "Mis capacitaciones", icon: GraduationCap, permission: "INT.CAPACITACIONES.VER" },
 ];
 
 export function isIntranetRouteActive(

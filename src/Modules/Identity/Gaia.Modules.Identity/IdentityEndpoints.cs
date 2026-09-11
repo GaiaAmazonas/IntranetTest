@@ -43,6 +43,7 @@ internal static class IdentityEndpoints
     private static IResult GetCurrentUser(ClaimsPrincipal principal)
     {
         var id = principal.FindFirstValue("oid")
+            ?? principal.FindFirstValue("http://schemas.microsoft.com/identity/claims/objectidentifier")
             ?? principal.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? string.Empty;
         var displayName = principal.FindFirstValue("name")

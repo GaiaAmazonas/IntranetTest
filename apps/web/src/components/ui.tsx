@@ -3,9 +3,11 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { Inbox } from "lucide-react";
 import Image from "next/image";
+import { PersonAvatar, personInitials } from "./person-avatar";
 
-export function Avatar({ name, imageUrl }: { name: string; imageUrl?: string | null }) {
-  const initials = name.trim().split(/\s+/).slice(0, 2).map(part => part[0]).join("").toUpperCase();
+export function Avatar({ name, imageUrl, currentUser = false }: { name: string; imageUrl?: string | null; currentUser?: boolean }) {
+  if (currentUser) return <PersonAvatar className="gaia-avatar" currentUser name={name} size={36} />;
+  const initials = personInitials(name);
   return imageUrl
     ? <Image alt="" className="gaia-avatar" height={36} src={imageUrl} unoptimized width={36} />
     : <span aria-hidden="true" className="gaia-avatar">{initials || "GA"}</span>;

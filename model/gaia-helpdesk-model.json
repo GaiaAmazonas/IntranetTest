@@ -1,0 +1,516 @@
+{
+  "environment": {
+    "uniqueName": "unqb9a0b8999970f111b27c002248de5",
+    "environmentId": "779ec35f-99f7-eb54-b238-7246c49193e9",
+    "organizationId": "b9a0b899-9970-f111-b27c-002248de57e6",
+    "environmentUrl": "https://org16eb6fd8.crm2.dynamics.com",
+    "webApiUrl": "https://org16eb6fd8.api.crm2.dynamics.com/api/data/v9.2"
+  },
+  "solution": {
+    "displayName": "GAIA – Helpdesk",
+    "uniqueName": "GAIAHelpdesk",
+    "version": "1.0.0.0",
+    "preferred": true
+  },
+  "publisher": {
+    "displayName": "Gaia Amazonas",
+    "uniqueName": "GaiaAmazonas",
+    "customizationPrefix": "gaia",
+    "customizationOptionValuePrefix": 29954
+  },
+  "languageCode": 3082,
+  "referencedTables": [
+    "gaia_organizacion",
+    "gaia_terceros"
+  ],
+  "tables": [
+    {
+      "schemaName": "gaia_DiaNoLaborable",
+      "logicalName": "gaia_dianolaborable",
+      "displayName": "Día no laborable",
+      "displayCollectionName": "Días no laborables",
+      "description": "Fechas que no deben contabilizarse como días hábiles.",
+      "primary": { "schemaName": "gaia_Nombre", "logicalName": "gaia_nombre", "displayName": "Nombre", "maxLength": 200, "required": true },
+      "columns": [
+        { "schemaName": "gaia_Fecha", "logicalName": "gaia_fecha", "displayName": "Fecha", "type": "date", "required": true },
+        { "schemaName": "gaia_Descripcion", "logicalName": "gaia_descripcion", "displayName": "Descripción", "type": "memo", "maxLength": 500, "required": false }
+      ],
+      "keys": [
+        { "schemaName": "ak_gaia_dianolaborable_fecha", "displayName": "Día no laborable por fecha", "attributes": ["gaia_fecha"] }
+      ]
+    },
+    {
+      "schemaName": "gaia_EstadoSolicitud",
+      "logicalName": "gaia_estadosolicitud",
+      "displayName": "Estado de solicitud",
+      "displayCollectionName": "Estados de solicitud",
+      "description": "Catálogo administrable de estados de Helpdesk.",
+      "primary": { "schemaName": "gaia_Nombre", "logicalName": "gaia_nombre", "displayName": "Nombre", "maxLength": 100, "required": true },
+      "columns": [
+        { "schemaName": "gaia_Codigo", "logicalName": "gaia_codigo", "displayName": "Código", "type": "string", "maxLength": 50, "required": true },
+        { "schemaName": "gaia_Descripcion", "logicalName": "gaia_descripcion", "displayName": "Descripción", "type": "memo", "maxLength": 500, "required": false },
+        { "schemaName": "gaia_Orden", "logicalName": "gaia_orden", "displayName": "Orden", "type": "integer", "minValue": 0, "maxValue": 2147483647, "required": true },
+        { "schemaName": "gaia_EsInicial", "logicalName": "gaia_esinicial", "displayName": "Es inicial", "type": "boolean", "defaultValue": false, "required": true },
+        { "schemaName": "gaia_EsFinal", "logicalName": "gaia_esfinal", "displayName": "Es final", "type": "boolean", "defaultValue": false, "required": true },
+        {
+          "schemaName": "gaia_ResponsableAccion", "logicalName": "gaia_responsableaccion", "displayName": "Responsable de la acción", "type": "choice", "required": true,
+          "options": [
+            { "label": "Solicitante", "value": 299540000 },
+            { "label": "Área responsable", "value": 299540001 },
+            { "label": "Sistema", "value": 299540002 },
+            { "label": "Ninguno", "value": 299540003 }
+          ]
+        },
+        { "schemaName": "gaia_VisibleAlSolicitante", "logicalName": "gaia_visiblealsolicitante", "displayName": "Visible al solicitante", "type": "boolean", "defaultValue": true, "required": true },
+        { "schemaName": "gaia_PermiteComentarioSolicitante", "logicalName": "gaia_permitecomentariosolicitante", "displayName": "Permite comentarios del solicitante", "type": "boolean", "defaultValue": true, "required": true },
+        { "schemaName": "gaia_Color", "logicalName": "gaia_color", "displayName": "Color", "type": "string", "maxLength": 7, "required": false }
+      ],
+      "keys": [
+        { "schemaName": "ak_gaia_estadosolicitud_codigo", "displayName": "Estado de solicitud por código", "attributes": ["gaia_codigo"] }
+      ]
+    },
+    {
+      "schemaName": "gaia_TransicionEstadoSolicitud",
+      "logicalName": "gaia_transicionestadosolicitud",
+      "displayName": "Transición de estado de solicitud",
+      "displayCollectionName": "Transiciones de estado de solicitud",
+      "description": "Cambios permitidos entre estados y su efecto sobre el SLA.",
+      "primary": { "schemaName": "gaia_Nombre", "logicalName": "gaia_nombre", "displayName": "Nombre", "maxLength": 200, "required": true },
+      "columns": [
+        {
+          "schemaName": "gaia_ActorAutorizado", "logicalName": "gaia_actorautorizado", "displayName": "Actor autorizado", "type": "choice", "required": true,
+          "options": [
+            { "label": "Solicitante", "value": 299540010 },
+            { "label": "Responsable interno", "value": 299540011 },
+            { "label": "Administrador", "value": 299540012 },
+            { "label": "Sistema", "value": 299540013 }
+          ]
+        },
+        {
+          "schemaName": "gaia_AccionSLA", "logicalName": "gaia_accionsla", "displayName": "Acción sobre SLA", "type": "choice", "required": true,
+          "options": [
+            { "label": "Sin cambio", "value": 299540020 },
+            { "label": "Iniciar", "value": 299540021 },
+            { "label": "Pausar", "value": 299540022 },
+            { "label": "Reanudar", "value": 299540023 },
+            { "label": "Detener", "value": 299540024 }
+          ]
+        },
+        { "schemaName": "gaia_RequiereComentario", "logicalName": "gaia_requierecomentario", "displayName": "Requiere comentario", "type": "boolean", "defaultValue": false, "required": true },
+        { "schemaName": "gaia_RequiereMotivo", "logicalName": "gaia_requieremotivo", "displayName": "Requiere motivo", "type": "boolean", "defaultValue": false, "required": true },
+        { "schemaName": "gaia_RequiereSolucion", "logicalName": "gaia_requieresolucion", "displayName": "Requiere solución", "type": "boolean", "defaultValue": false, "required": true },
+        { "schemaName": "gaia_SolicitaCalificacion", "logicalName": "gaia_solicitacalificacion", "displayName": "Solicita calificación", "type": "boolean", "defaultValue": false, "required": true },
+        { "schemaName": "gaia_Orden", "logicalName": "gaia_orden", "displayName": "Orden", "type": "integer", "minValue": 0, "maxValue": 2147483647, "required": false }
+      ],
+      "lookups": [
+        { "schemaName": "gaia_EstadoOrigen", "logicalName": "gaia_estadoorigen", "displayName": "Estado origen", "target": "gaia_estadosolicitud", "relationshipSchemaName": "gaia_estadosolicitud_transicion_origen", "required": true },
+        { "schemaName": "gaia_EstadoDestino", "logicalName": "gaia_estadodestino", "displayName": "Estado destino", "target": "gaia_estadosolicitud", "relationshipSchemaName": "gaia_estadosolicitud_transicion_destino", "required": true }
+      ]
+    },
+    {
+      "schemaName": "gaia_Servicio",
+      "logicalName": "gaia_servicio",
+      "displayName": "Servicio",
+      "displayCollectionName": "Servicios",
+      "description": "Servicios de Helpdesk y sus condiciones de atención.",
+      "primary": { "schemaName": "gaia_Nombre", "logicalName": "gaia_nombre", "displayName": "Nombre", "maxLength": 150, "required": true },
+      "columns": [
+        { "schemaName": "gaia_Codigo", "logicalName": "gaia_codigo", "displayName": "Código", "type": "string", "maxLength": 50, "required": true },
+        { "schemaName": "gaia_Descripcion", "logicalName": "gaia_descripcion", "displayName": "Descripción", "type": "memo", "maxLength": 1000, "required": false },
+        { "schemaName": "gaia_Instrucciones", "logicalName": "gaia_instrucciones", "displayName": "Instrucciones", "type": "memo", "maxLength": 1000, "required": false },
+        { "schemaName": "gaia_DiasGestionHabiles", "logicalName": "gaia_diasgestionhabiles", "displayName": "Días hábiles de gestión", "type": "integer", "minValue": 1, "maxValue": 2147483647, "required": true },
+        { "schemaName": "gaia_PermiteAdjuntos", "logicalName": "gaia_permiteadjuntos", "displayName": "Permite adjuntos generales", "type": "boolean", "defaultValue": true, "required": true },
+        { "schemaName": "gaia_MaximoAdjuntos", "logicalName": "gaia_maximoadjuntos", "displayName": "Máximo de adjuntos", "type": "integer", "minValue": 0, "maxValue": 100, "required": true },
+        { "schemaName": "gaia_TamanoMaximoMB", "logicalName": "gaia_tamanomaximomb", "displayName": "Tamaño máximo por archivo MB", "type": "integer", "minValue": 1, "maxValue": 2048, "required": true },
+        { "schemaName": "gaia_DiasCierreAutomatico", "logicalName": "gaia_diascierreautomatico", "displayName": "Días para cierre automático", "type": "integer", "minValue": 0, "maxValue": 2147483647, "required": false },
+        { "schemaName": "gaia_VisibleAlSolicitante", "logicalName": "gaia_visiblealsolicitante", "displayName": "Visible al solicitante", "type": "boolean", "defaultValue": true, "required": true },
+        { "schemaName": "gaia_Orden", "logicalName": "gaia_orden", "displayName": "Orden", "type": "integer", "minValue": 0, "maxValue": 2147483647, "required": false }
+      ],
+      "lookups": [
+        { "schemaName": "gaia_UnidadResponsable", "logicalName": "gaia_unidadresponsable", "displayName": "Unidad responsable", "target": "gaia_organizacion", "relationshipSchemaName": "gaia_organizacion_servicio_unidadresponsable", "required": true },
+        { "schemaName": "gaia_ResponsablePredeterminado", "logicalName": "gaia_responsablepredeterminado", "displayName": "Responsable predeterminado", "target": "gaia_terceros", "relationshipSchemaName": "gaia_terceros_servicio_responsablepredeterminado", "required": true },
+        { "schemaName": "gaia_FormularioVigente", "logicalName": "gaia_formulariovigente", "displayName": "Formulario vigente", "target": "gaia_formularioservicio", "relationshipSchemaName": "gaia_formularioservicio_servicio_vigente", "required": false }
+      ],
+      "keys": [
+        { "schemaName": "ak_gaia_servicio_codigo", "displayName": "Servicio por código", "attributes": ["gaia_codigo"] }
+      ]
+    },
+    {
+      "schemaName": "gaia_FormularioServicio",
+      "logicalName": "gaia_formularioservicio",
+      "displayName": "Formulario de servicio",
+      "displayCollectionName": "Formularios de servicio",
+      "description": "Versión inmutable de un formulario asociado a un servicio.",
+      "primary": { "schemaName": "gaia_Nombre", "logicalName": "gaia_nombre", "displayName": "Nombre", "maxLength": 200, "required": true },
+      "columns": [
+        { "schemaName": "gaia_Version", "logicalName": "gaia_version", "displayName": "Versión", "type": "integer", "minValue": 1, "maxValue": 2147483647, "required": true },
+        {
+          "schemaName": "gaia_EstadoFormulario", "logicalName": "gaia_estadoformulario", "displayName": "Estado del formulario", "type": "choice", "required": true, "defaultValue": 299540030,
+          "options": [
+            { "label": "Borrador", "value": 299540030 },
+            { "label": "Publicado", "value": 299540031 },
+            { "label": "Retirado", "value": 299540032 }
+          ]
+        },
+        { "schemaName": "gaia_Titulo", "logicalName": "gaia_titulo", "displayName": "Título para el usuario", "type": "string", "maxLength": 200, "required": true },
+        { "schemaName": "gaia_Instrucciones", "logicalName": "gaia_instrucciones", "displayName": "Instrucciones", "type": "memo", "maxLength": 2000, "required": false },
+        { "schemaName": "gaia_FechaPublicacion", "logicalName": "gaia_fechapublicacion", "displayName": "Fecha de publicación", "type": "datetime", "required": false }
+      ],
+      "lookups": [
+        { "schemaName": "gaia_Servicio", "logicalName": "gaia_servicio", "displayName": "Servicio", "target": "gaia_servicio", "relationshipSchemaName": "gaia_servicio_formularioservicio", "required": true },
+        { "schemaName": "gaia_PublicadoPor", "logicalName": "gaia_publicadopor", "displayName": "Publicado por", "target": "gaia_terceros", "relationshipSchemaName": "gaia_terceros_formularioservicio_publicadopor", "required": false }
+      ],
+      "keys": [
+        { "schemaName": "ak_gaia_formularioservicio_version", "displayName": "Formulario por servicio y versión", "attributes": ["gaia_servicio", "gaia_version"] }
+      ]
+    },
+    {
+      "schemaName": "gaia_CampoFormulario",
+      "logicalName": "gaia_campoformulario",
+      "displayName": "Campo de formulario",
+      "displayCollectionName": "Campos de formulario",
+      "description": "Pregunta, dato o control de una versión de formulario.",
+      "primary": { "schemaName": "gaia_Nombre", "logicalName": "gaia_nombre", "displayName": "Nombre", "maxLength": 150, "required": true },
+      "columns": [
+        { "schemaName": "gaia_Codigo", "logicalName": "gaia_codigo", "displayName": "Código", "type": "string", "maxLength": 80, "required": true },
+        {
+          "schemaName": "gaia_TipoDato", "logicalName": "gaia_tipodato", "displayName": "Tipo de dato", "type": "choice", "required": true,
+          "options": [
+            { "label": "Texto", "value": 299540040 },
+            { "label": "Número entero", "value": 299540041 },
+            { "label": "Número decimal", "value": 299540042 },
+            { "label": "Fecha", "value": 299540043 },
+            { "label": "Fecha y hora", "value": 299540044 },
+            { "label": "Booleano", "value": 299540045 },
+            { "label": "Opción", "value": 299540046 },
+            { "label": "Archivo", "value": 299540047 }
+          ]
+        },
+        {
+          "schemaName": "gaia_TipoControl", "logicalName": "gaia_tipocontrol", "displayName": "Tipo de control", "type": "choice", "required": true,
+          "options": [
+            { "label": "Text", "value": 299540050 },
+            { "label": "Textarea", "value": 299540051 },
+            { "label": "Number", "value": 299540052 },
+            { "label": "Email", "value": 299540053 },
+            { "label": "Teléfono", "value": 299540054 },
+            { "label": "URL", "value": 299540055 },
+            { "label": "Date", "value": 299540056 },
+            { "label": "Datetime", "value": 299540057 },
+            { "label": "Select", "value": 299540058 },
+            { "label": "Radio", "value": 299540059 },
+            { "label": "Checkbox", "value": 299540060 },
+            { "label": "Checkbox group", "value": 299540061 },
+            { "label": "File", "value": 299540062 }
+          ]
+        },
+        { "schemaName": "gaia_TextoAyuda", "logicalName": "gaia_textoayuda", "displayName": "Texto de ayuda", "type": "memo", "maxLength": 500, "required": false },
+        { "schemaName": "gaia_Placeholder", "logicalName": "gaia_placeholder", "displayName": "Placeholder", "type": "string", "maxLength": 200, "required": false },
+        { "schemaName": "gaia_Requerido", "logicalName": "gaia_requerido", "displayName": "Requerido", "type": "boolean", "defaultValue": false, "required": true },
+        { "schemaName": "gaia_Orden", "logicalName": "gaia_orden", "displayName": "Orden", "type": "integer", "minValue": 0, "maxValue": 2147483647, "required": true },
+        { "schemaName": "gaia_AnchoColumnas", "logicalName": "gaia_anchocolumnas", "displayName": "Ancho en columnas", "type": "integer", "minValue": 1, "maxValue": 12, "required": true },
+        { "schemaName": "gaia_LongitudMinima", "logicalName": "gaia_longitudminima", "displayName": "Longitud mínima", "type": "integer", "minValue": 0, "maxValue": 4000, "required": false },
+        { "schemaName": "gaia_LongitudMaxima", "logicalName": "gaia_longitudmaxima", "displayName": "Longitud máxima", "type": "integer", "minValue": 0, "maxValue": 4000, "required": false },
+        { "schemaName": "gaia_ValorMinimo", "logicalName": "gaia_valorminimo", "displayName": "Valor mínimo", "type": "decimal", "minValue": -100000000000, "maxValue": 100000000000, "precision": 4, "required": false },
+        { "schemaName": "gaia_ValorMaximo", "logicalName": "gaia_valormaximo", "displayName": "Valor máximo", "type": "decimal", "minValue": -100000000000, "maxValue": 100000000000, "precision": 4, "required": false },
+        { "schemaName": "gaia_PatronValidacion", "logicalName": "gaia_patronvalidacion", "displayName": "Patrón de validación", "type": "string", "maxLength": 500, "required": false },
+        { "schemaName": "gaia_MensajeValidacion", "logicalName": "gaia_mensajevalidacion", "displayName": "Mensaje de validación", "type": "string", "maxLength": 300, "required": false },
+        { "schemaName": "gaia_ValorPredeterminado", "logicalName": "gaia_valorpredeterminado", "displayName": "Valor predeterminado", "type": "memo", "maxLength": 1000, "required": false },
+        { "schemaName": "gaia_PermiteVarios", "logicalName": "gaia_permitevarios", "displayName": "Permite varios valores", "type": "boolean", "defaultValue": false, "required": true },
+        { "schemaName": "gaia_MaximoArchivos", "logicalName": "gaia_maximoarchivos", "displayName": "Máximo de archivos", "type": "integer", "minValue": 1, "maxValue": 100, "required": false },
+        { "schemaName": "gaia_TiposArchivoPermitidos", "logicalName": "gaia_tiposarchivopermitidos", "displayName": "Tipos de archivo permitidos", "type": "string", "maxLength": 500, "required": false },
+        { "schemaName": "gaia_ConfiguracionJson", "logicalName": "gaia_configuracionjson", "displayName": "Configuración adicional", "type": "memo", "maxLength": 4000, "required": false },
+        { "schemaName": "gaia_Visible", "logicalName": "gaia_visible", "displayName": "Visible", "type": "boolean", "defaultValue": true, "required": true }
+      ],
+      "lookups": [
+        { "schemaName": "gaia_Formulario", "logicalName": "gaia_formulario", "displayName": "Formulario", "target": "gaia_formularioservicio", "relationshipSchemaName": "gaia_formularioservicio_campoformulario", "required": true }
+      ],
+      "keys": [
+        { "schemaName": "ak_gaia_campoformulario_codigo", "displayName": "Campo por formulario y código", "attributes": ["gaia_formulario", "gaia_codigo"] }
+      ]
+    },
+    {
+      "schemaName": "gaia_OpcionCampoFormulario",
+      "logicalName": "gaia_opcioncampoformulario",
+      "displayName": "Opción de campo de formulario",
+      "displayCollectionName": "Opciones de campo de formulario",
+      "description": "Opciones disponibles para controles de selección.",
+      "primary": { "schemaName": "gaia_Nombre", "logicalName": "gaia_nombre", "displayName": "Nombre", "maxLength": 150, "required": true },
+      "columns": [
+        { "schemaName": "gaia_Codigo", "logicalName": "gaia_codigo", "displayName": "Código", "type": "string", "maxLength": 80, "required": true },
+        { "schemaName": "gaia_Orden", "logicalName": "gaia_orden", "displayName": "Orden", "type": "integer", "minValue": 0, "maxValue": 2147483647, "required": true },
+        { "schemaName": "gaia_EsPredeterminada", "logicalName": "gaia_espredeterminada", "displayName": "Es predeterminada", "type": "boolean", "defaultValue": false, "required": true }
+      ],
+      "lookups": [
+        { "schemaName": "gaia_CampoFormulario", "logicalName": "gaia_campoformulario", "displayName": "Campo de formulario", "target": "gaia_campoformulario", "relationshipSchemaName": "gaia_campoformulario_opcioncampoformulario", "required": true }
+      ],
+      "keys": [
+        { "schemaName": "ak_gaia_opcioncampo_codigo", "displayName": "Opción por campo y código", "attributes": ["gaia_campoformulario", "gaia_codigo"] }
+      ]
+    },
+    {
+      "schemaName": "gaia_Solicitud",
+      "logicalName": "gaia_solicitud",
+      "displayName": "Solicitud",
+      "displayCollectionName": "Solicitudes",
+      "description": "Caso principal de Helpdesk y seguimiento de su SLA.",
+      "primary": { "schemaName": "gaia_Nombre", "logicalName": "gaia_nombre", "displayName": "Número de solicitud", "maxLength": 200, "required": true, "autoNumberFormat": "HD-{SEQNUM:7}" },
+      "columns": [
+        { "schemaName": "gaia_Asunto", "logicalName": "gaia_asunto", "displayName": "Asunto", "type": "string", "maxLength": 200, "required": true },
+        { "schemaName": "gaia_DescripcionInicial", "logicalName": "gaia_descripcioninicial", "displayName": "Descripción inicial", "type": "memo", "maxLength": 4000, "formatName": "RichText", "required": true },
+        { "schemaName": "gaia_FechaRadicacion", "logicalName": "gaia_fecharadicacion", "displayName": "Fecha de radicación", "type": "datetime", "required": false },
+        { "schemaName": "gaia_FechaInicioSLA", "logicalName": "gaia_fechainiciosla", "displayName": "Fecha de inicio SLA", "type": "datetime", "required": false },
+        { "schemaName": "gaia_DiasObjetivo", "logicalName": "gaia_diasobjetivo", "displayName": "Días hábiles objetivo", "type": "integer", "minValue": 1, "maxValue": 2147483647, "required": false },
+        { "schemaName": "gaia_FechaLimiteOriginal", "logicalName": "gaia_fechalimiteoriginal", "displayName": "Fecha límite original", "type": "date", "required": false },
+        { "schemaName": "gaia_FechaLimiteActual", "logicalName": "gaia_fechalimiteactual", "displayName": "Fecha límite actual", "type": "date", "required": false },
+        { "schemaName": "gaia_FechaInicioPausaSLA", "logicalName": "gaia_fechainiciopausasla", "displayName": "Inicio de pausa SLA", "type": "datetime", "required": false },
+        { "schemaName": "gaia_DiasHabilesPausados", "logicalName": "gaia_diashabilespausados", "displayName": "Días hábiles pausados", "type": "integer", "minValue": 0, "maxValue": 2147483647, "required": true },
+        { "schemaName": "gaia_DiasGestionReales", "logicalName": "gaia_diasgestionreales", "displayName": "Días hábiles de gestión", "type": "integer", "minValue": 0, "maxValue": 2147483647, "required": false },
+        { "schemaName": "gaia_CumplioSLA", "logicalName": "gaia_cumpliosla", "displayName": "Cumplió SLA", "type": "boolean", "required": false },
+        { "schemaName": "gaia_FechaPrimeraGestion", "logicalName": "gaia_fechaprimeragestion", "displayName": "Fecha de primera gestión", "type": "datetime", "required": false },
+        { "schemaName": "gaia_FechaPrimeraResolucion", "logicalName": "gaia_fechaprimeraresolucion", "displayName": "Fecha de primera resolución", "type": "datetime", "required": false },
+        { "schemaName": "gaia_FechaResolucionActual", "logicalName": "gaia_fecharesolucionactual", "displayName": "Fecha de resolución actual", "type": "datetime", "required": false },
+        { "schemaName": "gaia_ResumenSolucion", "logicalName": "gaia_resumensolucion", "displayName": "Resumen de la solución", "type": "memo", "maxLength": 4000, "formatName": "RichText", "required": false },
+        { "schemaName": "gaia_FechaCierre", "logicalName": "gaia_fechacierre", "displayName": "Fecha de cierre", "type": "datetime", "required": false },
+        { "schemaName": "gaia_MotivoCancelacion", "logicalName": "gaia_motivocancelacion", "displayName": "Motivo de cancelación", "type": "memo", "maxLength": 1000, "required": false }
+      ],
+      "lookups": [
+        { "schemaName": "gaia_Servicio", "logicalName": "gaia_servicio", "displayName": "Servicio", "target": "gaia_servicio", "relationshipSchemaName": "gaia_servicio_solicitud", "required": true },
+        { "schemaName": "gaia_FormularioUtilizado", "logicalName": "gaia_formularioutilizado", "displayName": "Formulario utilizado", "target": "gaia_formularioservicio", "relationshipSchemaName": "gaia_formularioservicio_solicitud_utilizado", "required": false },
+        { "schemaName": "gaia_Solicitante", "logicalName": "gaia_solicitante", "displayName": "Solicitante", "target": "gaia_terceros", "relationshipSchemaName": "gaia_terceros_solicitud_solicitante", "required": true },
+        { "schemaName": "gaia_UnidadSolicitante", "logicalName": "gaia_unidadsolicitante", "displayName": "Unidad solicitante", "target": "gaia_organizacion", "relationshipSchemaName": "gaia_organizacion_solicitud_unidadsolicitante", "required": false },
+        { "schemaName": "gaia_UnidadResponsable", "logicalName": "gaia_unidadresponsable", "displayName": "Unidad responsable", "target": "gaia_organizacion", "relationshipSchemaName": "gaia_organizacion_solicitud_unidadresponsable", "required": false },
+        { "schemaName": "gaia_ResponsableInterno", "logicalName": "gaia_responsableinterno", "displayName": "Responsable interno", "target": "gaia_terceros", "relationshipSchemaName": "gaia_terceros_solicitud_responsableinterno", "required": false },
+        { "schemaName": "gaia_EstadoActual", "logicalName": "gaia_estadoactual", "displayName": "Estado actual", "target": "gaia_estadosolicitud", "relationshipSchemaName": "gaia_estadosolicitud_solicitud_estadoactual", "required": true }
+      ]
+    },
+    {
+      "schemaName": "gaia_RespuestaCampo",
+      "logicalName": "gaia_respuestacampo",
+      "displayName": "Respuesta de campo",
+      "displayCollectionName": "Respuestas de campo",
+      "description": "Valor suministrado para un campo del formulario utilizado.",
+      "primary": { "schemaName": "gaia_Nombre", "logicalName": "gaia_nombre", "displayName": "Nombre", "maxLength": 250, "required": true },
+      "columns": [
+        { "schemaName": "gaia_ValorTexto", "logicalName": "gaia_valortexto", "displayName": "Valor texto", "type": "memo", "maxLength": 4000, "required": false },
+        { "schemaName": "gaia_ValorEntero", "logicalName": "gaia_valorentero", "displayName": "Valor entero", "type": "integer", "minValue": -2147483648, "maxValue": 2147483647, "required": false },
+        { "schemaName": "gaia_ValorDecimal", "logicalName": "gaia_valordecimal", "displayName": "Valor decimal", "type": "decimal", "minValue": -100000000000, "maxValue": 100000000000, "precision": 4, "required": false },
+        { "schemaName": "gaia_ValorFecha", "logicalName": "gaia_valorfecha", "displayName": "Valor fecha", "type": "date", "required": false },
+        { "schemaName": "gaia_ValorFechaHora", "logicalName": "gaia_valorfechahora", "displayName": "Valor fecha y hora", "type": "datetime", "required": false },
+        { "schemaName": "gaia_ValorBooleano", "logicalName": "gaia_valorbooleano", "displayName": "Valor booleano", "type": "boolean", "required": false }
+      ],
+      "lookups": [
+        { "schemaName": "gaia_Solicitud", "logicalName": "gaia_solicitud", "displayName": "Solicitud", "target": "gaia_solicitud", "relationshipSchemaName": "gaia_solicitud_respuestacampo", "required": true },
+        { "schemaName": "gaia_CampoFormulario", "logicalName": "gaia_campoformulario", "displayName": "Campo de formulario", "target": "gaia_campoformulario", "relationshipSchemaName": "gaia_campoformulario_respuestacampo", "required": true }
+      ],
+      "keys": [
+        { "schemaName": "ak_gaia_respuestacampo_solicitudcampo", "displayName": "Respuesta por solicitud y campo", "attributes": ["gaia_solicitud", "gaia_campoformulario"] }
+      ]
+    },
+    {
+      "schemaName": "gaia_RespuestaOpcionCampo",
+      "logicalName": "gaia_respuestaopcioncampo",
+      "displayName": "Respuesta de opción de campo",
+      "displayCollectionName": "Respuestas de opciones de campo",
+      "description": "Opción seleccionada en una respuesta de formulario.",
+      "primary": { "schemaName": "gaia_Nombre", "logicalName": "gaia_nombre", "displayName": "Nombre", "maxLength": 250, "required": true },
+      "lookups": [
+        { "schemaName": "gaia_RespuestaCampo", "logicalName": "gaia_respuestacampo", "displayName": "Respuesta de campo", "target": "gaia_respuestacampo", "relationshipSchemaName": "gaia_respuestacampo_respuestaopcioncampo", "required": true },
+        { "schemaName": "gaia_OpcionCampoFormulario", "logicalName": "gaia_opcioncampoformulario", "displayName": "Opción seleccionada", "target": "gaia_opcioncampoformulario", "relationshipSchemaName": "gaia_opcioncampoformulario_respuestaopcioncampo", "required": true }
+      ],
+      "keys": [
+        { "schemaName": "ak_gaia_respuestaopcion", "displayName": "Respuesta y opción", "attributes": ["gaia_respuestacampo", "gaia_opcioncampoformulario"] }
+      ]
+    },
+    {
+      "schemaName": "gaia_ComentarioSolicitud",
+      "logicalName": "gaia_comentariosolicitud",
+      "displayName": "Comentario de solicitud",
+      "displayCollectionName": "Comentarios de solicitud",
+      "description": "Conversación cronológica y notas internas de una solicitud.",
+      "primary": { "schemaName": "gaia_Nombre", "logicalName": "gaia_nombre", "displayName": "Nombre", "maxLength": 250, "required": true },
+      "columns": [
+        {
+          "schemaName": "gaia_Tipo", "logicalName": "gaia_tipo", "displayName": "Tipo", "type": "choice", "required": true,
+          "options": [
+            { "label": "Comentario", "value": 299540070 },
+            { "label": "Solicitud de información", "value": 299540071 },
+            { "label": "Respuesta del solicitante", "value": 299540072 },
+            { "label": "Respuesta de gestión", "value": 299540073 },
+            { "label": "Nota interna", "value": 299540074 },
+            { "label": "Solución", "value": 299540075 },
+            { "label": "Mensaje automático", "value": 299540076 }
+          ]
+        },
+        {
+          "schemaName": "gaia_Visibilidad", "logicalName": "gaia_visibilidad", "displayName": "Visibilidad", "type": "choice", "required": true,
+          "options": [
+            { "label": "Solicitante", "value": 299540080 },
+            { "label": "Interna", "value": 299540081 }
+          ]
+        },
+        { "schemaName": "gaia_Contenido", "logicalName": "gaia_contenido", "displayName": "Contenido", "type": "memo", "maxLength": 4000, "formatName": "RichText", "required": true },
+        { "schemaName": "gaia_FechaPublicacion", "logicalName": "gaia_fechapublicacion", "displayName": "Fecha de publicación", "type": "datetime", "required": true }
+      ],
+      "lookups": [
+        { "schemaName": "gaia_Solicitud", "logicalName": "gaia_solicitud", "displayName": "Solicitud", "target": "gaia_solicitud", "relationshipSchemaName": "gaia_solicitud_comentariosolicitud", "required": true },
+        { "schemaName": "gaia_Autor", "logicalName": "gaia_autor", "displayName": "Autor", "target": "gaia_terceros", "relationshipSchemaName": "gaia_terceros_comentariosolicitud_autor", "required": false }
+      ]
+    },
+    {
+      "schemaName": "gaia_AdjuntoSolicitud",
+      "logicalName": "gaia_adjuntosolicitud",
+      "displayName": "Adjunto de solicitud",
+      "displayCollectionName": "Adjuntos de solicitud",
+      "description": "Metadatos y referencias de archivos almacenados fuera de Dataverse.",
+      "primary": { "schemaName": "gaia_Nombre", "logicalName": "gaia_nombre", "displayName": "Nombre", "maxLength": 255, "required": true },
+      "columns": [
+        { "schemaName": "gaia_NombreAlmacenado", "logicalName": "gaia_nombrealmacenado", "displayName": "Nombre almacenado", "type": "string", "maxLength": 255, "required": true },
+        { "schemaName": "gaia_TipoMIME", "logicalName": "gaia_tipomime", "displayName": "Tipo MIME", "type": "string", "maxLength": 150, "required": true },
+        { "schemaName": "gaia_TamanoBytes", "logicalName": "gaia_tamanobytes", "displayName": "Tamaño en bytes", "type": "bigint", "required": true },
+        { "schemaName": "gaia_HashSHA256", "logicalName": "gaia_hashsha256", "displayName": "Hash SHA-256", "type": "string", "maxLength": 64, "required": false },
+        {
+          "schemaName": "gaia_ProveedorAlmacenamiento", "logicalName": "gaia_proveedoralmacenamiento", "displayName": "Proveedor de almacenamiento", "type": "choice", "required": true, "defaultValue": 299540090,
+          "options": [
+            { "label": "SharePoint", "value": 299540090 },
+            { "label": "Otro proveedor", "value": 299540091 }
+          ]
+        },
+        { "schemaName": "gaia_RepositorioExternoId", "logicalName": "gaia_repositorioexternoid", "displayName": "Repositorio externo", "type": "string", "maxLength": 300, "required": true },
+        { "schemaName": "gaia_ContenedorExternoId", "logicalName": "gaia_contenedorexternoid", "displayName": "Contenedor externo", "type": "string", "maxLength": 300, "required": true },
+        { "schemaName": "gaia_ArchivoExternoId", "logicalName": "gaia_archivoexternoid", "displayName": "Archivo externo", "type": "string", "maxLength": 300, "required": true },
+        { "schemaName": "gaia_ETag", "logicalName": "gaia_etag", "displayName": "ETag", "type": "string", "maxLength": 300, "required": false },
+        { "schemaName": "gaia_UrlWeb", "logicalName": "gaia_urlweb", "displayName": "URL web", "type": "string", "formatName": "Url", "maxLength": 500, "required": false },
+        { "schemaName": "gaia_RutaLogica", "logicalName": "gaia_rutalogica", "displayName": "Ruta lógica", "type": "string", "maxLength": 500, "required": false },
+        {
+          "schemaName": "gaia_Visibilidad", "logicalName": "gaia_visibilidad", "displayName": "Visibilidad", "type": "choice", "required": true,
+          "options": [
+            { "label": "Solicitante", "value": 299540080 },
+            { "label": "Interna", "value": 299540081 }
+          ]
+        },
+        { "schemaName": "gaia_FechaCarga", "logicalName": "gaia_fechacarga", "displayName": "Fecha de carga", "type": "datetime", "required": true }
+      ],
+      "lookups": [
+        { "schemaName": "gaia_Solicitud", "logicalName": "gaia_solicitud", "displayName": "Solicitud", "target": "gaia_solicitud", "relationshipSchemaName": "gaia_solicitud_adjuntosolicitud", "required": true },
+        { "schemaName": "gaia_ComentarioSolicitud", "logicalName": "gaia_comentariosolicitud", "displayName": "Comentario", "target": "gaia_comentariosolicitud", "relationshipSchemaName": "gaia_comentariosolicitud_adjuntosolicitud", "required": false },
+        { "schemaName": "gaia_RespuestaCampo", "logicalName": "gaia_respuestacampo", "displayName": "Respuesta de campo", "target": "gaia_respuestacampo", "relationshipSchemaName": "gaia_respuestacampo_adjuntosolicitud", "required": false },
+        { "schemaName": "gaia_CargadoPor", "logicalName": "gaia_cargadopor", "displayName": "Cargado por", "target": "gaia_terceros", "relationshipSchemaName": "gaia_terceros_adjuntosolicitud_cargadopor", "required": true }
+      ]
+    },
+    {
+      "schemaName": "gaia_HistorialSolicitud",
+      "logicalName": "gaia_historialsolicitud",
+      "displayName": "Historial de solicitud",
+      "displayCollectionName": "Historial de solicitudes",
+      "description": "Bitácora funcional inmutable de las acciones de una solicitud.",
+      "primary": { "schemaName": "gaia_Nombre", "logicalName": "gaia_nombre", "displayName": "Nombre", "maxLength": 250, "required": true },
+      "columns": [
+        { "schemaName": "gaia_OperacionId", "logicalName": "gaia_operacionid", "displayName": "Identificador de operación", "type": "string", "maxLength": 100, "required": true },
+        {
+          "schemaName": "gaia_TipoMovimiento", "logicalName": "gaia_tipomovimiento", "displayName": "Tipo de movimiento", "type": "choice", "required": true,
+          "options": [
+            { "label": "Solicitud creada", "value": 299540100 },
+            { "label": "Solicitud editada", "value": 299540101 },
+            { "label": "Solicitud radicada", "value": 299540102 },
+            { "label": "Estado cambiado", "value": 299540103 },
+            { "label": "Responsable reasignado", "value": 299540104 },
+            { "label": "Unidad responsable cambiada", "value": 299540105 },
+            { "label": "Comentario agregado", "value": 299540106 },
+            { "label": "Archivo agregado", "value": 299540107 },
+            { "label": "Archivo inactivado", "value": 299540108 },
+            { "label": "SLA iniciado", "value": 299540109 },
+            { "label": "SLA pausado", "value": 299540110 },
+            { "label": "SLA reanudado", "value": 299540111 },
+            { "label": "Solicitud resuelta", "value": 299540112 },
+            { "label": "Solicitud reabierta", "value": 299540113 },
+            { "label": "Solicitud cerrada", "value": 299540114 },
+            { "label": "Solicitud cancelada", "value": 299540115 },
+            { "label": "Calificación registrada", "value": 299540116 }
+          ]
+        },
+        {
+          "schemaName": "gaia_Origen", "logicalName": "gaia_origen", "displayName": "Origen", "type": "choice", "required": true,
+          "options": [
+            { "label": "Portal del solicitante", "value": 299540120 },
+            { "label": "Administración Helpdesk", "value": 299540121 },
+            { "label": "API", "value": 299540122 },
+            { "label": "Sistema", "value": 299540123 },
+            { "label": "Integración externa", "value": 299540124 }
+          ]
+        },
+        { "schemaName": "gaia_CampoModificado", "logicalName": "gaia_campomodificado", "displayName": "Campo modificado", "type": "string", "maxLength": 150, "required": false },
+        { "schemaName": "gaia_ValorAnterior", "logicalName": "gaia_valoranterior", "displayName": "Valor anterior", "type": "memo", "maxLength": 2000, "required": false },
+        { "schemaName": "gaia_ValorNuevo", "logicalName": "gaia_valornuevo", "displayName": "Valor nuevo", "type": "memo", "maxLength": 2000, "required": false },
+        { "schemaName": "gaia_Detalle", "logicalName": "gaia_detalle", "displayName": "Detalle", "type": "memo", "maxLength": 4000, "required": false },
+        {
+          "schemaName": "gaia_AccionSLA", "logicalName": "gaia_accionsla", "displayName": "Acción SLA", "type": "choice", "required": false,
+          "options": [
+            { "label": "Sin cambio", "value": 299540020 },
+            { "label": "Iniciar", "value": 299540021 },
+            { "label": "Pausar", "value": 299540022 },
+            { "label": "Reanudar", "value": 299540023 },
+            { "label": "Detener", "value": 299540024 }
+          ]
+        },
+        { "schemaName": "gaia_VisibleAlSolicitante", "logicalName": "gaia_visiblealsolicitante", "displayName": "Visible al solicitante", "type": "boolean", "defaultValue": false, "required": true },
+        { "schemaName": "gaia_FechaEvento", "logicalName": "gaia_fechaevento", "displayName": "Fecha del evento", "type": "datetime", "required": true }
+      ],
+      "lookups": [
+        { "schemaName": "gaia_Solicitud", "logicalName": "gaia_solicitud", "displayName": "Solicitud", "target": "gaia_solicitud", "relationshipSchemaName": "gaia_solicitud_historialsolicitud", "required": true },
+        { "schemaName": "gaia_Actor", "logicalName": "gaia_actor", "displayName": "Actor", "target": "gaia_terceros", "relationshipSchemaName": "gaia_terceros_historialsolicitud_actor", "required": false },
+        { "schemaName": "gaia_EstadoAnterior", "logicalName": "gaia_estadoanterior", "displayName": "Estado anterior", "target": "gaia_estadosolicitud", "relationshipSchemaName": "gaia_estadosolicitud_historial_estadoanterior", "required": false },
+        { "schemaName": "gaia_EstadoNuevo", "logicalName": "gaia_estadonuevo", "displayName": "Estado nuevo", "target": "gaia_estadosolicitud", "relationshipSchemaName": "gaia_estadosolicitud_historial_estadonuevo", "required": false }
+      ]
+    },
+    {
+      "schemaName": "gaia_CalificacionSolicitud",
+      "logicalName": "gaia_calificacionsolicitud",
+      "displayName": "Calificación de solicitud",
+      "displayCollectionName": "Calificaciones de solicitud",
+      "description": "Valoración del solicitante al confirmar el cierre.",
+      "primary": { "schemaName": "gaia_Nombre", "logicalName": "gaia_nombre", "displayName": "Nombre", "maxLength": 200, "required": true },
+      "columns": [
+        { "schemaName": "gaia_Calificacion", "logicalName": "gaia_calificacion", "displayName": "Calificación", "type": "integer", "minValue": 1, "maxValue": 5, "required": true },
+        { "schemaName": "gaia_Comentario", "logicalName": "gaia_comentario", "displayName": "Comentario", "type": "memo", "maxLength": 2000, "required": false },
+        { "schemaName": "gaia_FechaCalificacion", "logicalName": "gaia_fechacalificacion", "displayName": "Fecha de calificación", "type": "datetime", "required": true }
+      ],
+      "lookups": [
+        { "schemaName": "gaia_Solicitud", "logicalName": "gaia_solicitud", "displayName": "Solicitud", "target": "gaia_solicitud", "relationshipSchemaName": "gaia_solicitud_calificacionsolicitud", "required": true },
+        { "schemaName": "gaia_CalificadoPor", "logicalName": "gaia_calificadopor", "displayName": "Calificado por", "target": "gaia_terceros", "relationshipSchemaName": "gaia_terceros_calificacionsolicitud_calificadopor", "required": true }
+      ],
+      "keys": [
+        { "schemaName": "ak_gaia_calificacionsolicitud_solicitud", "displayName": "Calificación por solicitud", "attributes": ["gaia_solicitud"] }
+      ]
+    }
+  ],
+  "seed": {
+    "states": [
+      { "code": "CREADA", "name": "Creada", "order": 10, "actor": 299540000, "initial": true, "final": false, "visible": true, "allowComments": true, "color": "#64748B" },
+      { "code": "RADICADA", "name": "Radicada", "order": 20, "actor": 299540001, "initial": false, "final": false, "visible": true, "allowComments": true, "color": "#2563EB" },
+      { "code": "EN_GESTION", "name": "En gestión", "order": 30, "actor": 299540001, "initial": false, "final": false, "visible": true, "allowComments": true, "color": "#7C3AED" },
+      { "code": "EN_ESPERA_SOLICITANTE", "name": "En espera del solicitante", "order": 40, "actor": 299540000, "initial": false, "final": false, "visible": true, "allowComments": true, "color": "#D97706" },
+      { "code": "RESUELTA", "name": "Resuelta", "order": 50, "actor": 299540000, "initial": false, "final": false, "visible": true, "allowComments": true, "color": "#059669" },
+      { "code": "REABIERTA", "name": "Reabierta", "order": 60, "actor": 299540001, "initial": false, "final": false, "visible": true, "allowComments": true, "color": "#DC2626" },
+      { "code": "CERRADA", "name": "Cerrada", "order": 70, "actor": 299540003, "initial": false, "final": true, "visible": true, "allowComments": false, "color": "#334155" },
+      { "code": "CANCELADA", "name": "Cancelada", "order": 80, "actor": 299540003, "initial": false, "final": true, "visible": true, "allowComments": false, "color": "#991B1B" }
+    ],
+    "transitions": [
+      { "from": "CREADA", "to": "RADICADA", "actor": 299540010, "sla": 299540021, "comment": false, "reason": false, "solution": false, "rating": false, "order": 10 },
+      { "from": "RADICADA", "to": "EN_GESTION", "actor": 299540011, "sla": 299540020, "comment": false, "reason": false, "solution": false, "rating": false, "order": 20 },
+      { "from": "EN_GESTION", "to": "EN_ESPERA_SOLICITANTE", "actor": 299540011, "sla": 299540022, "comment": true, "reason": false, "solution": false, "rating": false, "order": 30 },
+      { "from": "EN_ESPERA_SOLICITANTE", "to": "EN_GESTION", "actor": 299540010, "sla": 299540023, "comment": true, "reason": false, "solution": false, "rating": false, "order": 40 },
+      { "from": "EN_ESPERA_SOLICITANTE", "to": "EN_GESTION", "actor": 299540011, "sla": 299540023, "comment": false, "reason": false, "solution": false, "rating": false, "order": 41 },
+      { "from": "EN_GESTION", "to": "RESUELTA", "actor": 299540011, "sla": 299540022, "comment": false, "reason": false, "solution": true, "rating": false, "order": 50 },
+      { "from": "RESUELTA", "to": "CERRADA", "actor": 299540010, "sla": 299540024, "comment": false, "reason": false, "solution": false, "rating": true, "order": 60 },
+      { "from": "RESUELTA", "to": "CERRADA", "actor": 299540013, "sla": 299540024, "comment": false, "reason": false, "solution": false, "rating": false, "order": 61 },
+      { "from": "RESUELTA", "to": "REABIERTA", "actor": 299540010, "sla": 299540023, "comment": true, "reason": false, "solution": false, "rating": false, "order": 70 },
+      { "from": "REABIERTA", "to": "EN_GESTION", "actor": 299540011, "sla": 299540020, "comment": false, "reason": false, "solution": false, "rating": false, "order": 80 },
+      { "from": "CREADA", "to": "CANCELADA", "actor": 299540010, "sla": 299540024, "comment": false, "reason": true, "solution": false, "rating": false, "order": 90 },
+      { "from": "RADICADA", "to": "CANCELADA", "actor": 299540010, "sla": 299540024, "comment": false, "reason": true, "solution": false, "rating": false, "order": 91 },
+      { "from": "RADICADA", "to": "CANCELADA", "actor": 299540012, "sla": 299540024, "comment": false, "reason": true, "solution": false, "rating": false, "order": 92 },
+      { "from": "EN_GESTION", "to": "CANCELADA", "actor": 299540012, "sla": 299540024, "comment": false, "reason": true, "solution": false, "rating": false, "order": 93 },
+      { "from": "EN_ESPERA_SOLICITANTE", "to": "CANCELADA", "actor": 299540012, "sla": 299540024, "comment": false, "reason": true, "solution": false, "rating": false, "order": 94 }
+    ]
+  }
+}

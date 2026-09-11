@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertTriangle, Save, X } from "lucide-react";
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Button, IconButton } from "./ui";
 
 export function FormDialog({ open, title, subtitle, children, onClose, formId, submitLabel = "Guardar", loading = false, error }: {
@@ -9,6 +9,7 @@ export function FormDialog({ open, title, subtitle, children, onClose, formId, s
   formId: string; submitLabel?: string; loading?: boolean; error?: string | null;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const [reportedError, setReportedError] = useState("");
   const onCloseRef = useRef(onClose);
   useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
   useEffect(() => {
@@ -19,11 +20,17 @@ export function FormDialog({ open, title, subtitle, children, onClose, formId, s
     document.addEventListener("keydown", keydown); document.body.style.overflow = "hidden";
     return () => { cancelAnimationFrame(frame); document.removeEventListener("keydown", keydown); document.body.style.overflow = ""; previous?.focus(); };
   }, [loading, open]);
+  useEffect(() => {
+    if (!open) return;
+    const report = (event: Event) => setReportedError((event as CustomEvent<string>).detail ?? "No fue posible completar la operación.");
+    window.addEventListener("gaia:form-error", report);
+    return () => window.removeEventListener("gaia:form-error", report);
+  }, [open]);
   if (!open) return null;
   return <div className="gaia-dialog-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !loading) onClose(); }}>
     <div aria-labelledby={`${formId}-title`} aria-modal="true" className="gaia-form-dialog" ref={dialogRef} role="dialog">
       <header className="gaia-dialog-header"><div><p>Plataforma Gaia</p><h2 id={`${formId}-title`}>{title}</h2>{subtitle && <span>{subtitle}</span>}</div><IconButton label="Cerrar formulario" disabled={loading} onClick={onClose}><X size={19} /></IconButton></header>
-      <div className="gaia-dialog-content">{error && <div className="gaia-form-error" role="alert"><AlertTriangle size={17} /><span>{error}</span></div>}{children}</div>
+      <div className="gaia-dialog-content">{(error || reportedError) && <div className="gaia-form-error" role="alert"><AlertTriangle size={17} /><span>{error || reportedError}</span></div>}{children}</div>
       <footer className="gaia-dialog-footer"><Button disabled={loading} onClick={onClose} variant="secondary">Cancelar</Button><Button disabled={loading} form={formId} type="submit"><Save size={17} />{loading ? "Guardando…" : submitLabel}</Button></footer>
     </div>
   </div>;

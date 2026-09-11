@@ -3,7 +3,7 @@
 import Link from "@/components/document-link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Building2, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Home, LoaderCircle, LogOut, Menu, PackageSearch, Palette, PanelLeftClose, PanelLeftOpen, Settings, UserRound, Users, X } from "lucide-react";
+import { Building2, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, GraduationCap, Headphones, Home, LoaderCircle, LogOut, Menu, PackageSearch, Palette, PanelLeftClose, PanelLeftOpen, Settings, UserRound, Users, X } from "lucide-react";
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { Avatar, IconButton } from "./ui";
 import { ConfirmDialog } from "./form-dialog";
@@ -30,6 +30,11 @@ const navigation = [
     { href: "/comunicaciones/tipos-evento", aliases: [], label: "Tipos de evento", permission: "COM.TIPOS_EVENTO.VER" },
     { href: "/comunicaciones/destacados", aliases: [], label: "Destacados", permission: "COM.DESTACADOS.VER" },
   ] },
+  { label: "Helpdesk", icon: Headphones, permission: "HD.SOLICITUDES.VER|HD.CATALOGOS.VER", children: [
+    { href: "/helpdesk/solicitudes", aliases: [], label: "Solicitudes", permission: "HD.SOLICITUDES.VER" },
+    { href: "/helpdesk/catalogos", aliases: ["/helpdesk/catalogos/formulario"], label: "Configuración", permission: "HD.CATALOGOS.VER" },
+  ] },
+  { href: "/capacitaciones/catalogo", label: "Capacitaciones", icon: GraduationCap, permission: "CAP.CATALOGO.VER" },
   { label: "Seguridad", icon: Settings, permission: "TI.USUARIOS.VER|TI.ROLES.VER|TI.MODULOS.VER", children: [
     { href: "/seguridad/usuarios", aliases: [], label: "Usuarios", permission: "TI.USUARIOS.VER" },
     { href: "/seguridad/roles", aliases: [], label: "Roles y permisos", permission: "TI.ROLES.VER" },
@@ -72,7 +77,7 @@ export function AppShell({ title, user: suppliedUser }: { title: string; user?: 
         return <div className="gaia-nav-group" key={item.label}><button aria-expanded={isExpanded} className={`gaia-nav-item gaia-nav-parent ${childActive ? "has-active-child" : ""}`} onClick={() => setExpanded(current => current.includes(item.label) ? current.filter(label => label !== item.label) : [...current, item.label])} title={collapsed ? item.label : undefined} type="button"><Icon size={20} strokeWidth={1.8} />{!collapsed && <><span>{item.label}</span><ChevronDown className="gaia-nav-chevron" size={15} /></>}</button>{isExpanded && !collapsed && <div className="gaia-subnavigation">{children.filter(child => security.can(child.permission)).map(child => { const active = pathname.startsWith(child.href) || child.aliases?.some(alias => pathname.startsWith(alias)); return <Link aria-busy={pendingNavigation === child.href} aria-current={active ? "page" : undefined} className={`gaia-subnav-item ${active ? "is-active" : ""}`} href={child.href} key={child.href} onClick={event => beginNavigation(child.href, event)}>{child.label}{pendingNavigation === child.href && <LoaderCircle className="gaia-spin gaia-nav-loading" size={13} />}</Link>; })}</div>}</div>;
       })}</nav>
       <div className="gaia-sidebar-footer" ref={accountRef}>{accountOpen && <div className={`gaia-account-menu ${collapsed ? "is-collapsed" : ""}`} role="menu"><div className="gaia-account-summary"><UserRound size={17} /><div><strong>{displayedUser?.displayName ?? "Usuario Gaia"}</strong><span>{displayedUser?.email}</span></div></div><div className="gaia-theme-selector"><div><Palette size={16} /><span>Color de la plataforma</span></div><div aria-label="Color de la plataforma" className="gaia-theme-options" role="radiogroup">{accentThemes.map(theme => <button aria-checked={accentTheme === theme.value} aria-label={theme.label} className={accentTheme === theme.value ? "is-selected" : ""} key={theme.value} onClick={() => selectAccent(theme.value)} role="radio" title={theme.label} type="button"><span style={{ backgroundColor: theme.color }} /><small>{theme.label}</small></button>)}</div></div><button className="gaia-account-action" disabled={loggingOut} onClick={logout} role="menuitem" type="button">{loggingOut ? <LoaderCircle className="gaia-spin" size={17} /> : <LogOut size={17} />}{loggingOut ? "Cerrando sesión..." : "Cerrar sesión"}</button></div>}
-        <button aria-expanded={accountOpen} className="gaia-user-trigger" onClick={() => setAccountOpen(value => !value)} title={collapsed ? displayedUser?.displayName : undefined} type="button"><Avatar name={displayedUser?.displayName ?? "Usuario Gaia"} />{!collapsed && <><span className="min-w-0 flex-1 text-left"><strong>{displayedUser?.displayName ?? "Usuario Gaia"}</strong><small>{displayedUser?.email ?? "Cuenta institucional"}</small></span><ChevronRight size={17} /></>}</button>
+        <button aria-expanded={accountOpen} className="gaia-user-trigger" onClick={() => setAccountOpen(value => !value)} title={collapsed ? displayedUser?.displayName : undefined} type="button"><Avatar currentUser name={displayedUser?.displayName ?? "Usuario Gaia"} />{!collapsed && <><span className="min-w-0 flex-1 text-left"><strong>{displayedUser?.displayName ?? "Usuario Gaia"}</strong><small>{displayedUser?.email ?? "Cuenta institucional"}</small></span><ChevronRight size={17} /></>}</button>
         <button className="gaia-collapse-button" onClick={() => setCollapsed(value => !value)} title={collapsed ? "Expandir navegación" : "Contraer navegación"} type="button">{collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}{!collapsed && <span>Contraer</span>}</button></div>
     </aside>
     <header className="gaia-topbar"><IconButton className="gaia-menu-button" label="Abrir navegación" onClick={() => setMobileOpen(true)}><Menu size={21} /></IconButton><h1>{title}</h1><div className="gaia-topbar-status"><span aria-hidden="true" /><span>Entorno institucional</span></div></header>

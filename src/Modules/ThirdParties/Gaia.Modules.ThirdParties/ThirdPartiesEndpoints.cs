@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Globalization;
 using Gaia.Modules.Security;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -16,10 +17,17 @@ internal static class ThirdPartiesEndpoints
             .RequireAuthorization();
         intranet.MapGet("/people", ListIntranetPeopleAsync)
             .RequireAuthorization(AdminCorePermissions.IntranetPersonasVer);
+        intranet.MapGet("/people/{id:guid}/photo", GetPersonPhotoAsync)
+            .RequireAuthorization(AdminCorePermissions.IntranetPersonasVer);
         intranet.MapGet("/people/organization-units", ListIntranetOrganizationUnitsAsync)
             .RequireAuthorization(AdminCorePermissions.IntranetPersonasVer);
         intranet.MapGet("/birthdays", ListIntranetBirthdaysAsync)
             .RequireAuthorization("IntranetBirthdays");
+
+        var profile = endpoints.MapGroup("/api/profile")
+            .WithTags("Perfil")
+            .RequireAuthorization();
+        profile.MapGet("/photo", GetCurrentUserPhotoAsync);
 
         var group = endpoints.MapGroup("/api/third-parties")
             .WithTags("Third parties")
@@ -73,6 +81,62 @@ internal static class ThirdPartiesEndpoints
         IIntranetDirectoryReader reader,
         CancellationToken cancellationToken) =>
         Results.Ok(await reader.ListOrganizationUnitsAsync(cancellationToken));
+
+    private static async Task<IResult> GetCurrentUserPhotoAsync(
+        int? size,
+        ClaimsPrincipal principal,
+        HttpContext context,
+        IProfilePhotoReader reader,
+        CancellationToken cancellationToken)
+    {
+        var requestedSize = PhotoSize(size);
+        if (requestedSize is null) return InvalidPhotoSize();
+        var identityCacheKey = principal.FindFirstValue("oid")
+            ?? principal.FindFirstValue("http://schemas.microsoft.com/identity/claims/objectidentifier")
+            ?? principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(identityCacheKey)) return Results.NotFound();
+        return PhotoResult(await reader.ReadCurrentUserAsync(identityCacheKey, requestedSize.Value, cancellationToken), context);
+    }
+
+    private static async Task<IResult> GetPersonPhotoAsync(
+        Guid id,
+        int? size,
+        HttpContext context,
+        IProfilePhotoReader reader,
+        CancellationToken cancellationToken)
+    {
+        var requestedSize = PhotoSize(size);
+        if (requestedSize is null) return InvalidPhotoSize();
+        return PhotoResult(await reader.ReadPersonAsync(id, requestedSize.Value, cancellationToken), context);
+    }
+
+    private static int? PhotoSize(int? size)
+    {
+        var requested = size ?? 96;
+        return ProfilePhotoSizes.IsAllowed(requested) ? requested : null;
+    }
+
+    private static IResult InvalidPhotoSize() => Results.ValidationProblem(
+        new Dictionary<string, string[]> { ["size"] = ["El tamaño solicitado no está permitido."] });
+
+    private static IResult PhotoResult(ProfilePhotoResult result, HttpContext context)
+    {
+        if (result.Unavailable)
+        {
+            if (result.RetryAfter is { } retryAfter)
+                context.Response.Headers.RetryAfter = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds)).ToString(CultureInfo.InvariantCulture);
+            return Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable,
+                title: "Fotografía institucional no disponible",
+                detail: "No fue posible consultar la fotografía institucional en este momento.");
+        }
+        if (result.Content is null)
+        {
+            context.Response.Headers.CacheControl = "private, max-age=900";
+            return Results.NotFound();
+        }
+        context.Response.Headers.CacheControl = "private, max-age=21600";
+        return Results.File(result.Content.Bytes, result.Content.ContentType);
+    }
 
     private static async Task<IResult> ListIntranetBirthdaysAsync(
         int month,

@@ -8,6 +8,9 @@
   </Folder>
   <Folder Name="/src/Modules/" />
   <Folder Name="/src/Modules/Security/"><Project Path="src/Modules/Security/Gaia.Modules.Security/Gaia.Modules.Security.csproj" /></Folder>
+  <Folder Name="/src/Modules/Helpdesk/">
+    <Project Path="src/Modules/Helpdesk/Gaia.Modules.Helpdesk/Gaia.Modules.Helpdesk.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Identity/">
     <Project Path="src/Modules/Identity/Gaia.Modules.Identity/Gaia.Modules.Identity.csproj" />
   </Folder>
@@ -19,6 +22,9 @@
   </Folder>
   <Folder Name="/src/Modules/ThirdParties/">
     <Project Path="src/Modules/ThirdParties/Gaia.Modules.ThirdParties/Gaia.Modules.ThirdParties.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Training/">
+    <Project Path="src/Modules/Training/Gaia.Modules.Training/Gaia.Modules.Training.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Gaia.ArchitectureTests/Gaia.ArchitectureTests.csproj" />

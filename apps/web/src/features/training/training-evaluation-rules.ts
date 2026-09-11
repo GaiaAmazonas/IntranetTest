@@ -1,0 +1,4 @@
+export function hasOptions(type: number) { return [299541060, 299541061, 299541062].includes(type); }
+export function canAddOptions(type: number) { return [299541060, 299541061].includes(type); }
+export function optionMarker(type: number, index: number) { return type === 299541062 ? "" : `${String.fromCharCode(97 + index)})`; }
+export function questionHelp(type: number) { return ({ 299541060: "Muestra las opciones como botones y permite elegir una sola respuesta.", 299541061: "Muestra las opciones dentro de una lista desplegable y permite elegir solamente una.", 299541062: "El sistema crea únicamente Sí y No; tú defines cuál es correcta.", 299541063: "El participante responderá en una sola línea de texto.", 299541064: "El participante podrá escribir una respuesta extensa.", 299541065: "El participante elegirá un valor entre los extremos que configures." } as Record<number, string>)[type]; }

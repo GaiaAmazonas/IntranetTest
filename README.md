@@ -6,6 +6,8 @@ Los Excel, datos personales, credenciales y configuraciones reales de una organi
 
 ## Arquitectura actual
 
+Para continuar el desarrollo en una nueva conversación, empezar por [Contexto para un nuevo chat](Md/CONTEXTO_PARA_NUEVO_CHAT.md). Incluye arquitectura verificada, seguridad, decisiones vigentes y una receta para crear módulos.
+
 - Frontend: Next.js 16, React 19, TypeScript y Tailwind CSS.
 - API: ASP.NET Core sobre .NET 10.
 - Autenticación: Microsoft Entra ID mediante OpenID Connect.

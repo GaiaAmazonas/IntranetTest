@@ -3,14 +3,28 @@ using Gaia.Api.Infrastructure.Dataverse.ThirdParties;
 using Gaia.Api.Infrastructure.Dataverse;
 using Gaia.Api.Infrastructure.Dataverse.Security;
 using Gaia.Api.Infrastructure.Dataverse.Communications;
+using Gaia.Api.Infrastructure.Dataverse.Helpdesk;
+using Gaia.Api.Infrastructure.Dataverse.Training;
 using Gaia.Modules.Communications;
 using Gaia.Modules.Identity;
 using Gaia.Modules.Inventory;
+using Gaia.Modules.Helpdesk;
 using Gaia.Modules.Organization;
 using Gaia.Modules.Security;
 using Gaia.Modules.ThirdParties;
+using Gaia.Modules.Training;
+using Gaia.Api.Infrastructure.Files;
 
 var builder = WebApplication.CreateBuilder(args);
+
+if (builder.Environment.IsDevelopment())
+    builder.Logging.ClearProviders();
+if (builder.Environment.IsDevelopment())
+    builder.Logging.AddConsole();
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+    options.MultipartBodyLengthLimit = 262_144_000);
+
+builder.Services.AddGaiaFileStorage(builder.Configuration, builder.Environment.EnvironmentName);
 var dataverseConfiguration = DataverseConfiguration.From(builder.Configuration);
 
 builder.Services.AddOpenApi();
@@ -24,6 +38,12 @@ builder.Services.AddHttpClient("Dataverse", client =>
     client.DefaultRequestHeaders.Add("OData-Version", "4.0");
     client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
 }).AddHttpMessageHandler<DataverseDiagnosticsHandler>();
+builder.Services.AddHttpClient("GraphProfilePhotos", client =>
+{
+    client.BaseAddress = new Uri("https://graph.microsoft.com/v1.0/");
+    client.Timeout = TimeSpan.FromSeconds(15);
+    client.DefaultRequestHeaders.Accept.ParseAdd("image/*");
+});
 builder.Services.AddScoped<OrganizationDataverseImporter>();
 builder.Services.AddScoped<IDataverseDelegatedClientFactory, DataverseDelegatedClientFactory>();
 builder.Services.AddScoped<IOrganizationUnitReader, DataverseOrganizationUnitReader>();
@@ -43,6 +63,8 @@ builder.Services.AddScoped<IDocumentTypeReader>(provider => provider.GetRequired
 builder.Services.AddScoped<ICollaboratorEmailStore, DataverseCollaboratorEmailStore>();
 builder.Services.AddScoped<ICollaboratorPhoneStore, DataverseCollaboratorPhoneStore>();
 builder.Services.AddScoped<IIntranetDirectoryReader, DataverseIntranetDirectoryReader>();
+builder.Services.AddSingleton<ProfilePhotoMemoryCache>();
+builder.Services.AddScoped<IProfilePhotoReader, MicrosoftGraphProfilePhotoReader>();
 builder.Services.AddScoped<IAdministrativePersonnelImporter, DataversePersonnelImporter>();
 builder.Services.AddScoped<IOrganizationalAssignmentStore, DataverseOrganizationalAssignmentStore>();
 builder.Services.AddScoped<IOrganizationalAssignmentImporter, OrganizationalAssignmentWorkbookImporter>();
@@ -51,6 +73,24 @@ builder.Services.AddScoped<DataverseSecurityStore>();
 builder.Services.AddScoped<ISecurityStore>(provider => provider.GetRequiredService<DataverseSecurityStore>());
 builder.Services.AddScoped<IAdminCoreAuthorization>(provider => provider.GetRequiredService<DataverseSecurityStore>());
 builder.Services.AddScoped<ICommunicationsStore, DataverseCommunicationsStore>();
+builder.Services.AddScoped<IHelpdeskAttachmentStore, DataverseHelpdeskAttachmentStore>();
+builder.Services.AddScoped<IHelpdeskAttachmentPolicyStore, DataverseHelpdeskAttachmentPolicyStore>();
+builder.Services.AddScoped<IHelpdeskHistoryStore, DataverseHelpdeskHistoryStore>();
+builder.Services.AddScoped<IHelpdeskPortalReader, DataverseHelpdeskPortalReader>();
+builder.Services.AddScoped<IHelpdeskRequestStore, DataverseHelpdeskRequestStore>();
+builder.Services.AddScoped<IHelpdeskFormReader, DataverseHelpdeskFormReader>();
+builder.Services.AddScoped<IHelpdeskRequestApplication, HelpdeskRequestApplication>();
+builder.Services.AddScoped<IHelpdeskConversationStore, DataverseHelpdeskConversationStore>();
+builder.Services.AddScoped<IHelpdeskConversationApplication, HelpdeskConversationApplication>();
+builder.Services.AddScoped<IHelpdeskManagementStore, DataverseHelpdeskManagementStore>();
+builder.Services.AddScoped<IHelpdeskManagementApplication, HelpdeskManagementApplication>();
+builder.Services.AddScoped<IHelpdeskAttachmentApplication, HelpdeskAttachmentApplication>();
+
+builder.Services.AddScoped<IHelpdeskObservationApplication, HelpdeskObservationApplication>();
+builder.Services.AddScoped<ITrainingAdministrationReader, DataverseTrainingAdministrationReader>();
+builder.Services.AddScoped<ITrainingOperations, DataverseTrainingOperations>();
+
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddIdentityModule(
     builder.Configuration,
     builder.Environment.IsDevelopment());
@@ -134,6 +174,19 @@ app.Use(async (context, next) =>
             detail = "No fue posible conectar con el servicio de datos. Intenta nuevamente o contacta al administrador."
         });
     }
+    catch (Gaia.BuildingBlocks.Files.FileStorageException exception)
+    {
+        context.Response.StatusCode = exception.Code == Gaia.BuildingBlocks.Files.FileStorageError.FileTooLarge
+            ? StatusCodes.Status413PayloadTooLarge : StatusCodes.Status422UnprocessableEntity;
+        context.Response.ContentType = "application/problem+json";
+        await context.Response.WriteAsJsonAsync(new
+        {
+            title = exception.Code == Gaia.BuildingBlocks.Files.FileStorageError.FileTooLarge
+                ? "El archivo es demasiado grande" : "No fue posible cargar el archivo",
+            status = context.Response.StatusCode,
+            detail = exception.Message
+        });
+    }
 });
 
 if (app.Environment.IsDevelopment())
@@ -157,11 +210,14 @@ app.MapGet("/health", () => Results.Ok(new
 
 app.MapIdentityEndpoints();
 app.MapDataverseEndpoints();
+app.MapFileStorageDiagnostics();
 app.MapOrganizationEndpoints();
 app.MapThirdPartiesEndpoints();
 app.MapInventoryEndpoints();
 app.MapSecurityEndpoints();
+app.MapHelpdeskEndpoints();
 app.MapCommunicationsEndpoints();
+app.MapTrainingEndpoints();
 app.MapGet("/api/intranet/home", async (ICommunicationsStore communications, IIntranetDirectoryReader directory,
     CancellationToken token) =>
 {

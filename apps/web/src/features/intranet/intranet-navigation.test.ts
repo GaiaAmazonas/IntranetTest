@@ -2,13 +2,14 @@ import { describe, expect, it } from "vitest";
 import { intranetNavigation, isIntranetRouteActive } from "./intranet-navigation";
 
 describe("intranetNavigation", () => {
-  it("mantiene las cinco opciones principales aprobadas", () => {
+  it("mantiene las opciones principales aprobadas", () => {
     expect(intranetNavigation.map(item => item.label)).toEqual([
       "Inicio",
       "Personas",
       "Calendario",
       "Aplicaciones",
       "Helpdesk",
+      "Mis capacitaciones",
     ]);
   });
 

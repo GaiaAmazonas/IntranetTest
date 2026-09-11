@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Azure.Identity" Version="1.17.2" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
     <PackageReference Include="Microsoft.OpenApi" Version="2.7.5" />
   </ItemGroup>
@@ -15,10 +16,12 @@
   <ItemGroup>
     <ProjectReference Include="..\Modules\Communications\Gaia.Modules.Communications\Gaia.Modules.Communications.csproj" />
     <ProjectReference Include="..\Modules\Identity\Gaia.Modules.Identity\Gaia.Modules.Identity.csproj" />
+    <ProjectReference Include="..\Modules\Helpdesk\Gaia.Modules.Helpdesk\Gaia.Modules.Helpdesk.csproj" />
     <ProjectReference Include="..\Modules\Organization\Gaia.Modules.Organization\Gaia.Modules.Organization.csproj" />
     <ProjectReference Include="..\Modules\ThirdParties\Gaia.Modules.ThirdParties\Gaia.Modules.ThirdParties.csproj" />
     <ProjectReference Include="..\Modules\Inventory\Gaia.Modules.Inventory\Gaia.Modules.Inventory.csproj" />
     <ProjectReference Include="..\Modules\Security\Gaia.Modules.Security\Gaia.Modules.Security.csproj" />
+    <ProjectReference Include="..\Modules\Training\Gaia.Modules.Training\Gaia.Modules.Training.csproj" />
   </ItemGroup>
 
   <ItemGroup>
