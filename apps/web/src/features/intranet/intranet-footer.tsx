@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/document-link";
 import { useSecurity } from "@/components/security-context";
 import { intranetNavigation } from "./intranet-navigation";
 
