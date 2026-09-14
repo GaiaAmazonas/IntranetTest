@@ -5,10 +5,10 @@ using Gaia.Modules.ThirdParties;
 
 namespace Gaia.Api.Infrastructure.Dataverse.Training;
 
-internal sealed class DataverseTrainingOperations(
+internal sealed partial class DataverseTrainingOperations(
     IDataverseDelegatedClientFactory clients,
     ITrainingAdministrationReader administration,
-    IIntranetDirectoryReader directory) : ITrainingOperations
+    IIntranetDirectoryReader directory) : ITrainingOperations, ITrainingParticipantOperations
 {
     public async Task<TrainingAssignmentGenerationResult> GenerateAssignmentsAsync(Guid versionId,Guid actorId,CancellationToken token)
     {
@@ -87,22 +87,36 @@ internal sealed class DataverseTrainingOperations(
 
     public async Task<IReadOnlyList<MyTrainingItem>> ReadMyAssignmentsAsync(Guid actorId,CancellationToken token)
     {
-        var items=await ReadAssignments(token);
-        return items.Where(x=>x.ParticipantId==actorId&&x.Status is not (299541096 or 299541097)).Select(ToMyTraining).ToArray();
+        var items=await ReadAssignments(token,actorId);
+        return items.Where(x=>x.Status is not (299541096 or 299541097)).Select(ToMyTraining).ToArray();
     }
 
     public async Task<MyTrainingDetail> ReadMyAssignmentAsync(Guid assignmentId,Guid actorId,CancellationToken token)
     {
-        var assignment=(await ReadAssignments(token)).FirstOrDefault(x=>x.Id==assignmentId&&x.ParticipantId==actorId)??throw new KeyNotFoundException("La capacitación asignada no existe o no pertenece al usuario autenticado.");
+        var assigned=await ReadAssignments(token,actorId,assignmentId);
+        var assignment=assigned.Count>0?assigned[0]:throw new KeyNotFoundException("La capacitación asignada no existe o no pertenece al usuario autenticado.");
         var client=await clients.CreateAsync();var version=await DataverseMetadataResolver.TableAsync(client,"gaia_versioncapacitacion",token);var objective=version.Attribute("gaia_Objetivo");var sequential=version.Attribute("gaia_RequiereOrdenSecuencial");var completion=version.Attribute("gaia_MensajeFinalizacion");var summary=version.Attribute("gaia_Resumen");
-        var versionRow=await DataverseMetadataResolver.ReadOneAsync(client,$"{version.EntitySetName}({assignment.VersionId:D})?$select={objective},{sequential},{completion},{summary}",token)??throw new KeyNotFoundException("La versión asignada no existe.");
+        var versionRow=await DataverseMetadataResolver.ReadOneAsync(client,$"{version.EntitySetName}({assignment.VersionId:D})",token)??throw new KeyNotFoundException("La versión asignada no existe.");
         var sections=await administration.ReadContentAsync(assignment.VersionId,token);var completedIds=await CompletedBlocks(client,assignmentId,token);
+        await Owned(client,assignmentId,actorId,token);
+        if(completedIds.Count>0||(await Attempts(client,assignmentId,token)).Count>0)
+        {
+            var refreshed=await RefreshCompletion(client,assignmentId,assignment.VersionId,token);
+            var refreshedItems=await ReadAssignments(token,actorId,assignmentId);
+            assignment=refreshedItems[0] with{Progress=refreshed.Progress,Status=refreshed.Status};
+        }
         var item=ToMyTraining(assignment) with { Summary=Text(versionRow,summary) };
-        return new(item,Text(versionRow,objective),Boolean(versionRow,sequential)??true,Text(versionRow,completion),sections,completedIds.ToArray());
+        var now=DateTimeOffset.UtcNow;string? unavailable=null;
+        if((Number(versionRow,version.Attribute("gaia_Estado"))??0)!=299540002||(Number(versionRow,"statecode")??0)!=0)unavailable="Esta versión está cerrada para nuevas actividades; puedes consultar su historial.";
+        else if(Date(versionRow,version.Attribute("gaia_InicioDisponibilidad")) is DateTimeOffset from&&from>now)unavailable=$"Disponible a partir del {from:yyyy-MM-dd HH:mm} UTC.";
+        else if(Date(versionRow,version.Attribute("gaia_FinDisponibilidad"))<now)unavailable="Terminó el período de disponibilidad. Consulta al responsable de la capacitación.";
+        else if(assignment.DueAt<now&&!(Boolean(versionRow,version.Attribute("gaia_PermitirContinuarVencida"))??false))unavailable="Tu fecha límite venció y esta versión no permite continuar después del vencimiento.";
+        return new(item,Text(versionRow,objective),Boolean(versionRow,sequential)??true,Text(versionRow,completion),sections,completedIds.ToArray(),unavailable is null,unavailable);
     }
 
-    public async Task<TrainingProgressResult> CompleteBlockAsync(Guid assignmentId,Guid blockId,Guid actorId,CancellationToken token)
+    public async Task<TrainingProgressResult> CompleteBlockAsync(Guid assignmentId,Guid blockId,Guid actorId,CancellationToken token,CompleteTrainingBlock? observation=null)
     {
+        await Owned(await clients.CreateAsync(),assignmentId,actorId,token,true);
         var client=await clients.CreateAsync();var assignment=await DataverseMetadataResolver.TableAsync(client,"gaia_asignacioncapacitacion",token);var participantRelation=assignment.Relationship("gaia_Participante","gaia_terceros");var versionRelation=assignment.Relationship("gaia_VersionCapacitacion","gaia_versioncapacitacion");var status=assignment.Attribute("gaia_Estado");var started=assignment.Attribute("gaia_FechaInicio");
         var row=await DataverseMetadataResolver.ReadOneAsync(client,$"{assignment.EntitySetName}({assignmentId:D})?$select=_{participantRelation.ReferencingAttribute}_value,_{versionRelation.ReferencingAttribute}_value,{status},{started},statecode",token)??throw new KeyNotFoundException("La asignación no existe.");
         if(GuidValue(row,$"_{participantRelation.ReferencingAttribute}_value")!=actorId)throw new UnauthorizedAccessException("La asignación no pertenece al usuario autenticado.");
@@ -111,11 +125,10 @@ internal sealed class DataverseTrainingOperations(
         var completed=await CompletedBlocks(client,assignmentId,token);
         var version=await DataverseMetadataResolver.TableAsync(client,"gaia_versioncapacitacion",token);var sequentialField=version.Attribute("gaia_RequiereOrdenSecuencial");var versionRow=await DataverseMetadataResolver.ReadOneAsync(client,$"{version.EntitySetName}({versionId:D})?$select={sequentialField}",token)??throw new KeyNotFoundException("La versión no existe.");
         if((Boolean(versionRow,sequentialField)??true)&&ordered.TakeWhile(x=>x.Id!=selected.Id).Any(x=>x.Required&&!completed.Contains(x.Id)))throw new InvalidOperationException("Completa primero los bloques anteriores de la capacitación.");
-        await SaveCompletedBlock(client,assignmentId,blockId,token);completed.Add(blockId);
-        var required=ordered.Where(x=>x.Required).Select(x=>x.Id).ToArray();var percentage=required.Length==0?100m:Math.Round(required.Count(completed.Contains)*100m/required.Length,2);var allCompleted=percentage>=100;
-        var evaluation=await DataverseMetadataResolver.TableAsync(client,"gaia_evaluacion",token);var evaluationVersion=evaluation.Relationship("gaia_VersionCapacitacion","gaia_versioncapacitacion");var requiredEvaluation=evaluation.Attribute("gaia_Obligatoria");var evaluations=await DataverseJson.ReadAllAsync(client,$"{evaluation.EntitySetName}?$select={evaluation.PrimaryIdAttribute}&$filter=_{evaluationVersion.ReferencingAttribute}_value eq {versionId:D} and {requiredEvaluation} eq true and statecode eq 0&$top=1",token);var nextStatus=allCompleted?(evaluations.Count>0?299541092:299541093):299541091;var now=DateTimeOffset.UtcNow;
-        var payload=new Dictionary<string,object?>{{assignment.Attribute("gaia_PorcentajeAvance"),percentage},{assignment.Attribute("gaia_UltimoAcceso"),now},{status,assignment.EncodedIntegerValue("gaia_Estado",nextStatus)}};if(Date(row,started) is null)payload[started]=now;if(allCompleted){payload[assignment.Attribute("gaia_FechaFinalizacion")]=now;if(nextStatus==299541093){payload[assignment.Attribute("gaia_FechaAprobacion")]=now;payload[assignment.Attribute("gaia_ResultadoPorcentaje")]=100m;}}
-        await Patch(client,$"{assignment.EntitySetName}({assignmentId:D})",payload,token);return new(percentage,nextStatus,allCompleted);
+        if(observation is {ViewedPercentage:<0 or >100} or {ViewedSeconds:<0})throw new ArgumentException("El avance del video no es válido.");
+        if(!completed.Contains(blockId)&&selected.Type==299541074&&selected.MinimumViewPercentage is int minimum&&(observation?.ViewedPercentage??0)<minimum)throw new InvalidOperationException($"Visualiza al menos el {minimum}% del video antes de confirmar.");
+        await SaveCompletedBlock(client,assignmentId,blockId,token,selected.Type==299541074?observation:null);
+        return await RefreshCompletion(client,assignmentId,versionId,token);
     }
 
     static MyTrainingItem ToMyTraining(TrainingAssignmentItem x)=>new(x.Id,x.VersionId,x.Training,x.Version,x.Summary,x.Status,x.AssignedAt,x.DueAt,x.Progress,x.Result);
@@ -125,15 +138,15 @@ internal sealed class DataverseTrainingOperations(
         var progress=await DataverseMetadataResolver.TableAsync(client,"gaia_progresobloque",token);var assignment=progress.Relationship("gaia_AsignacionCapacitacion","gaia_asignacioncapacitacion");var block=progress.Relationship("gaia_BloqueCapacitacion","gaia_bloquecapacitacion");var status=progress.Attribute("gaia_Estado");var rows=await DataverseJson.ReadAllAsync(client,$"{progress.EntitySetName}?$select=_{block.ReferencingAttribute}_value&$filter=_{assignment.ReferencingAttribute}_value eq {assignmentId:D} and {status} eq 299541102 and statecode eq 0",token);return rows.Select(x=>GuidValue(x,$"_{block.ReferencingAttribute}_value")).ToHashSet();
     }
 
-    static async Task SaveCompletedBlock(HttpClient client,Guid assignmentId,Guid blockId,CancellationToken token)
+    static async Task SaveCompletedBlock(HttpClient client,Guid assignmentId,Guid blockId,CancellationToken token,CompleteTrainingBlock? observation=null)
     {
-        var progress=await DataverseMetadataResolver.TableAsync(client,"gaia_progresobloque",token);var assignment=progress.Relationship("gaia_AsignacionCapacitacion","gaia_asignacioncapacitacion");var block=progress.Relationship("gaia_BloqueCapacitacion","gaia_bloquecapacitacion");var state=progress.Attribute("gaia_Estado");var rows=await DataverseJson.ReadAllAsync(client,$"{progress.EntitySetName}?$select={progress.PrimaryIdAttribute}&$filter=_{assignment.ReferencingAttribute}_value eq {assignmentId:D} and _{block.ReferencingAttribute}_value eq {blockId:D}&$top=1",token);var now=DateTimeOffset.UtcNow;var payload=new Dictionary<string,object?>{{state,progress.EncodedIntegerValue("gaia_Estado",299541102)},{progress.Attribute("gaia_PorcentajeVisualizado"),100m},{progress.Attribute("gaia_ConfirmacionRealizada"),true},{progress.Attribute("gaia_FechaConfirmacion"),now},{progress.Attribute("gaia_FechaFinalizacion"),now},{"statecode",0}};
-        if(rows.Count>0){await Patch(client,$"{progress.EntitySetName}({GuidValue(rows[0],progress.PrimaryIdAttribute):D})",payload,token);return;}var assignmentTable=await DataverseMetadataResolver.TableAsync(client,"gaia_asignacioncapacitacion",token);var blockTable=await DataverseMetadataResolver.TableAsync(client,"gaia_bloquecapacitacion",token);payload[progress.PrimaryNameAttribute]=$"Progreso {assignmentId:N} {blockId:N}";payload[assignment.NavigationProperty+"@odata.bind"]=$"/{assignmentTable.EntitySetName}({assignmentId:D})";payload[block.NavigationProperty+"@odata.bind"]=$"/{blockTable.EntitySetName}({blockId:D})";payload[progress.Attribute("gaia_TiempoAcumuladoSegundos")]=0;using var response=await client.PostAsJsonAsync(progress.EntitySetName,payload,token);if(!response.IsSuccessStatusCode)throw new InvalidOperationException($"Dataverse rechazó el progreso ({(int)response.StatusCode}): {await response.Content.ReadAsStringAsync(token)}");
+        var progress=await DataverseMetadataResolver.TableAsync(client,"gaia_progresobloque",token);var assignment=progress.Relationship("gaia_AsignacionCapacitacion","gaia_asignacioncapacitacion");var block=progress.Relationship("gaia_BloqueCapacitacion","gaia_bloquecapacitacion");var state=progress.Attribute("gaia_Estado");var rows=await DataverseJson.ReadAllAsync(client,$"{progress.EntitySetName}?$select={progress.PrimaryIdAttribute}&$filter=_{assignment.ReferencingAttribute}_value eq {assignmentId:D} and _{block.ReferencingAttribute}_value eq {blockId:D}&$top=1",token);var now=DateTimeOffset.UtcNow;var payload=new Dictionary<string,object?>{{state,progress.EncodedIntegerValue("gaia_Estado",299541102)},{progress.Attribute("gaia_PorcentajeVisualizado"),observation?.ViewedPercentage??100m},{progress.Attribute("gaia_TiempoAcumuladoSegundos"),observation?.ViewedSeconds??0},{progress.Attribute("gaia_ConfirmacionRealizada"),true},{progress.Attribute("gaia_FechaConfirmacion"),now},{progress.Attribute("gaia_FechaFinalizacion"),now},{"statecode",0}};
+        if(rows.Count>0){await Patch(client,$"{progress.EntitySetName}({GuidValue(rows[0],progress.PrimaryIdAttribute):D})",payload,token);return;}var assignmentTable=await DataverseMetadataResolver.TableAsync(client,"gaia_asignacioncapacitacion",token);var blockTable=await DataverseMetadataResolver.TableAsync(client,"gaia_bloquecapacitacion",token);payload[progress.PrimaryNameAttribute]=$"Progreso {assignmentId:N} {blockId:N}";payload[assignment.NavigationProperty+"@odata.bind"]=$"/{assignmentTable.EntitySetName}({assignmentId:D})";payload[block.NavigationProperty+"@odata.bind"]=$"/{blockTable.EntitySetName}({blockId:D})";using var response=await client.PostAsJsonAsync(progress.EntitySetName,payload,token);if(!response.IsSuccessStatusCode)throw new InvalidOperationException($"Dataverse rechazó el progreso ({(int)response.StatusCode}): {await response.Content.ReadAsStringAsync(token)}");
     }
 
     static async Task Patch(HttpClient client,string uri,Dictionary<string,object?> payload,CancellationToken token){using var request=new HttpRequestMessage(HttpMethod.Patch,uri){Content=JsonContent.Create(payload)};request.Headers.TryAddWithoutValidation("If-Match","*");using var response=await client.SendAsync(request,token);if(!response.IsSuccessStatusCode)throw new InvalidOperationException($"Dataverse rechazó el progreso ({(int)response.StatusCode}): {await response.Content.ReadAsStringAsync(token)}");}
 
-    async Task<IReadOnlyList<TrainingAssignmentItem>> ReadAssignments(CancellationToken token)
+    async Task<IReadOnlyList<TrainingAssignmentItem>> ReadAssignments(CancellationToken token,Guid? actorId=null,Guid? assignmentId=null)
     {
         var client=await clients.CreateAsync();
         var assignment=await DataverseMetadataResolver.TableAsync(client,"gaia_asignacioncapacitacion",token);
@@ -142,7 +155,9 @@ internal sealed class DataverseTrainingOperations(
         var unitRelation=assignment.Relationship("gaia_UnidadAlAsignar","gaia_organizacion");
         var state=assignment.Attribute("gaia_Estado");var assigned=assignment.Attribute("gaia_FechaAsignacion");var due=assignment.Attribute("gaia_FechaVencimiento");var started=assignment.Attribute("gaia_FechaInicio");var access=assignment.Attribute("gaia_UltimoAcceso");var completed=assignment.Attribute("gaia_FechaFinalizacion");var approved=assignment.Attribute("gaia_FechaAprobacion");var progress=assignment.Attribute("gaia_PorcentajeAvance");var result=assignment.Attribute("gaia_ResultadoPorcentaje");
         var select=string.Join(',',assignment.PrimaryIdAttribute,$"_{versionRelation.ReferencingAttribute}_value",$"_{participantRelation.ReferencingAttribute}_value",$"_{unitRelation.ReferencingAttribute}_value",state,assigned,due,started,access,completed,approved,progress,result,"statecode");
-        var rows=await DataverseJson.ReadAllAsync(client,$"{assignment.EntitySetName}?$select={select}&$filter=statecode eq 0&$orderby={assigned} desc",token);
+        var filter="statecode eq 0";if(actorId.HasValue)filter+=$" and _{participantRelation.ReferencingAttribute}_value eq {actorId:D}";if(assignmentId.HasValue)filter+=$" and {assignment.PrimaryIdAttribute} eq {assignmentId:D}";
+        var rows=await DataverseJson.ReadAllAsync(client,$"{assignment.EntitySetName}?$select={select}&$filter={filter}&$orderby={assigned} desc",token);
+        if(rows.Count==0)return [];
         var version=await DataverseMetadataResolver.TableAsync(client,"gaia_versioncapacitacion",token);var trainingRelation=version.Relationship("gaia_Capacitacion","gaia_capacitacion");var number=version.Attribute("gaia_NumeroVersion");var summary=version.Attribute("gaia_Resumen");
         var versions=await DataverseJson.ReadAllAsync(client,$"{version.EntitySetName}?$select={version.PrimaryIdAttribute},_{trainingRelation.ReferencingAttribute}_value,{number},{summary}",token);
         var training=await DataverseMetadataResolver.TableAsync(client,"gaia_capacitacion",token);var trainings=(await DataverseJson.ReadAllAsync(client,$"{training.EntitySetName}?$select={training.PrimaryIdAttribute},{training.PrimaryNameAttribute}",token)).ToDictionary(x=>GuidValue(x,training.PrimaryIdAttribute),x=>Text(x,training.PrimaryNameAttribute)??"Capacitación");
@@ -156,7 +171,7 @@ internal sealed class DataverseTrainingOperations(
     static string Limit(string value,int maximum)=>value.Length<=maximum?value:value[..maximum];
     static string? Text(JsonElement row,string property)=>row.TryGetProperty(property,out var value)&&value.ValueKind==JsonValueKind.String?value.GetString():null;
     static int? Number(JsonElement row,string property)=>DataverseJson.OptionalEncodedInt32(row,property);
-    static decimal? Decimal(JsonElement row,string property)=>row.TryGetProperty(property,out var value)&&value.TryGetDecimal(out var number)?number:null;
+    static decimal? Decimal(JsonElement row,string property)=>row.TryGetProperty(property,out var value)&&value.ValueKind==JsonValueKind.Number&&value.TryGetDecimal(out var number)?number:null;
     static bool? Boolean(JsonElement row,string property)=>row.TryGetProperty(property,out var value)&&value.ValueKind is JsonValueKind.True or JsonValueKind.False?value.GetBoolean():null;
     static DateTimeOffset? Date(JsonElement row,string property)=>DateTimeOffset.TryParse(Text(row,property),out var value)?value:null;
     static Guid? OptionalGuid(JsonElement row,string property)=>Guid.TryParse(Text(row,property),out var value)?value:null;

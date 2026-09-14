@@ -11,6 +11,7 @@ import {
   Menu,
   UserRound,
   X,
+  Grid2X2,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { startLogin } from "@/lib/api-client";
@@ -84,7 +85,7 @@ export function IntranetShell({ children }: { children: React.ReactNode }) {
         </Link>
 
         <nav aria-label="Navegación de la intranet" className="intranet-desktop-nav">
-          {intranetNavigation.filter(item => security.can(item.permission)).map(item => {
+          {intranetNavigation.filter(item => !item.group && security.can(item.permission)).map(item => {
             const Icon = item.icon;
             const active = isIntranetRouteActive(pathname, item);
             return (
@@ -99,6 +100,7 @@ export function IntranetShell({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
+          <ServiceNavigation pathname={pathname} can={security.can}/>
         </nav>
 
         <div className="intranet-profile" ref={profileRef}>
@@ -158,6 +160,7 @@ export function IntranetShell({ children }: { children: React.ReactNode }) {
                 const active = isIntranetRouteActive(pathname, item);
                 return <Link aria-current={active ? "page" : undefined} className={active ? "is-active" : undefined} href={item.href} key={item.href} onClick={() => setMobileOpen(false)}><Icon size={19} />{item.label}</Link>;
               })}
+              <ServiceNavigation pathname={pathname} can={security.can} onNavigate={()=>setMobileOpen(false)}/>
             </nav>
             <div className="intranet-mobile-user"><PersonAvatar className="intranet-avatar" currentUser name={security.user.name} size={34} /><span><strong>{security.user.name}</strong><small>{security.user.email}</small></span></div>
           </aside>
@@ -168,4 +171,11 @@ export function IntranetShell({ children }: { children: React.ReactNode }) {
       <IntranetFooter />
     </div>
   );
+}
+function ServiceNavigation({pathname,can,onNavigate}:{pathname:string;can:(permission:string)=>boolean;onNavigate?:()=>void}) {
+ const [open,setOpen]=useState(false),ref=useRef<HTMLDivElement>(null);
+ const items=intranetNavigation.filter(x=>x.group==="services"&&can(x.permission));
+ useEffect(()=>{const close=(event:MouseEvent)=>{if(!ref.current?.contains(event.target as Node))setOpen(false)};document.addEventListener("mousedown",close);return()=>document.removeEventListener("mousedown",close)},[]);
+ if(!items.length)return null;
+ return <div className="intranet-service-nav" ref={ref} onKeyDown={e=>{if(e.key==="Escape")setOpen(false)}}><button className={items.some(x=>isIntranetRouteActive(pathname,x))?"is-active":undefined} type="button" aria-expanded={open} onClick={()=>setOpen(!open)}><Grid2X2 size={17}/>Mi espacio<ChevronDown size={15}/></button>{open&&<div className="intranet-service-links">{items.map(x=>{const Icon=x.icon;return <Link key={x.href} href={x.href} aria-current={isIntranetRouteActive(pathname,x)?"page":undefined} onClick={()=>{setOpen(false);onNavigate?.()}}><Icon size={18}/>{x.label}</Link>})}</div>}</div>;
 }

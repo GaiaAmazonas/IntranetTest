@@ -31,8 +31,9 @@ public sealed record TrainingResultItem(Guid AssignmentId,Guid VersionId,string 
 public sealed record TrainingResultsOverview(int Participants,int Completed,int Approved,int NotApproved,decimal AverageResult,IReadOnlyList<TrainingResultItem> Items);
 public sealed record TrainingAssignmentGenerationResult(int Audience,int Created,int Existing);
 public sealed record MyTrainingItem(Guid AssignmentId,Guid VersionId,string Training,string Version,string? Summary,int Status,DateTimeOffset AssignedAt,DateTimeOffset? DueAt,decimal Progress,decimal? Result);
-public sealed record MyTrainingDetail(MyTrainingItem Assignment,string? Objective,bool SequentialOrder,string? CompletionMessage,IReadOnlyList<TrainingSectionItem> Sections,IReadOnlyList<Guid> CompletedBlockIds);
+public sealed record MyTrainingDetail(MyTrainingItem Assignment,string? Objective,bool SequentialOrder,string? CompletionMessage,IReadOnlyList<TrainingSectionItem> Sections,IReadOnlyList<Guid> CompletedBlockIds,bool CanContinue=true,string? AvailabilityMessage=null);
 public sealed record TrainingProgressResult(decimal Progress,int Status,bool Completed);
+public sealed record CompleteTrainingBlock(decimal ViewedPercentage=0,int ViewedSeconds=0);
 
 public interface ITrainingAdministrationReader
 {
@@ -56,7 +57,7 @@ public interface ITrainingAdministrationReader
     Task<TrainingAudienceOverview> ReadAudienceAsync(Guid versionId,CancellationToken token);
     Task<Guid> SaveAudienceRuleAsync(Guid versionId,SaveTrainingAudienceRule value,Guid actorId,CancellationToken token);
     Task RemoveAudienceRuleAsync(Guid versionId,Guid id,CancellationToken token);
-    Task TransitionVersionAsync(Guid versionId,int targetStatus,string? reason,string? correlationId,Guid actorId,CancellationToken token);
+    Task TransitionVersionAsync(Guid versionId,int targetStatus,string? reason,string? correlationId,Guid actorId,CancellationToken token,bool directPublication=false);
 }
 
 public interface ITrainingOperations
@@ -66,5 +67,5 @@ public interface ITrainingOperations
     Task<TrainingResultsOverview> ReadResultsAsync(CancellationToken token);
     Task<IReadOnlyList<MyTrainingItem>> ReadMyAssignmentsAsync(Guid actorId,CancellationToken token);
     Task<MyTrainingDetail> ReadMyAssignmentAsync(Guid assignmentId,Guid actorId,CancellationToken token);
-    Task<TrainingProgressResult> CompleteBlockAsync(Guid assignmentId,Guid blockId,Guid actorId,CancellationToken token);
+    Task<TrainingProgressResult> CompleteBlockAsync(Guid assignmentId,Guid blockId,Guid actorId,CancellationToken token,CompleteTrainingBlock? observation=null);
 }

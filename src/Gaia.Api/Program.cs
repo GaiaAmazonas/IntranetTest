@@ -89,6 +89,7 @@ builder.Services.AddScoped<IHelpdeskAttachmentApplication, HelpdeskAttachmentApp
 builder.Services.AddScoped<IHelpdeskObservationApplication, HelpdeskObservationApplication>();
 builder.Services.AddScoped<ITrainingAdministrationReader, DataverseTrainingAdministrationReader>();
 builder.Services.AddScoped<ITrainingOperations, DataverseTrainingOperations>();
+builder.Services.AddScoped<ITrainingParticipantOperations, DataverseTrainingOperations>();
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddIdentityModule(

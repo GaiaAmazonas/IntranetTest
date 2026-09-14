@@ -150,3 +150,19 @@ Antes de cerrar un cambio visual se debe comprobar al menos escritorio, 768 px, 
 - Una tabla operativa debe usar separación por `--gaia-line`, encabezado con superficie de acento, hover discreto, celdas verticalmente centradas y acciones claramente diferenciadas.
 - Los estados se expresan con etiquetas semánticas y texto; el color nunca es la única señal.
 - En móvil debe habilitarse desplazamiento horizontal controlado o una transformación a tarjetas cuando las acciones no resulten legibles.
+
+## 9. Participación en capacitaciones
+
+La pantalla de Intranet usa el mismo `Button` y `Badge` del toolkit, no una paleta paralela de botones. La acción primaria avanza el flujo (confirmar material, iniciar o enviar evaluación); volver, actualizar, expandir y contraer son secundarias. Mantener hover, foco visible, estado deshabilitado y altura táctil mínima de 42 px.
+
+Las preguntas se contienen completamente en su superficie, con título dentro del bloque y etiqueta accesible para el control. Una lista desplegable es selección única; nunca convertirla en checkboxes. No incluir respuestas correctas en los datos iniciales del participante. Los controles deben envolver en 390 px sin ampliar el viewport. La hoja `training-participant.css` tiene alcance por clases del módulo y respeta `--brand-primary`.
+
+El estado de carga y el error de una consulta no equivalen a cero asignaciones. Conservar esa distinción en Inicio, catálogo y resultados. Véase `31_CAPACITACIONES_FLUJO_Y_PRUEBAS.md` para reglas y pruebas funcionales.
+## 10. Portada y navegación de Intranet
+
+- Inicio, Personas y Calendario permanecen en primer nivel. Mi espacio agrupa Mis aplicaciones, Mis solicitudes de ayuda y Mis capacitaciones; cada acceso conserva su permiso y ruta. No mostrar Helpdesk como etiqueta principal al colaborador.
+- Accesos rápidos: una sola fila, navegación anterior/siguiente, sin scrollbar. En móvil se muestra un acceso por página; escritorio muestra cuatro. El bloque omite Explorar aplicaciones; ese acceso permanece en Mi espacio. La fila de accesos tiene 112 px y las tres tarjetas inferiores comparten 350 px de altura. No ocultar accesos sin ofrecer navegación.
+- Celebraciones y Agenda comparten altura en cada breakpoint. Agenda muestra máximo dos eventos por página.
+- La fila inferior conserva orden Cumpleaños, Capacitaciones, Herramientas, con tarjetas de altura uniforme y navegación paginada. No reintroducir una cuarta tarjeta de soporte ni barras de scroll.
+- Mis capacitaciones permite alternar Listado/Bloques sin perder búsqueda ni filtro. Comenzar, Continuar y Ver capacitación dependen del estado, no solo del porcentaje de contenido. Una aprobada se consulta sin iniciar nuevos intentos.
+- Calificación manual de preguntas abiertas y revisión editorial para publicar son controles diferentes. Seguimiento debe indicar dónde consultar Resultados y calificar, sujeto a permisos.

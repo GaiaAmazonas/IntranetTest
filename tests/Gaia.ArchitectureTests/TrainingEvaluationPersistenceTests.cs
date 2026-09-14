@@ -37,6 +37,22 @@ public sealed class TrainingEvaluationPersistenceTests
         Assert.DoesNotContain("$select={f.Order}&$filter=_{f.VersionLookup}_value eq {versionId:D} and statecode eq 0", Source);
     }
 
+    [Fact]
+    public void NewBlocksAndQuestionsDoNotReuseInactiveOrderKeys()
+    {
+        Assert.Contains("await NextChildOrder(client,table,f.SectionLookup,f.Order,sectionId,token)",Source);
+        Assert.Contains("await NextChildOrder(client,table,f.EvaluationLookup,f.Order,evaluationId,token)",Source);
+        Assert.Contains("$select={order}&$filter=_{parentLookup}_value eq {parentId:D}",Source);
+    }
+
+    [Fact]
+    public void EditorialReviewDoesNotDemandAnExamOrAllowDirectPublicationFromReview()
+    {
+        Assert.Contains("if(directPublication&&current!=299540000)",Source);
+        Assert.DoesNotContain("if(requiresApproval&&!evaluations.Any",Source);
+        Assert.Contains("if(surveyRequired&&!evaluations.Any",Source);
+    }
+
     private static string FindRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { IntranetShell } from "@/features/intranet/intranet-shell";
 import "@/features/intranet/intranet.css";
+import "@/features/intranet/intranet-refinements.css";
 
 export const metadata: Metadata = {
   title: "Intranet Gaia | Fundación Gaia Amazonas",
