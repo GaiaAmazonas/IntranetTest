@@ -6,14 +6,15 @@ import { usePathname } from "next/navigation";
 import {
   AppWindow,
   ChevronDown,
+  ChevronRight,
   ExternalLink,
   LogOut,
   Menu,
   UserRound,
   X,
-  Grid2X2,
+  LayoutDashboard,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { startLogin } from "@/lib/api-client";
 import { AccessState } from "@/components/route-access-gate";
 import { useSecurity } from "@/components/security-context";
@@ -173,9 +174,14 @@ export function IntranetShell({ children }: { children: React.ReactNode }) {
   );
 }
 function ServiceNavigation({pathname,can,onNavigate}:{pathname:string;can:(permission:string)=>boolean;onNavigate?:()=>void}) {
- const [open,setOpen]=useState(false),ref=useRef<HTMLDivElement>(null);
+ const [open,setOpen]=useState(false),ref=useRef<HTMLDivElement>(null),trigger=useRef<HTMLButtonElement>(null),panelId=useId();
  const items=intranetNavigation.filter(x=>x.group==="services"&&can(x.permission));
+ const descriptions:Record<string,string>={"/intranet/aplicaciones":"Herramientas para tu trabajo diario","/intranet/helpdesk":"Crea solicitudes y consulta tus casos","/intranet/capacitaciones":"Continúa tu aprendizaje y ve tus resultados"};
  useEffect(()=>{const close=(event:MouseEvent)=>{if(!ref.current?.contains(event.target as Node))setOpen(false)};document.addEventListener("mousedown",close);return()=>document.removeEventListener("mousedown",close)},[]);
  if(!items.length)return null;
- return <div className="intranet-service-nav" ref={ref} onKeyDown={e=>{if(e.key==="Escape")setOpen(false)}}><button className={items.some(x=>isIntranetRouteActive(pathname,x))?"is-active":undefined} type="button" aria-expanded={open} onClick={()=>setOpen(!open)}><Grid2X2 size={17}/>Mi espacio<ChevronDown size={15}/></button>{open&&<div className="intranet-service-links">{items.map(x=>{const Icon=x.icon;return <Link key={x.href} href={x.href} aria-current={isIntranetRouteActive(pathname,x)?"page":undefined} onClick={()=>{setOpen(false);onNavigate?.()}}><Icon size={18}/>{x.label}</Link>})}</div>}</div>;
+ const active=items.some(x=>isIntranetRouteActive(pathname,x));
+ return <div className="intranet-service-nav" ref={ref} onBlur={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node))setOpen(false)}} onKeyDown={e=>{if(e.key==="Escape"){setOpen(false);trigger.current?.focus()}}}>
+   <button ref={trigger} className={active||open?"is-active":undefined} type="button" aria-expanded={open} aria-controls={panelId} onClick={()=>setOpen(!open)}><LayoutDashboard size={19}/><span>Mi espacio</span><ChevronDown size={16} className={open?"intranet-service-chevron is-open":"intranet-service-chevron"}/></button>
+   {open&&<div className="intranet-service-links" id={panelId}><header><small>Mi espacio</small><strong>Tus accesos de trabajo</strong><p>Herramientas, apoyo y aprendizaje en un solo lugar.</p></header><nav aria-label="Accesos de Mi espacio">{items.map(x=>{const Icon=x.icon,selected=isIntranetRouteActive(pathname,x);return <Link className={selected?"intranet-service-item is-selected":"intranet-service-item"} key={x.href} href={x.href} aria-current={selected?"page":undefined} onClick={()=>{setOpen(false);onNavigate?.()}}><span className="intranet-service-icon"><Icon size={23}/></span><span className="intranet-service-copy"><strong>{x.label}</strong><small>{descriptions[x.href]}</small></span><ChevronRight size={19}/></Link>})}</nav></div>}
+ </div>;
 }

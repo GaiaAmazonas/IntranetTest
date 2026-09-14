@@ -62,6 +62,20 @@ public sealed class HelpdeskObservationApplicationTests
         Assert.False(attachments.RollbackCalled);
     }
 
+    [Theory]
+    [InlineData("Radicada")]
+    [InlineData("Asignada")]
+    [InlineData("En gestión")]
+    public async Task ResponsePreservesTheServerSelectedReturnState(string state)
+    {
+        var attachments = new Attachments();
+        var application = new HelpdeskObservationApplication(attachments, new Conversation { ReturnState = state });
+        var result = await application.AttendAsync(Command(), new MemoryStream(new byte[10]), default);
+        Assert.Equal(state, result.Request.Status);
+        Assert.True(attachments.UploadCalled);
+        Assert.False(attachments.RollbackCalled);
+    }
+
     private static AttendHelpdeskObservation Command() => new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
         "Respuesta con soporte documental", "evidencia-observacion.pdf", "application/pdf", 10);
 
@@ -91,6 +105,7 @@ public sealed class HelpdeskObservationApplicationTests
 
     private sealed class Conversation : IHelpdeskConversationApplication
     {
+        public string ReturnState { get; init; } = "En gestión";
         public bool FailTransition { get; init; }
         public bool TransitionCalled { get; private set; }
         public Task<HelpdeskRequestDetail> TransitionAsync(Guid requestId, Guid actorThirdPartyId,
@@ -99,7 +114,7 @@ public sealed class HelpdeskObservationApplicationTests
             TransitionCalled = true;
             if (FailTransition) throw new InvalidOperationException("Transition failed");
             return Task.FromResult(new HelpdeskRequestDetail(requestId, "HD-TEST", "Asunto", "Descripción", "Servicio",
-                "En gestión", null, DateTimeOffset.UtcNow, null, false, false, [], []));
+                ReturnState, null, DateTimeOffset.UtcNow, null, false, false, [], []));
         }
         public Task<HelpdeskRequestDetail> ReadAsync(Guid requestId, Guid actorThirdPartyId, bool managementAccess, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<HelpdeskComment> AddAsync(Guid requestId, Guid actorThirdPartyId, AddHelpdeskComment request, bool managementAccess, CancellationToken cancellationToken) => throw new NotSupportedException();

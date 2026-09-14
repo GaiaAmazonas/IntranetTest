@@ -17,6 +17,23 @@ internal sealed class DataverseIntranetDirectoryReader(IDataverseDelegatedClient
     private const string UnitTable = "gaia_organizacion";
     private const string SiteTable = "gaia_sede";
 
+    public async Task<IntranetPerson?> ReadPersonAsync(Guid id, CancellationToken token)
+    {
+        var client=await clientFactory.CreateAsync();
+        var person=await DataverseMetadataResolver.TableAsync(client,ThirdPartyTable,token);
+        var name=person.Attribute("gaia_Nombretercero");
+        var row=await DataverseMetadataResolver.ReadOneAsync(client,$"{person.EntitySetName}({id:D})?$select={name},statecode",token);
+        if(row is null||row.Value.GetProperty("statecode").GetInt32()!=0)return null;
+        var email=await DataverseMetadataResolver.TableAsync(client,EmailTable,token);
+        var phone=await DataverseMetadataResolver.TableAsync(client,PhoneTable,token);
+        var emails=await ReadInstitutionalEmails(client,email,[id],token);
+        var phones=await ReadCorporatePhones(client,phone,[id],token);
+        var assignments=await ReadOrganizationalDetails(client,[id],token);
+        assignments.TryGetValue(id,out var assignment);
+        return new(id,StringValue(row.Value,name)??"Sin nombre",assignment?.Position,assignment?.UnitId,
+            assignment?.Unit,assignment?.UnitCode,assignment?.Site,emails.GetValueOrDefault(id),phones.GetValueOrDefault(id),null);
+    }
+
     public async Task<IntranetPeoplePage> ListPeopleAsync(string? search, Guid? organizationUnitId,
         bool includeDescendants, int page, int pageSize, CancellationToken token)
     {

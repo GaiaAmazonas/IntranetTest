@@ -38,6 +38,10 @@ internal sealed class DataverseHelpdeskConversationStore(IDataverseDelegatedClie
             : requesterCanReply
                 ? await ReadTransitions(client,state,stateId,299540010,token)
                 : [];
+        if(requesterCanReply) {
+            var previous=await ReadReturnState(client,request,state,requestId,stateId,token);
+            transitions=[..transitions.Where(item=>item.Id!=previous.Id),new HelpdeskTransition(previous.Id,previous.Id,previous.Name,true,false,false,false,true)];
+        }
         return new(requestId,Text(row.Value,request.PrimaryNameAttribute)??"",Text(row.Value,fields.Subject)??"",Text(row.Value,fields.Description)??"",Text(serviceRow.Value,service.PrimaryNameAttribute)??"Servicio",stateName,Text(stateRow.Value,color),Date(row.Value,fields.Submitted),DateOnlyValue(row.Value,fields.Due),isManager||requesterCanReply,isManager,comments,transitions);
     }
 
@@ -74,7 +78,14 @@ internal sealed class DataverseHelpdeskConversationStore(IDataverseDelegatedClie
         if(allowed.RequiresSolution&&string.IsNullOrWhiteSpace(command.Solution))throw new ArgumentException("La transición requiere una solución.");
         if(allowed.RequestsRating&&command.Rating is not (>=1 and <=5))throw new ArgumentException("Selecciona una calificación entre 1 y 5.");
         var client=await clients.CreateAsync();var request=await DataverseMetadataResolver.TableAsync(client,"gaia_solicitud",token);var state=await DataverseMetadataResolver.TableAsync(client,"gaia_estadosolicitud",token);var transition=await DataverseMetadataResolver.TableAsync(client,"gaia_transicionestadosolicitud",token);
+        if(allowed.IsObservationReturn) {
+            var commentId=await CommitObservation(client,request,state,requestId,actorId,allowed,command.Comment!.Trim(),now,token);
+            var updated=detail with { Status=allowed.TargetState, AllowsRequesterComments=false, Comments=[..detail.Comments,new HelpdeskComment(commentId,command.Comment!.Trim(),now,false,true,"Solicitante")],Transitions=[] };
+            // El cambio ya está confirmado: un fallo de lectura posterior no debe eliminar el adjunto.
+            return updated;
+        }
         var action=transition.Attribute("gaia_AccionSLA");var directReturn=allowed.Id==allowed.TargetStateId;var row=directReturn?null:await DataverseMetadataResolver.ReadOneAsync(client,$"{transition.EntitySetName}({command.TransitionId:D})?$select={action}",token);if(!directReturn&&row is null)throw new InvalidOperationException("La transición ya no está disponible.");
+        var previousState=await CurrentState(client,request,requestId,token);
         var stateRelationship=request.Relationship("gaia_EstadoActual","gaia_estadosolicitud");var payload=new Dictionary<string,object?>{{stateRelationship.NavigationProperty+"@odata.bind",$"/{state.EntitySetName}({allowed.TargetStateId:D})"}};
         switch(directReturn?299540022:Int(row!.Value,action)){case 299540021:payload[request.Attribute("gaia_FechaInicioSLA")]=now;break;case 299540022:payload[request.Attribute("gaia_FechaInicioPausaSLA")]=now;break;case 299540023:payload[request.Attribute("gaia_FechaInicioPausaSLA")]=null;break;case 299540024:payload[request.Attribute("gaia_FechaResolucionActual")]=now;if(!string.IsNullOrWhiteSpace(command.Solution))payload[request.Attribute("gaia_ResumenSolucion")]=command.Solution.Trim();break;}
         // El solicitante solo puede comentar mientras el caso está esperando su respuesta.
@@ -96,6 +107,82 @@ internal sealed class DataverseHelpdeskConversationStore(IDataverseDelegatedClie
         var current=await DataverseMetadataResolver.ReadOneAsync(client,$"{state.EntitySetName}({stateId:D})?$select={state.PrimaryNameAttribute}",token);var currentName=current is null?"":Text(current.Value,state.PrimaryNameAttribute)??"";if(currentName.Contains("radicad",StringComparison.OrdinalIgnoreCase)&&!result.Any(item=>item.TargetState.Contains("solicitante",StringComparison.OrdinalIgnoreCase)||item.TargetState.Contains("devuelt",StringComparison.OrdinalIgnoreCase))){var stateRows=await DataverseJson.ReadAllAsync(client,$"{state.EntitySetName}?$select={state.PrimaryIdAttribute},{state.PrimaryNameAttribute}&$filter=statecode eq 0",token);var returned=stateRows.FirstOrDefault(item=>{var name=Text(item,state.PrimaryNameAttribute)??"";return name.Contains("espera del solicitante",StringComparison.OrdinalIgnoreCase)||name.Contains("devuelt",StringComparison.OrdinalIgnoreCase);});if(returned.ValueKind!=JsonValueKind.Undefined){var returnedId=GuidValue(returned,state.PrimaryIdAttribute);result.Add(new(returnedId,returnedId,"Devolver al solicitante",true,false,false,false));}}return result;
     }
 
+
+    static async Task<Guid> CurrentState(HttpClient client,DataverseTableMetadata request,Guid id,CancellationToken token) {
+        var field=request.Attribute("gaia_EstadoActual");
+        var row=await DataverseMetadataResolver.ReadOneAsync(client,$"{request.EntitySetName}({id:D})?$select=_{field}_value",token);
+        return row is null?Guid.Empty:GuidValue(row.Value,field);
+    }
+    static async Task<(Guid Id,string Name)> ReadReturnState(HttpClient client,DataverseTableMetadata request,DataverseTableMetadata state,Guid requestId,Guid currentState,CancellationToken token) {
+        var historyTable=await DataverseMetadataResolver.TableAsync(client,"gaia_historialsolicitud",token);
+        var relation=historyTable.Attribute("gaia_Solicitud");var movement=historyTable.Attribute("gaia_TipoMovimiento");var date=historyTable.Attribute("gaia_FechaEvento");
+        var previous=historyTable.Attribute("gaia_ValorAnterior");var next=historyTable.Attribute("gaia_ValorNuevo");var operation=historyTable.Attribute("gaia_OperacionId");
+        var rows=await DataverseJson.ReadAllAsync(client,$"{historyTable.EntitySetName}?$select={previous},{next},{operation}&$filter=statecode eq 0 and _{relation}_value eq {requestId:D} and {movement} eq {historyTable.EncodedIntegerLiteral("gaia_TipoMovimiento",299540103)}&$orderby={date} desc&$top=1",token);
+        var candidate=Guid.Empty;
+        if(rows.Count>0) {
+            var entry=rows[0];
+            if(GuidValue(entry,next)==currentState)candidate=GuidValue(entry,previous);
+            else if(Guid.TryParse(Text(entry,operation),out var transitionId)) {
+                var transition=await DataverseMetadataResolver.TableAsync(client,"gaia_transicionestadosolicitud",token);
+                var target=transition.Attribute("gaia_EstadoDestino");var origin=transition.Attribute("gaia_EstadoOrigen");
+                var tr=await DataverseMetadataResolver.ReadOneAsync(client,$"{transition.EntitySetName}({transitionId:D})?$select=_{target}_value,_{origin}_value",token);
+                if(tr is not null&&GuidValue(tr.Value,target)==currentState)candidate=GuidValue(tr.Value,origin);
+            }
+        }
+        var states=await DataverseJson.ReadAllAsync(client,$"{state.EntitySetName}?$select={state.PrimaryIdAttribute},{state.PrimaryNameAttribute}&$filter=statecode eq 0",token);
+        var chosen=states.FirstOrDefault(x=>GuidValue(x,state.PrimaryIdAttribute)==candidate&&candidate!=currentState);
+        if(chosen.ValueKind==JsonValueKind.Undefined)chosen=states.FirstOrDefault(x=>(Text(x,state.PrimaryNameAttribute)??"").Contains("radicad",StringComparison.OrdinalIgnoreCase));
+        if(chosen.ValueKind==JsonValueKind.Undefined)throw new InvalidOperationException("No hay un estado de retorno disponible. El equipo administrador debe revisar los estados de la mesa de ayuda.");
+        return (GuidValue(chosen,state.PrimaryIdAttribute),Text(chosen,state.PrimaryNameAttribute)??"Radicada");
+    }
+    static async Task<Guid> CommitObservation(HttpClient client,DataverseTableMetadata request,DataverseTableMetadata state,Guid id,Guid actorId,HelpdeskTransition target,string content,DateTimeOffset now,CancellationToken token) {
+        var stateField=request.Attribute("gaia_EstadoActual");
+        var current=await DataverseMetadataResolver.ReadOneAsync(client,$"{request.EntitySetName}({id:D})?$select=_{stateField}_value",token)??throw new KeyNotFoundException("La solicitud no existe.");
+        var stateRow=await DataverseMetadataResolver.ReadOneAsync(client,$"{state.EntitySetName}({GuidValue(current,stateField):D})?$select={state.PrimaryNameAttribute}",token);
+        var stateName=stateRow is null?"":Text(stateRow.Value,state.PrimaryNameAttribute)??"";
+        if(!stateName.Contains("espera del solicitante",StringComparison.OrdinalIgnoreCase)&&!stateName.Contains("devuelt",StringComparison.OrdinalIgnoreCase))throw new InvalidOperationException("El estado de la solicitud cambió. Actualiza el detalle antes de responder.");
+        var comment=await DataverseMetadataResolver.TableAsync(client,"gaia_comentariosolicitud",token);
+        var history=await DataverseMetadataResolver.TableAsync(client,"gaia_historialsolicitud",token);
+        var actor=await DataverseMetadataResolver.TableAsync(client,"gaia_terceros",token);
+        var commentId=Guid.NewGuid();
+        var commentPayload=new Dictionary<string,object?>{
+            [comment.PrimaryIdAttribute]=commentId,[comment.PrimaryNameAttribute]=$"Respuesta {now:yyyy-MM-dd HH:mm}",
+            [comment.Attribute("gaia_Tipo")]=comment.EncodedIntegerValue("gaia_Tipo",299540072),
+            [comment.Attribute("gaia_Visibilidad")]=comment.EncodedIntegerValue("gaia_Visibilidad",299540080),
+            [comment.Attribute("gaia_Contenido")]=content,[comment.Attribute("gaia_FechaPublicacion")]=now,
+            [comment.Relationship("gaia_Solicitud","gaia_solicitud").NavigationProperty+"@odata.bind"]=$"/{request.EntitySetName}({id:D})",
+            [comment.Relationship("gaia_Autor","gaia_terceros").NavigationProperty+"@odata.bind"]=$"/{actor.EntitySetName}({actorId:D})",["statecode"]=0};
+        var statePayload=new Dictionary<string,object?>{
+            [request.Relationship("gaia_EstadoActual","gaia_estadosolicitud").NavigationProperty+"@odata.bind"]=$"/{state.EntitySetName}({target.TargetStateId:D})",
+            [request.Attribute("gaia_FechaInicioPausaSLA")]=null};
+        var historyPayload=new Dictionary<string,object?>{
+            [history.PrimaryNameAttribute]="Observación atendida",[history.Attribute("gaia_OperacionId")]=Guid.NewGuid().ToString("D"),
+            [history.Attribute("gaia_TipoMovimiento")]=history.EncodedIntegerValue("gaia_TipoMovimiento",299540103),
+            [history.Attribute("gaia_Origen")]=history.EncodedIntegerValue("gaia_Origen",299540120),
+            [history.Attribute("gaia_CampoModificado")]="EstadoActual",
+            [history.Attribute("gaia_ValorAnterior")]=GuidValue(current,stateField).ToString("D"),
+            [history.Attribute("gaia_ValorNuevo")]=target.TargetStateId.ToString("D"),
+            [history.Attribute("gaia_VisibleAlSolicitante")]=true,[history.Attribute("gaia_FechaEvento")]=now,
+            [history.Relationship("gaia_Solicitud","gaia_solicitud").NavigationProperty+"@odata.bind"]=$"/{request.EntitySetName}({id:D})",
+            [history.Relationship("gaia_Actor","gaia_terceros").NavigationProperty+"@odata.bind"]=$"/{actor.EntitySetName}({actorId:D})",["statecode"]=0};
+        var batch="batch_"+Guid.NewGuid().ToString("N");var change="changeset_"+Guid.NewGuid().ToString("N");var body=new System.Text.StringBuilder();
+        body.Append(CultureInfo.InvariantCulture,$"--{batch}\r\nContent-Type: multipart/mixed; boundary={change}\r\n\r\n");
+        void Add(string method,string path,object payload,int index,string? etag=null) {
+            body.Append(CultureInfo.InvariantCulture,$"--{change}\r\nContent-Type: application/http\r\nContent-Transfer-Encoding: binary\r\nContent-ID: {index}\r\n\r\n{method} {new Uri(client.BaseAddress!,path)} HTTP/1.1\r\nContent-Type: application/json\r\n");
+            if(etag is not null)body.Append(CultureInfo.InvariantCulture,$"If-Match: {etag}\r\n");
+            body.Append("\r\n").Append(JsonSerializer.Serialize(payload)).Append("\r\n");
+        }
+        Add("POST",comment.EntitySetName,commentPayload,1);
+        Add("PATCH",$"{request.EntitySetName}({id:D})",statePayload,2,Text(current,"@odata.etag")??"*");
+        Add("POST",history.EntitySetName,historyPayload,3);
+        body.Append(CultureInfo.InvariantCulture,$"--{change}--\r\n--{batch}--\r\n");
+        using var message=new HttpRequestMessage(HttpMethod.Post,"$batch"){Content=new StringContent(body.ToString(),System.Text.Encoding.UTF8)};
+        message.Content.Headers.ContentType=System.Net.Http.Headers.MediaTypeHeaderValue.Parse($"multipart/mixed; boundary={batch}");
+        using var response=await client.SendAsync(message,token);var result=await response.Content.ReadAsStringAsync(token);
+        if(!response.IsSuccessStatusCode||Regex.IsMatch(result,@"HTTP/1\.[01] [45]\d\d"))
+            throw new InvalidOperationException("No fue posible guardar la respuesta y reanudar la solicitud. Actualiza el detalle y vuelve a intentarlo.");
+        return commentId;
+    }
     static async Task AddRating(HttpClient client,Guid requestId,Guid actorId,int value,string? comment,DateTimeOffset now,CancellationToken token){var rating=await DataverseMetadataResolver.TableAsync(client,"gaia_calificacionsolicitud",token);var request=await DataverseMetadataResolver.TableAsync(client,"gaia_solicitud",token);var actor=await DataverseMetadataResolver.TableAsync(client,"gaia_terceros",token);var payload=new Dictionary<string,object?>{{rating.PrimaryNameAttribute,$"Calificación {requestId:D}"},{rating.Attribute("gaia_Calificacion"),value},{rating.Attribute("gaia_Comentario"),comment},{rating.Attribute("gaia_FechaCalificacion"),now},{rating.Relationship("gaia_Solicitud","gaia_solicitud").NavigationProperty+"@odata.bind",$"/{request.EntitySetName}({requestId:D})"},{rating.Relationship("gaia_CalificadoPor","gaia_terceros").NavigationProperty+"@odata.bind",$"/{actor.EntitySetName}({actorId:D})"},{"statecode",0}};using var response=await client.PostAsJsonAsync(rating.EntitySetName,payload,token);if(!response.IsSuccessStatusCode)throw new InvalidOperationException("Dataverse no pudo registrar la calificación.");}
 
     static string? Text(JsonElement x,string p)=>x.TryGetProperty(p,out var v)&&v.ValueKind==JsonValueKind.String?v.GetString():null;

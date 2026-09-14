@@ -28,6 +28,7 @@ internal static class ThirdPartiesEndpoints
             .WithTags("Perfil")
             .RequireAuthorization();
         profile.MapGet("/photo", GetCurrentUserPhotoAsync);
+        profile.MapGet("/", GetCurrentUserProfileAsync);
 
         var group = endpoints.MapGroup("/api/third-parties")
             .WithTags("Third parties")
@@ -81,6 +82,15 @@ internal static class ThirdPartiesEndpoints
         IIntranetDirectoryReader reader,
         CancellationToken cancellationToken) =>
         Results.Ok(await reader.ListOrganizationUnitsAsync(cancellationToken));
+
+    private static async Task<IResult> GetCurrentUserProfileAsync(
+        ClaimsPrincipal principal, ISecurityStore security, IIntranetDirectoryReader reader, CancellationToken token)
+    {
+        var account=await security.GetOrProvisionAsync(principal,token);
+        if(account.User.ThirdPartyId is not { } id)return Results.NotFound(new {detail="Tu cuenta todavía no está vinculada a una ficha de persona."});
+        var person=await reader.ReadPersonAsync(id,token);
+        return person is null?Results.NotFound(new {detail="No encontramos una ficha activa vinculada a tu cuenta."}):Results.Ok(person);
+    }
 
     private static async Task<IResult> GetCurrentUserPhotoAsync(
         int? size,

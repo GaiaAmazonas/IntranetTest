@@ -2,6 +2,7 @@ namespace Gaia.Modules.ThirdParties;
 
 public interface IIntranetDirectoryReader
 {
+    Task<IntranetPerson?> ReadPersonAsync(Guid id, CancellationToken cancellationToken);
     Task<IntranetPeoplePage> ListPeopleAsync(string? search, Guid? organizationUnitId, bool includeDescendants,
         int page, int pageSize, CancellationToken cancellationToken);
     Task<IReadOnlyList<IntranetOrganizationUnit>> ListOrganizationUnitsAsync(CancellationToken cancellationToken);

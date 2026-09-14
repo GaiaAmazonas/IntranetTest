@@ -1,5 +1,3 @@
-import { IntranetPage } from "@/features/intranet/intranet-page";
+import { IntranetProfile } from "@/features/intranet/intranet-profile";
 
-export default function ProfilePage() {
-  return <IntranetPage description="Información institucional y preferencias disponibles para el colaborador." eyebrow="Cuenta institucional" title="Mi perfil" />;
-}
+export default function ProfilePage(){return <IntranetProfile/>;}

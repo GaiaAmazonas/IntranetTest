@@ -21,6 +21,11 @@ internal sealed class DataverseHelpdeskHistoryStore(IDataverseDelegatedClientFac
             [metadata.Relationship("gaia_Solicitud", "gaia_solicitud").NavigationProperty + "@odata.bind"] = $"/{request.EntitySetName}({history.RequestId:D})",
             ["statecode"] = 0
         };
+        if (history.PreviousStateId.HasValue) {
+            payload[metadata.Attribute("gaia_CampoModificado")] = "EstadoActual";
+            payload[metadata.Attribute("gaia_ValorAnterior")] = history.PreviousStateId.Value.ToString("D");
+            payload[metadata.Attribute("gaia_ValorNuevo")] = history.NewStateId?.ToString("D");
+        }
         if (history.ActorThirdPartyId.HasValue)
         {
             var actor = await DataverseMetadataResolver.TableAsync(client, "gaia_terceros", token);

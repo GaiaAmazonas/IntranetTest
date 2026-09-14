@@ -18,6 +18,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Gaia | Plataforma empresarial",
   description: "Gestión institucional de la Fundación Gaia Amazonas",
+  manifest: "/manifest.webmanifest",
+  icons: {icon: [{url:"/brand/gaia-app-icon.svg",type:"image/svg+xml"},{url:"/brand/gaia-icon-32.png",sizes:"32x32",type:"image/png"}],apple:[{url:"/brand/gaia-icon-180.png",sizes:"180x180",type:"image/png"}]},
+  appleWebApp: {capable:true,title:"Gaia",statusBarStyle:"default"},
 };
 
 export default function RootLayout({

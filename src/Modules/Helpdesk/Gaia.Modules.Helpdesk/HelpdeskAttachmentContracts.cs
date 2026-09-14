@@ -68,7 +68,7 @@ public interface IHelpdeskAttachmentPolicyStore
 public enum HelpdeskHistoryMovement { StateChanged = 299540103, CommentAdded = 299540106, FileAdded = 299540107, FileDeactivated = 299540108 }
 public enum HelpdeskHistoryOrigin { RequesterPortal = 299540120, HelpdeskAdministration = 299540121, Api = 299540122, System = 299540123 }
 public sealed record AppendHelpdeskHistory(Guid RequestId, Guid? ActorThirdPartyId, string OperationId,
-    HelpdeskHistoryMovement Movement, HelpdeskHistoryOrigin Origin, bool VisibleToRequester, DateTimeOffset OccurredAt);
+    HelpdeskHistoryMovement Movement, HelpdeskHistoryOrigin Origin, bool VisibleToRequester, DateTimeOffset OccurredAt, Guid? PreviousStateId = null, Guid? NewStateId = null);
 public interface IHelpdeskHistoryStore
 {
     Task AppendAsync(AppendHelpdeskHistory history, CancellationToken cancellationToken);
