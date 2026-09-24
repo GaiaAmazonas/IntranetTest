@@ -8,6 +8,12 @@ internal sealed class DataverseConfiguredFileStorage(ISharePointRepositoryReader
     IHostEnvironment environment, IHttpClientFactory clients, IEnumerable<IFileContentScanner> scanners,
     ILogger<SharePointFileStorage> logger) : IFileStorage, IFileStorageMaintenance, IFileStorageDiagnostics, IDisposable
 {
+    private static readonly Action<ILogger, FileStorageError, Exception?> LogRepositoryProfileFailure =
+        LoggerMessage.Define<FileStorageError>(LogLevel.Warning, new EventId(4302, "RepositoryProfileValidationFailed"),
+            "SharePoint storage configuration validation failed at repository profile mapping: {Code}");
+    private static readonly Action<ILogger, FileStorageError, Exception?> LogCredentialFailure =
+        LoggerMessage.Define<FileStorageError>(LogLevel.Warning, new EventId(4303, "StorageCredentialLoadingFailed"),
+            "SharePoint storage configuration validation failed at credential loading: {Code}");
     private readonly List<(GraphFileTransport Transport, GraphApplicationTokenProvider Tokens)> resources = [];
 
     public void Dispose()
@@ -32,8 +38,21 @@ internal sealed class DataverseConfiguredFileStorage(ISharePointRepositoryReader
             throw new FileStorageException(FileStorageError.MissingConfiguration);
         var row = await reader.ReadAsync(file, token);
         ValidateState(row.OperationalState, write, diagnostic);
-        var (options, prefix) = RepositoryStorageConfiguration.Build(row, configuration, environment.EnvironmentName);
-        var credentials = GraphApplicationTokenProvider.Create(options, configuration, prefix);
+        SharePointStorageConfiguration options;
+        string prefix;
+        try { (options, prefix) = RepositoryStorageConfiguration.Build(row, configuration, environment.EnvironmentName); }
+        catch (FileStorageException error)
+        {
+            LogRepositoryProfileFailure(logger, error.Code, null);
+            throw;
+        }
+        GraphApplicationTokenProvider credentials;
+        try { credentials = GraphApplicationTokenProvider.Create(options, configuration, prefix); }
+        catch (FileStorageException error)
+        {
+            LogCredentialFailure(logger, error.Code, null);
+            throw;
+        }
         GraphFileTransport transport;
         try { transport = new(clients.CreateClient("GraphFiles"), credentials, options, TimeProvider.System); }
         catch { credentials.Dispose(); throw; }

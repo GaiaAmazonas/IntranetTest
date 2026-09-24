@@ -5,6 +5,9 @@ using Azure.Identity;
 using Gaia.BuildingBlocks.Files;
 using Microsoft.Extensions.Configuration.EnvironmentVariables;
 using Microsoft.Extensions.Configuration.Json;
+using Microsoft.Extensions.Configuration.UserSecrets;
+using Microsoft.Extensions.FileProviders;
+using System.Reflection;
 
 namespace Gaia.Api.Infrastructure.Files;
 
@@ -59,13 +62,32 @@ internal sealed class GraphApplicationTokenProvider(TokenCredential credential, 
             {
                 if (!provider.TryGet(key, out var value)) continue;
                 var permitted = provider is EnvironmentVariablesConfigurationProvider
-                    || provider is JsonConfigurationProvider json && string.Equals(json.Source.Path, "secrets.json", StringComparison.OrdinalIgnoreCase);
+                    || provider is JsonConfigurationProvider json && IsOfficialUserSecretsFile(json);
                 if (!permitted || string.IsNullOrWhiteSpace(value)) throw new FileStorageException(FileStorageError.MissingConfiguration);
                 return value;
             }
         }
         if (required) throw new FileStorageException(FileStorageError.MissingConfiguration);
         return null;
+    }
+
+    private static bool IsOfficialUserSecretsFile(JsonConfigurationProvider provider)
+    {
+        var sourcePath = provider.Source.Path;
+        if (string.IsNullOrWhiteSpace(sourcePath)
+            || !string.Equals(Path.GetFileName(sourcePath), "secrets.json", StringComparison.OrdinalIgnoreCase)) return false;
+        var userSecretsId = typeof(GraphApplicationTokenProvider).Assembly
+            .GetCustomAttribute<UserSecretsIdAttribute>()?.UserSecretsId;
+        if (string.IsNullOrWhiteSpace(userSecretsId)) return false;
+        var applicationData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        if (string.IsNullOrWhiteSpace(applicationData)) return false;
+        var expected = Path.GetFullPath(Path.Combine(applicationData, "Microsoft", "UserSecrets", userSecretsId, "secrets.json"));
+        var candidate = Path.IsPathRooted(sourcePath)
+            ? Path.GetFullPath(sourcePath)
+            : provider.Source.FileProvider is PhysicalFileProvider physical
+                ? Path.GetFullPath(Path.Combine(physical.Root, sourcePath))
+                : string.Empty;
+        return string.Equals(candidate, expected, StringComparison.OrdinalIgnoreCase);
     }
 
     private static X509Certificate2 LoadCertificate(SharePointStorageConfiguration options, IConfiguration configuration, string credentialPrefix)

@@ -1,0 +1,44 @@
+.visual-ambience{position:fixed;inset:0;z-index:35;overflow:hidden;pointer-events:none}
+.visual-ambience-particles{position:absolute;inset:0}
+.visual-ambience-particles i{position:absolute;top:-24px;display:block;border-radius:50%;background:var(--ambience-accent);opacity:.55}
+.visual-ambience.is-animated .visual-ambience-particles i{animation:ambience-fall linear infinite}
+.visual-ambience.effect-2 .visual-ambience-particles i{background:var(--ambience-primary);box-shadow:0 0 16px var(--ambience-secondary)}
+.visual-ambience.effect-3 .visual-ambience-particles i{background:#fff;box-shadow:0 0 7px rgb(255 255 255 / 80%)}
+.visual-ambience.effect-4 .visual-ambience-particles i{border-radius:2px;background:linear-gradient(135deg,var(--ambience-primary) 0 33%,var(--ambience-secondary) 34% 66%,var(--ambience-accent) 67%)}
+.visual-ambience.effect-5 .visual-ambience-particles i{border-radius:60% 40% 65% 35%;background:var(--ambience-accent)}
+.visual-ambience.effect-6 .visual-ambience-particles i{background:var(--ambience-accent);box-shadow:0 0 20px 8px color-mix(in srgb,var(--ambience-accent),transparent 55%)}
+.visual-ambience.theme-halloween .visual-ambience-particles i{display:grid;width:32px!important;height:32px!important;place-items:center;border-radius:0;background:none;box-shadow:none;font-style:normal;opacity:.82;filter:drop-shadow(0 3px 5px rgb(20 12 8 / 38%))}
+.visual-ambience.theme-halloween .visual-ambience-particles i::before{content:"🎃";font-size:27px}
+.visual-ambience.theme-halloween .visual-ambience-particles i:nth-child(3n)::before{content:"🦇";font-size:29px}
+.visual-ambience.theme-halloween .visual-ambience-particles i:nth-child(5n)::before{content:"🍁";font-size:24px}
+.visual-ambience-top{position:absolute;display:flex;align-items:flex-start;justify-content:space-around;background:linear-gradient(180deg,color-mix(in srgb,var(--ambience-primary),transparent 72%),transparent)}
+.visual-ambience-top::after{position:absolute;inset:0;background:linear-gradient(90deg,rgb(5 20 16 / 46%),rgb(5 20 16 / 58%) 38%,rgb(5 20 16 / 52%) 72%,rgb(5 20 16 / 42%));content:""}
+.visual-ambience-top>span{width:9px;height:9px;margin-top:9px;border-radius:50%;background:var(--ambience-accent);box-shadow:0 0 12px var(--ambience-accent)}
+.visual-ambience-top picture,.visual-ambience-top img{width:100%;height:100%;object-fit:cover;object-position:center}
+.visual-ambience.is-animated .visual-ambience-top img{animation:ambience-image-drift 18s ease-in-out infinite alternate}
+.visual-ambience-message{position:fixed;right:24px;bottom:22px;display:flex;max-width:min(420px,calc(100vw - 32px));align-items:center;gap:8px;border:1px solid rgb(255 255 255 / 55%);border-radius:999px;background:color-mix(in srgb,var(--ambience-primary),#fff 14%);padding:10px 17px;color:#fff;font-size:12px;font-weight:720;box-shadow:0 10px 28px rgb(15 42 38 / 22%);pointer-events:auto}
+.visual-ambience-message:hover{box-shadow:0 14px 34px rgb(15 42 38 / 30%);transform:translateY(-2px)}
+.visual-ambience-burst{position:fixed;right:72px;bottom:66px;width:1px;height:1px}
+.visual-ambience-burst i{--burst-angle:0deg;--burst-distance:120px;--burst-delay:0ms;position:absolute;width:28px;height:28px;animation:ambience-burst 1.35s cubic-bezier(.18,.78,.24,1) var(--burst-delay) both}
+.visual-ambience-burst i::before{content:"✦";color:var(--ambience-accent);font-size:24px}
+.visual-ambience.theme-halloween .visual-ambience-burst i::before{content:"🎃"}
+.visual-ambience.theme-halloween .visual-ambience-burst i:nth-child(even)::before{content:"🦇"}
+
+html[data-gaia-ambience-surface="admincore"] .visual-ambience-top{top:0;right:0;left:var(--gaia-sidebar-expanded);height:var(--gaia-topbar-height);overflow:hidden;transition:left 180ms ease}
+html[data-gaia-ambience-surface="admincore"][data-gaia-sidebar="collapsed"] .visual-ambience-top{left:var(--gaia-sidebar-collapsed)}
+html[data-gaia-ambience-surface="admincore"] .gaia-topbar{background:transparent;backdrop-filter:none;text-shadow:none}
+html[data-gaia-ambience-surface="admincore"] .gaia-topbar :is(h1,span){color:#fff;text-shadow:none}
+html[data-gaia-ambience-surface="admincore"] .gaia-topbar svg{color:#fff;filter:none}
+html[data-gaia-ambience-surface="intranet"] .visual-ambience-top{top:0;right:0;left:0;height:82px;overflow:hidden}
+html[data-gaia-ambience-surface="intranet"] .intranet-header{height:82px;background:transparent;backdrop-filter:none;text-shadow:none}
+html[data-gaia-ambience-surface="intranet"] .intranet-header :is(strong,small,a,button,span){text-shadow:none}
+html[data-gaia-ambience-surface="intranet"] .intranet-brand :is(strong,small),html[data-gaia-ambience-surface="intranet"] .intranet-desktop-nav>a{color:#fff}
+html[data-gaia-ambience-surface="intranet"] .intranet-desktop-nav>a:hover,html[data-gaia-ambience-surface="intranet"] .intranet-desktop-nav>a.is-active{background:rgb(255 255 255 / 16%);color:#fff}
+html[data-gaia-ambience-surface="intranet"] .intranet-desktop-nav>a svg{color:#fff;filter:none}
+html[data-gaia-ambience-surface="intranet"] .intranet-brand img{filter:brightness(0) invert(1) drop-shadow(0 1px 2px rgb(0 0 0 / 28%))}
+
+@keyframes ambience-fall{from{transform:translate3d(0,-20px,0) rotate(0)}to{transform:translate3d(45px,105vh,0) rotate(300deg)}}
+@keyframes ambience-image-drift{from{transform:scale(1.01) translateX(-.4%)}to{transform:scale(1.055) translateX(.4%)}}
+@keyframes ambience-burst{0%{opacity:0;transform:rotate(var(--burst-angle)) translateX(0) scale(.25)}22%{opacity:1}100%{opacity:0;transform:rotate(var(--burst-angle)) translateX(var(--burst-distance)) scale(1.12)}}
+@media(prefers-reduced-motion:reduce){.visual-ambience-particles i,.visual-ambience-top img,.visual-ambience-burst i{animation:none!important}.visual-ambience-message{transition:none!important}}
+@media(max-width:760px){.visual-ambience-message{right:16px;bottom:14px}html[data-gaia-ambience-surface="admincore"] .visual-ambience-top{top:0;left:0;height:var(--gaia-topbar-height)}html[data-gaia-ambience-surface="intranet"] .visual-ambience-top{top:0;left:0;height:68px}html[data-gaia-ambience-surface="intranet"] .intranet-header{height:68px}}

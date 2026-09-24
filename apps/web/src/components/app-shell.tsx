@@ -30,6 +30,10 @@ const navigation = [
     { href: "/comunicaciones/tipos-evento", aliases: [], label: "Tipos de evento", permission: "COM.TIPOS_EVENTO.VER" },
     { href: "/comunicaciones/destacados", aliases: [], label: "Destacados", permission: "COM.DESTACADOS.VER" },
   ] },
+  { label: "Configuración", icon: Settings, permission: "COM.DESTACADOS.VER", children: [
+    { href: "/configuracion/login", aliases: [], label: "Login institucional", permission: "COM.DESTACADOS.VER" },
+    { href: "/configuracion/ambientacion", aliases: [], label: "Ambientación visual", permission: "COM.DESTACADOS.VER" },
+  ] },
   { label: "Helpdesk", icon: Headphones, permission: "HD.SOLICITUDES.VER|HD.CATALOGOS.VER", children: [
     { href: "/helpdesk/solicitudes", aliases: [], label: "Solicitudes", permission: "HD.SOLICITUDES.VER" },
     { href: "/helpdesk/catalogos", aliases: ["/helpdesk/catalogos/formulario"], label: "Configuración", permission: "HD.CATALOGOS.VER" },

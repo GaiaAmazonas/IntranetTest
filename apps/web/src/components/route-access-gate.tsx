@@ -10,6 +10,9 @@ import { loginTransitionKey, startLogin } from "@/lib/api-client";
 import { routeRuleFor } from "@/lib/route-access";
 
 const loginTransitionMinimumMs = 300;
+const apiUrl = process.env.NEXT_PUBLIC_GAIA_API_URL ?? "https://localhost:7168";
+
+type PublicLoginConfiguration = { platformName?: string | null; eyebrow: string; description?: string | null; lowerLeftText?: string | null; footerTitle?: string | null; footerDescription?: string | null; imageAlt?: string | null; desktopImageUrl: string; tabletImageUrl: string; mobileImageUrl: string; socialNetworks: { name: string; label: string; order: number; url: string }[] };
 
 export function RouteAccessGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -59,25 +62,37 @@ const gaiaSocialNetworks = [
 
 export function AccessState({ action, description, href, icon, notice, onAction, title }: { action?: string; description?: string; href?: string; icon?: "login" | "loading"; notice?: string; onAction?: () => void; title: string }) {
   const Icon = icon === "login" ? LogIn : LockKeyhole;
+  const [loginConfiguration, setLoginConfiguration] = useState<PublicLoginConfiguration | null>(null);
+  useEffect(() => {
+    if (icon !== "login") return;
+    const controller = new AbortController();
+    fetch(`${apiUrl}/api/public/login-configuration`, { signal: controller.signal })
+      .then(async response => response.ok && response.status !== 204 ? await response.json() as PublicLoginConfiguration : null)
+      .then(value => { if (value) setLoginConfiguration(value); })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [icon]);
   if (icon === "loading") {
     return <main className="gaia-access-loading"><div className="gaia-access-loading-brand"><Image alt="Gaia Amazonas" height={54} priority src="/brand/logo-gaia.svg" width={98} /><span>ECOSISTEMA DIGITAL GAIA</span></div><div className="gaia-access-loading-orbit"><i /><i /><i /><span><ShieldCheck size={26} /></span></div><h1>{title}</h1><p>Estamos preparando tu espacio institucional.</p><div className="gaia-access-loading-progress"><span /></div></main>;
   }
   if (icon === "login") {
+    const configuredSocials = loginConfiguration?.socialNetworks.map(network => ({ label: network.label, mark: socialMark(network.name || network.label), href: network.url })) ?? gaiaSocialNetworks;
+    const imageUrl = (path: string | undefined) => path ? `${apiUrl}${path}` : undefined;
     return (
       <main className="gaia-access-portal">
         <section className="gaia-access-story">
-          <Image alt="Paisaje de la Amazonía colombiana junto a un río" fill priority sizes="(max-width: 820px) 100vw, 62vw" src="/brand/intranet/evento-amazonia-gaia2.jpg" />
+          {loginConfiguration ? <picture className="gaia-access-story-picture"><source media="(max-width: 520px)" srcSet={imageUrl(loginConfiguration.mobileImageUrl)} /><source media="(max-width: 900px)" srcSet={imageUrl(loginConfiguration.tabletImageUrl)} /><img alt={loginConfiguration.imageAlt || "Paisaje de la Amazonía colombiana junto a un río"} src={imageUrl(loginConfiguration.desktopImageUrl)} /></picture> : <Image alt="Paisaje de la Amazonía colombiana junto a un río" fill priority sizes="(max-width: 820px) 100vw, 62vw" src="/brand/intranet/evento-amazonia-gaia2.jpg" />}
           <div className="gaia-access-story-shade" />
-          <header><Image alt="Gaia Amazonas" height={48} src="/brand/logo-gaia.svg" width={88} /><span><small>Ecosistema digital institucional</small></span></header>
+          <header><Image alt="Gaia Amazonas" height={48} src="/brand/logo-gaia.svg" width={88} /><span><small>{loginConfiguration?.platformName || "Ecosistema digital institucional"}</small></span></header>
           <div className="gaia-access-story-copy">
-            <p>Territorio · conocimiento · futuro</p>
+            <p>{loginConfiguration?.eyebrow || "Territorio · conocimiento · futuro"}</p>
             <h1>Todo Gaia,<br />en un solo lugar</h1>
-            <span>Información, personas y herramientas conectadas para facilitar nuestro trabajo en la Amazonía.</span>
+            <span>{loginConfiguration?.description || "Información, personas y herramientas conectadas para facilitar nuestro trabajo en la Amazonía."}</span>
           </div>
           <div className="gaia-access-capabilities">
-            <span><Building2 size={17} /><strong>Intranet</strong><small>Información que nos conecta</small></span>
+            <span><Building2 size={17} /><strong>Intranet</strong><small>{loginConfiguration?.lowerLeftText || "Información que nos conecta"}</small></span>
             <nav aria-label="Redes sociales de Gaia Amazonas" className="gaia-access-socials gaia-access-socials-story">
-              {gaiaSocialNetworks.map(network => <a aria-label={`Gaia Amazonas en ${network.label}`} href={network.href} key={network.label} rel="noopener noreferrer" target="_blank"><i aria-hidden="true">{network.mark}</i><span>{network.label}</span></a>)}
+              {configuredSocials.map(network => <a aria-label={`Gaia Amazonas en ${network.label}`} href={network.href} key={`${network.label}-${network.href}`} rel="noopener noreferrer" target="_blank"><i aria-hidden="true">{network.mark}</i><span>{network.label}</span></a>)}
             </nav>
           </div>
         </section>
@@ -91,13 +106,25 @@ export function AccessState({ action, description, href, icon, notice, onAction,
             {action && <button className="gaia-access-primary-action" onClick={onAction} type="button"><i aria-hidden="true"><b /><b /><b /><b /></i>{action}<ArrowRight size={17} /></button>}
             <div className="gaia-access-security"><ShieldCheck size={17} /><span><strong>Acceso protegido por Microsoft</strong><small>Utiliza tu cuenta institucional autorizada.</small></span></div>
             <nav aria-label="Redes sociales de Gaia Amazonas" className="gaia-access-socials gaia-access-socials-mobile">
-              {gaiaSocialNetworks.map(network => <a aria-label={`Gaia Amazonas en ${network.label}`} href={network.href} key={network.label} rel="noopener noreferrer" target="_blank"><i aria-hidden="true">{network.mark}</i><span>{network.label}</span></a>)}
+              {configuredSocials.map(network => <a aria-label={`Gaia Amazonas en ${network.label}`} href={network.href} key={`${network.label}-${network.href}`} rel="noopener noreferrer" target="_blank"><i aria-hidden="true">{network.mark}</i><span>{network.label}</span></a>)}
             </nav>
           </div>
-          <footer><span>GAIA ENTERPRISE PLATFORM</span><small>Una plataforma creada para evolucionar con Gaia.</small></footer>
+          <footer><span>{loginConfiguration?.footerTitle || loginConfiguration?.platformName || "GAIA ENTERPRISE PLATFORM"}</span><small>{loginConfiguration?.footerDescription || "Una plataforma creada para evolucionar con Gaia."}</small></footer>
         </section>
       </main>
     );
   }
   return <main className="gaia-route-state"><span><Icon aria-hidden="true" size={25} /></span><h1>{title}</h1>{description && <p>{description}</p>}{href && action ? <Link href={href}>{action}</Link> : action ? <button onClick={onAction} type="button">{action}</button> : <RotateCcw aria-hidden="true" className="gaia-spin" size={18} />}</main>;
+}
+
+function socialMark(value: string) {
+  const normalized = value.toLocaleLowerCase();
+  if (normalized.includes("facebook")) return "f";
+  if (normalized.includes("instagram")) return "◎";
+  if (normalized.includes("youtube")) return "▶";
+  if (normalized.includes("vimeo")) return "v";
+  if (normalized.includes("spotify")) return "≋";
+  if (normalized.includes("tiktok")) return "♪";
+  if (normalized === "x" || normalized.includes("twitter")) return "X";
+  return "G";
 }

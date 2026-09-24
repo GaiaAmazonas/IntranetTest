@@ -28,6 +28,8 @@ export const routeAccessRules: RouteAccessRule[] = [
   { prefix: "/comunicaciones/eventos", requirements: ["INT.APP.ADMINCORE.VER", "COM.EVENTOS.VER"] },
   { prefix: "/comunicaciones/tipos-evento", requirements: ["INT.APP.ADMINCORE.VER", "COM.TIPOS_EVENTO.VER"] },
   { prefix: "/comunicaciones/destacados", requirements: ["INT.APP.ADMINCORE.VER", "COM.DESTACADOS.VER"] },
+  { prefix: "/configuracion/login", requirements: ["INT.APP.ADMINCORE.VER", "COM.DESTACADOS.VER"] },
+  { prefix: "/configuracion/ambientacion", requirements: ["INT.APP.ADMINCORE.VER", "COM.DESTACADOS.VER"] },
   { prefix: "/seguridad/usuarios", requirements: ["INT.APP.ADMINCORE.VER", "TI.USUARIOS.VER"] },
   { prefix: "/seguridad/roles", requirements: ["INT.APP.ADMINCORE.VER", "TI.ROLES.VER"] },
   { prefix: "/seguridad/modulos", requirements: ["INT.APP.ADMINCORE.VER|TI.MODULOS.ADMINISTRAR", "TI.MODULOS.VER"] },

@@ -1,0 +1,9 @@
+.ambience-list nav button{min-height:36px!important;gap:6px!important;border:1px solid var(--gaia-line-strong)!important;background:var(--gaia-surface-0);padding:0 12px!important;font-weight:750!important;box-shadow:0 3px 9px rgb(18 53 39 / 8%);transition:transform 140ms ease,box-shadow 140ms ease,background-color 140ms ease,border-color 140ms ease}
+.ambience-list>article>nav button:nth-of-type(2){border-color:var(--brand-primary)!important;background:var(--brand-primary);color:#fff}
+.ambience-list>article>nav button:nth-of-type(3){border-color:#ddb8b4!important;background:#fff7f5;color:#963f38}
+.ambience-list>article>nav button:not(:disabled):hover{border-color:var(--gaia-green-500)!important;background:var(--gaia-accent-soft);box-shadow:0 7px 16px rgb(18 53 39 / 14%);transform:translateY(-2px)}
+.ambience-list>article>nav button:nth-of-type(2):not(:disabled):hover{background:var(--brand-primary-hover);color:#fff}
+.ambience-list>article>nav button:nth-of-type(3):not(:disabled):hover{border-color:#c9847d!important;background:#fff0ed;color:#84332d}
+.ambience-list>article>nav button:active:not(:disabled){box-shadow:0 2px 5px rgb(18 53 39 / 10%);transform:translateY(0)}
+.ambience-list>article>nav button:disabled{cursor:wait;opacity:.45}
+.ambience-list>article:has(>nav>b)>nav button:nth-of-type(2){display:none}
