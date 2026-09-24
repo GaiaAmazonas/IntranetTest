@@ -20,8 +20,15 @@ public sealed record HelpdeskAdminForm(Guid Id,Guid ServiceId,int Version,int St
     DateTimeOffset? PublishedAt,int FieldCount,bool IsActive);
 public sealed record HelpdeskAdminResponsible(Guid Id,string Name,IReadOnlyList<Guid> UnitIds);
 public sealed record HelpdeskAdminUnit(Guid Id,string Code,string Name,Guid? ParentId,int Level);
+public sealed record HelpdeskAdminServiceMetrics(Guid ServiceId,int TotalRequests,int OpenRequests,
+    int ResolvedRequests,int PendingClosureRequests,int OverdueRequests);
+public sealed record HelpdeskRequestExportRow(Guid Id,string Number,string Subject,string? Description,string Service,
+    string Requester,string? RequesterUnit,DateTimeOffset? SubmittedAt,DateTimeOffset? FirstManagementAt,
+    string? Responsible,string? ResponsibleUnit,string Status,bool IsFinal,DateOnly? DueDate,
+    DateTimeOffset? ClosedAt,int? BusinessManagementDays,int CalendarElapsedDays,bool? MetSla,string? SolutionSummary);
 public sealed record HelpdeskAdminSnapshot(IReadOnlyList<HelpdeskAdminService> Services,IReadOnlyList<HelpdeskAdminForm> Forms,
-    IReadOnlyList<HelpdeskAdminResponsible> Responsibles,IReadOnlyList<HelpdeskAdminUnit> Units);
+    IReadOnlyList<HelpdeskAdminResponsible> Responsibles,IReadOnlyList<HelpdeskAdminUnit> Units,
+    IReadOnlyList<HelpdeskAdminServiceMetrics> Metrics);
 public sealed record SaveHelpdeskService(string Code,string Name,string? Description,string? Instructions,int BusinessDays,
     bool AllowsAttachments,int MaximumAttachments,int MaximumFileMb,bool Visible,int Order,Guid ResponsibleId,Guid UnitId,bool IsActive);
 public sealed record CreateHelpdeskFormDraft(Guid ServiceId,string Title,string? Instructions);
@@ -29,7 +36,8 @@ public sealed record SaveHelpdeskFormOption(Guid? Id,string Code,string Label,in
 public sealed record SaveHelpdeskFormField(string Code,string Label,int DataType,int ControlType,string? HelpText,
     string? Placeholder,bool Required,int Order,int Width,int? MinimumLength,int? MaximumLength,decimal? MinimumValue,
     decimal? MaximumValue,bool AllowsMultiple,int? MaximumFiles,string? AllowedFileTypes,bool Visible,
-    IReadOnlyList<SaveHelpdeskFormOption> Options);
+    IReadOnlyList<SaveHelpdeskFormOption> Options,string? ValidationPattern=null,string? ValidationMessage=null,
+    string? DefaultValue=null,string? ConfigurationJson=null);
 public sealed record HelpdeskAdminFormDefinition(HelpdeskAdminForm Form,IReadOnlyList<HelpdeskFormField> Fields);
 
 public interface IHelpdeskManagementStore
@@ -38,6 +46,7 @@ public interface IHelpdeskManagementStore
     Task<HelpdeskManagementCatalog> ReadCatalogAsync(CancellationToken token);
     Task ReassignAsync(Guid requestId,Guid actorId,ReassignHelpdeskRequest request,DateTimeOffset now,CancellationToken token);
     Task<HelpdeskAdminSnapshot> ReadAdministrationAsync(CancellationToken token);
+    Task<IReadOnlyList<HelpdeskRequestExportRow>> ReadExportAsync(CancellationToken token);
     Task<Guid> SaveServiceAsync(Guid? id,SaveHelpdeskService request,CancellationToken token);
     Task<Guid> CreateFormDraftAsync(CreateHelpdeskFormDraft request,CancellationToken token);
     Task PublishFormAsync(Guid formId,Guid actorId,DateTimeOffset now,CancellationToken token);
@@ -51,6 +60,7 @@ public interface IHelpdeskManagementApplication
     Task<HelpdeskManagementCatalog> ReadCatalogAsync(CancellationToken token);
     Task ReassignAsync(Guid requestId,Guid actorId,ReassignHelpdeskRequest request,CancellationToken token);
     Task<HelpdeskAdminSnapshot> ReadAdministrationAsync(CancellationToken token);
+    Task<IReadOnlyList<HelpdeskRequestExportRow>> ReadExportAsync(CancellationToken token);
     Task<Guid> SaveServiceAsync(Guid? id,SaveHelpdeskService request,CancellationToken token);
     Task<Guid> CreateFormDraftAsync(CreateHelpdeskFormDraft request,CancellationToken token);
     Task PublishFormAsync(Guid formId,Guid actorId,CancellationToken token);
@@ -72,6 +82,7 @@ public sealed class HelpdeskManagementApplication(IHelpdeskManagementStore store
         ArgumentNullException.ThrowIfNull(request);if(requestId==Guid.Empty||request.ResponsibleId==Guid.Empty)throw new ArgumentException("Selecciona una solicitud y un responsable válidos.");var reason=request.Reason?.Trim();if(string.IsNullOrWhiteSpace(reason)||reason.Length is <5 or >500)throw new ArgumentException("El motivo debe tener entre 5 y 500 caracteres.");return store.ReassignAsync(requestId,actorId,request with{Reason=reason},timeProvider.GetUtcNow(),token);
     }
     public Task<HelpdeskAdminSnapshot> ReadAdministrationAsync(CancellationToken token)=>store.ReadAdministrationAsync(token);
+    public Task<IReadOnlyList<HelpdeskRequestExportRow>> ReadExportAsync(CancellationToken token)=>store.ReadExportAsync(token);
     public Task<Guid> SaveServiceAsync(Guid? id,SaveHelpdeskService request,CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(request);var code=request.Code?.Trim().ToUpperInvariant();var name=request.Name?.Trim();if(string.IsNullOrWhiteSpace(code)||code.Length>50||!System.Text.RegularExpressions.Regex.IsMatch(code,"^[A-Z0-9_-]+$"))throw new ArgumentException("El código solo admite letras, números, guion y guion bajo.");if(string.IsNullOrWhiteSpace(name)||name.Length>150)throw new ArgumentException("El nombre es obligatorio y admite máximo 150 caracteres.");if(request.BusinessDays<1||request.MaximumAttachments is <0 or >100||request.MaximumFileMb is <1 or >2048)throw new ArgumentException("Revisa los límites de atención y adjuntos.");if(request.ResponsibleId==Guid.Empty||request.UnitId==Guid.Empty)throw new ArgumentException("Responsable y unidad son obligatorios.");return store.SaveServiceAsync(id,request with{Code=code,Name=name,Description=request.Description?.Trim(),Instructions=request.Instructions?.Trim()},token);
@@ -84,6 +95,7 @@ public sealed class HelpdeskManagementApplication(IHelpdeskManagementStore store
     public Task<HelpdeskAdminFormDefinition> ReadFormAsync(Guid formId,CancellationToken token){if(formId==Guid.Empty)throw new ArgumentException("Selecciona un formulario válido.");return store.ReadFormAsync(formId,token);}
     public Task<Guid> SaveFormFieldAsync(Guid formId,Guid? fieldId,SaveHelpdeskFormField request,CancellationToken token)
     {
-        ArgumentNullException.ThrowIfNull(request);var code=request.Code?.Trim().ToUpperInvariant();var label=request.Label?.Trim();if(formId==Guid.Empty||string.IsNullOrWhiteSpace(code)||code.Length>80||!System.Text.RegularExpressions.Regex.IsMatch(code,"^[A-Z0-9_-]+$")||string.IsNullOrWhiteSpace(label)||label.Length>150)throw new ArgumentException("Código y etiqueta del campo no son válidos.");if(request.DataType is <299540040 or >299540047||request.ControlType is <299540050 or >299540062||request.Width is <1 or >12||request.Order<0)throw new ArgumentException("Tipo, control, ancho u orden del campo no son válidos.");if(request.MinimumLength.HasValue&&request.MaximumLength.HasValue&&request.MinimumLength>request.MaximumLength||request.MinimumValue.HasValue&&request.MaximumValue.HasValue&&request.MinimumValue>request.MaximumValue)throw new ArgumentException("Los valores mínimos no pueden superar los máximos.");if(request.DataType==299540046&&request.Options.Count==0)throw new ArgumentException("Un campo de opción debe tener opciones.");var optionCodes=request.Options.Select(x=>x.Code.Trim().ToUpperInvariant()).ToArray();if(optionCodes.Distinct().Count()!=optionCodes.Length||request.Options.Any(x=>string.IsNullOrWhiteSpace(x.Code)||string.IsNullOrWhiteSpace(x.Label)))throw new ArgumentException("Las opciones deben tener códigos y etiquetas únicos.");return store.SaveFormFieldAsync(formId,fieldId,request with{Code=code,Label=label,HelpText=request.HelpText?.Trim(),Placeholder=request.Placeholder?.Trim(),Options=request.Options.Select(x=>x with{Code=x.Code.Trim().ToUpperInvariant(),Label=x.Label.Trim()}).ToArray()},token);
+        if(formId==Guid.Empty)throw new ArgumentException("Selecciona un formulario válido.");
+        return store.SaveFormFieldAsync(formId,fieldId,HelpdeskFormFieldValidation.Normalize(request),token);
     }
 }

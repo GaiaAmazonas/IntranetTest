@@ -1,10 +1,10 @@
 # Gaia: contexto de continuidad para un nuevo chat
 
-Fecha de revisión: **7 de septiembre de 2026**. Documento basado en el código local, no solamente en conversaciones anteriores. Raíz del proyecto: `Proyecto Gaia Aplicacion`.
+Fecha de revisión documental: **22 de septiembre de 2026**. Documento basado en el código local, no solamente en conversaciones anteriores. Raíz del proyecto: `Proyecto Gaia Aplicacion`.
 
 ## Cómo usar este documento
 
-Lee este archivo y los tres documentos enlazados abajo antes de crear un módulo. Después inspecciona solamente los archivos afectados y un módulo de referencia. No es necesario volver a explorar todo el repositorio, pero estos documentos no sustituyen verificar el código que vas a cambiar.
+Lee primero [Gobierno documental y arquitectura canónica](00_GOBIERNO_DOCUMENTAL_Y_ARQUITECTURA.md), luego este archivo y los documentos enlazados abajo antes de crear un módulo. Después inspecciona solamente los archivos afectados y un módulo de referencia. No es necesario volver a explorar todo el repositorio, pero estos documentos no sustituyen verificar el código que vas a cambiar.
 
 1. [Arquitectura, convenciones y conexiones](continuidad/01_ARQUITECTURA.md).
 2. [Seguridad, autenticación y tokens](continuidad/02_SEGURIDAD.md).
@@ -12,8 +12,9 @@ Lee este archivo y los tres documentos enlazados abajo antes de crear un módulo
 4. Para infraestructura de archivos: [Estado por fases de Graph / SharePoint](continuidad/04_ARCHIVOS_SHAREPOINT.md). Fundación, adaptador, diagnóstico, prueba controlada, configuración Dataverse y copia verificada entre repositorios están implementados; Staging fue validado. Falta integrar los puertos desde cada módulo y construir lotes cuando exista su inventario de referencias. Consultar allí nombres de tabla, opciones y credenciales por alias antes de continuar.
 5. Para Helpdesk y sus adjuntos: [Módulo Helpdesk](modulos/helpdesk.md) y [Preparación de adjuntos](continuidad/05_PREPARACION_ADJUNTOS_HELPDESK.md). Los endpoints, la persistencia funcional y la integración con SharePoint ya existen; el segundo documento conserva las decisiones de infraestructura. La fuente contractual del modelo sigue siendo `model/gaia-helpdesk-model.json`.
 6. Para fotos institucionales de perfil: [Microsoft Entra / Graph](continuidad/06_FOTOS_PERFIL_ENTRA.md). No almacenar fotos en Dataverse, no usar nombres para resolver identidades y completar primero el consentimiento delegado mínimo de Graph.
-7. Para campañas decorativas de Intranet y AdminCore: [Ambientación visual](modulos/ambientacion-visual.md). Dataverse conserva configuración y vigencia; SharePoint conserva imágenes; el tema es texto abierto y los efectos respetan reducción de movimiento.
-8. Para banners de la portada: [Destacados de Intranet](modulos/destacados.md). Dataverse conserva contenido, vigencia, estado y referencias; SharePoint conserva las variantes de imagen y la portada las consume mediante streaming autorizado desde la API.
+7. Para separar identidades de Dataverse y SharePoint, y especialmente para configuración anterior al login: [Autenticación Dataverse y SharePoint](continuidad/07_AUTENTICACION_DATAVERSE_SHAREPOINT.md).
+8. Para campañas decorativas de Intranet y AdminCore: [Ambientación visual](modulos/ambientacion-visual.md). Dataverse conserva configuración y vigencia; SharePoint conserva imágenes; el tema es texto abierto y los efectos respetan reducción de movimiento.
+9. Para banners de la portada: [Destacados de Intranet](modulos/destacados.md). Dataverse conserva contenido, vigencia, estado y referencias; SharePoint conserva las variantes de imagen y la portada las consume mediante streaming autorizado desde la API.
 
 Son una fotografía del estado revisado. La solicitud actual del usuario delimita el trabajo; los documentos históricos describen también aspiraciones. Si el código contradice esta guía, informa la diferencia y actualiza la documentación al terminar, sin sustituir silenciosamente la implementación.
 

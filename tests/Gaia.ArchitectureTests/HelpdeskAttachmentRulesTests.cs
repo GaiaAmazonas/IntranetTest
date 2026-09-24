@@ -6,6 +6,12 @@ namespace Gaia.ArchitectureTests;
 public sealed class HelpdeskAttachmentRulesTests
 {
     [Fact]
+    public void ManagementFieldResponseRequiresManagement()
+    {
+        var command=Valid() with{ManagementFieldResponseId=Guid.NewGuid()};
+        Assert.Throws<ArgumentException>(()=>HelpdeskAttachmentRules.Validate(command));
+    }
+    [Fact]
     public void ValidMetadataMatchesApprovedDataverseChoiceValues()
     {
         var command = Valid();

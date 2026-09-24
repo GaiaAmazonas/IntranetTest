@@ -20,7 +20,7 @@ import { AccessState } from "@/components/route-access-gate";
 import { useSecurity } from "@/components/security-context";
 import { PersonAvatar } from "@/components/person-avatar";
 import {
-  intranetNavigation,
+  intranetNavigationFromModules,
   isIntranetRouteActive,
 } from "./intranet-navigation";
 import { applicationsFromModules } from "./intranet-applications";
@@ -35,6 +35,7 @@ export function IntranetShell({ children }: { children: React.ReactNode }) {
   const [loggingOut, setLoggingOut] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const configuredApplications = useMemo(() => applicationsFromModules(security.modules), [security.modules]);
+  const navigation = useMemo(() => intranetNavigationFromModules(security.modules), [security.modules]);
 
   useEffect(() => {
     const close = (event: MouseEvent) => {
@@ -86,7 +87,7 @@ export function IntranetShell({ children }: { children: React.ReactNode }) {
         </Link>
 
         <nav aria-label="Navegación de la intranet" className="intranet-desktop-nav">
-          {intranetNavigation.filter(item => !item.group && security.can(item.permission)).map(item => {
+          {navigation.filter(item => !item.group).map(item => {
             const Icon = item.icon;
             const active = isIntranetRouteActive(pathname, item);
             return (
@@ -101,7 +102,7 @@ export function IntranetShell({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
-          <ServiceNavigation pathname={pathname} can={security.can}/>
+          <ServiceNavigation items={navigation.filter(item => item.group === "services")} pathname={pathname}/>
         </nav>
 
         <div className="intranet-profile" ref={profileRef}>
@@ -156,12 +157,12 @@ export function IntranetShell({ children }: { children: React.ReactNode }) {
               <button aria-label="Cerrar navegación" onClick={() => setMobileOpen(false)} type="button"><X size={21} /></button>
             </div>
             <nav>
-              {intranetNavigation.filter(item => security.can(item.permission)).map(item => {
+              {navigation.filter(item => !item.group).map(item => {
                 const Icon = item.icon;
                 const active = isIntranetRouteActive(pathname, item);
                 return <Link aria-current={active ? "page" : undefined} className={active ? "is-active" : undefined} href={item.href} key={item.href} onClick={() => setMobileOpen(false)}><Icon size={19} />{item.label}</Link>;
               })}
-              <ServiceNavigation pathname={pathname} can={security.can} onNavigate={()=>setMobileOpen(false)}/>
+              <ServiceNavigation items={navigation.filter(item => item.group === "services")} pathname={pathname} onNavigate={()=>setMobileOpen(false)}/>
             </nav>
             <div className="intranet-mobile-user"><PersonAvatar className="intranet-avatar" currentUser name={security.user.name} size={34} /><span><strong>{security.user.name}</strong><small>{security.user.email}</small></span></div>
           </aside>
@@ -169,19 +170,17 @@ export function IntranetShell({ children }: { children: React.ReactNode }) {
       )}
 
       <main className="intranet-main">{children}</main>
-      <IntranetFooter />
+      <IntranetFooter navigation={navigation} />
     </div>
   );
 }
-function ServiceNavigation({pathname,can,onNavigate}:{pathname:string;can:(permission:string)=>boolean;onNavigate?:()=>void}) {
+function ServiceNavigation({pathname,items,onNavigate}:{pathname:string;items:ReturnType<typeof intranetNavigationFromModules>;onNavigate?:()=>void}) {
  const [open,setOpen]=useState(false),ref=useRef<HTMLDivElement>(null),trigger=useRef<HTMLButtonElement>(null),panelId=useId();
- const items=intranetNavigation.filter(x=>x.group==="services"&&can(x.permission));
- const descriptions:Record<string,string>={"/intranet/aplicaciones":"Herramientas para tu trabajo diario","/intranet/helpdesk":"Crea solicitudes y consulta tus casos","/intranet/capacitaciones":"Continúa tu aprendizaje y ve tus resultados"};
  useEffect(()=>{const close=(event:MouseEvent)=>{if(!ref.current?.contains(event.target as Node))setOpen(false)};document.addEventListener("mousedown",close);return()=>document.removeEventListener("mousedown",close)},[]);
  if(!items.length)return null;
  const active=items.some(x=>isIntranetRouteActive(pathname,x));
  return <div className="intranet-service-nav" ref={ref} onBlur={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node))setOpen(false)}} onKeyDown={e=>{if(e.key==="Escape"){setOpen(false);trigger.current?.focus()}}}>
    <button ref={trigger} className={active||open?"is-active":undefined} type="button" aria-expanded={open} aria-controls={panelId} onClick={()=>setOpen(!open)}><LayoutDashboard size={19}/><span>Mi espacio</span><ChevronDown size={16} className={open?"intranet-service-chevron is-open":"intranet-service-chevron"}/></button>
-   {open&&<div className="intranet-service-links" id={panelId}><header><small>Mi espacio</small><strong>Tus accesos de trabajo</strong><p>Herramientas, apoyo y aprendizaje en un solo lugar.</p></header><nav aria-label="Accesos de Mi espacio">{items.map(x=>{const Icon=x.icon,selected=isIntranetRouteActive(pathname,x);return <Link className={selected?"intranet-service-item is-selected":"intranet-service-item"} key={x.href} href={x.href} aria-current={selected?"page":undefined} onClick={()=>{setOpen(false);onNavigate?.()}}><span className="intranet-service-icon"><Icon size={23}/></span><span className="intranet-service-copy"><strong>{x.label}</strong><small>{descriptions[x.href]}</small></span><ChevronRight size={19}/></Link>})}</nav></div>}
+   {open&&<div className="intranet-service-links" id={panelId}><header><small>Mi espacio</small><strong>Tus accesos de trabajo</strong><p>Herramientas, apoyo y aprendizaje en un solo lugar.</p></header><nav aria-label="Accesos de Mi espacio">{items.map(x=>{const Icon=x.icon,selected=isIntranetRouteActive(pathname,x);return <Link className={selected?"intranet-service-item is-selected":"intranet-service-item"} key={x.id} href={x.href} aria-current={selected?"page":undefined} onClick={()=>{setOpen(false);onNavigate?.()}}><span className="intranet-service-icon"><Icon size={23}/></span><span className="intranet-service-copy"><strong>{x.label}</strong><small>{x.description}</small></span><ChevronRight size={19}/></Link>})}</nav></div>}
  </div>;
 }

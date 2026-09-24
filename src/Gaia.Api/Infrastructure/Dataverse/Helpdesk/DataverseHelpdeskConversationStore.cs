@@ -33,11 +33,10 @@ internal sealed class DataverseHelpdeskConversationStore(IDataverseDelegatedClie
         var comments=rows.Select(item=>new HelpdeskComment(GuidValue(item,comment.PrimaryIdAttribute),Text(item,content)??"",Date(item,published)??DateTimeOffset.MinValue,Int(item,visibility)==299540081,GuidValue(item,author)==actorId,GuidValue(item,author)==requester?"Solicitante":"Equipo Gaia")).ToArray();
         var stateName=Text(stateRow.Value,state.PrimaryNameAttribute)??"Sin estado";
         var requesterCanReply=isRequester&&(stateName.Contains("devuelt",StringComparison.OrdinalIgnoreCase)||stateName.Contains("espera del solicitante",StringComparison.OrdinalIgnoreCase));
-        var transitions=isManager
-            ? await ReadTransitions(client,state,stateId,299540011,token)
-            : requesterCanReply
-                ? await ReadTransitions(client,state,stateId,299540010,token)
-                : [];
+        var availableTransitions=new List<HelpdeskTransition>();
+        if(isManager)availableTransitions.AddRange(await ReadTransitions(client,state,stateId,299540011,token));
+        if(isRequester)availableTransitions.AddRange(await ReadTransitions(client,state,stateId,299540010,token));
+        IReadOnlyList<HelpdeskTransition> transitions=availableTransitions.DistinctBy(item=>item.Id).ToArray();
         if(requesterCanReply) {
             var previous=await ReadReturnState(client,request,state,requestId,stateId,token);
             transitions=[..transitions.Where(item=>item.Id!=previous.Id),new HelpdeskTransition(previous.Id,previous.Id,previous.Name,true,false,false,false,true)];

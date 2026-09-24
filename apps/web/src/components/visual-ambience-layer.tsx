@@ -12,7 +12,7 @@ type ActiveAmbience={id:string;theme:string;effect:number;intensity:number;prima
 export function VisualAmbienceLayer(){
  const pathname=usePathname(),security=useSecurity(),[item,setItem]=useState<ActiveAmbience|null>(null),[celebrationKey,setCelebrationKey]=useState(0);
  const surface=pathname.startsWith("/intranet")?"intranet":pathname==="/"?null:"admincore";
- useEffect(()=>{let active=true;if(!surface||!security.user){setItem(null);return()=>{active=false}};apiRequest<ActiveAmbience|null>(`/api/communications/active-visual-ambience?surface=${surface}`).then(value=>{if(active)setItem(value)}).catch(()=>{if(active)setItem(null)});return()=>{active=false}},[surface,security.user]);
+ useEffect(()=>{let active=true;if(!surface||!security.user){queueMicrotask(()=>{if(active)setItem(null)});return()=>{active=false}};apiRequest<ActiveAmbience|null>(`/api/communications/active-visual-ambience?surface=${surface}`).then(value=>{if(active)setItem(value)}).catch(()=>{if(active)setItem(null)});return()=>{active=false}},[surface,security.user]);
  useEffect(()=>{const root=document.documentElement;if(item?.showTopDecoration&&surface)root.dataset.gaiaAmbienceSurface=surface;else delete root.dataset.gaiaAmbienceSurface;return()=>{delete root.dataset.gaiaAmbienceSurface}},[item?.showTopDecoration,surface]);
  const particles=useMemo(()=>Array.from({length:item?count(item.intensity):0},(_,index)=>({index,left:(index*37)%101,delay:-((index*13)%17),duration:8+((index*7)%10),size:7+((index*5)%13)})),[item]);
  if(!item)return null;

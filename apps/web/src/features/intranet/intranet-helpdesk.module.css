@@ -27,8 +27,10 @@
 .page :global(.helpdesk-detail form>button:hover:not(:disabled)){filter:brightness(.95)}
 .page :global(.helpdesk-detail form>button:disabled){opacity:.55;cursor:wait}
 .page :global(.helpdesk-detail form>button:focus-visible){outline:3px solid var(--brand-primary);outline-offset:3px}
+.page :global(.helpdesk-requester-actions){position:fixed;z-index:98;right:34px;bottom:28px;width:min(390px,calc(100vw - 40px));max-height:calc(100vh - 56px);overflow:auto;border:1px solid var(--intranet-line);border-radius:18px;background:#fff;padding:18px;box-shadow:0 24px 60px rgb(8 38 31/28%)}
+.page :global(.helpdesk-requester-actions form){display:grid;gap:12px}.page :global(.helpdesk-requester-actions small){color:var(--brand-primary);font-size:9px;font-weight:800;text-transform:uppercase}.page :global(.helpdesk-requester-actions h3){margin-top:3px;font-size:17px}.page :global(.helpdesk-requester-actions p){margin-top:5px;color:var(--intranet-muted);font-size:11px;line-height:1.5}.page :global(.helpdesk-requester-actions label){display:grid;gap:5px;color:var(--intranet-ink);font-size:10px;font-weight:700}.page :global(.helpdesk-requester-actions label span){font-weight:400}.page :global(.helpdesk-requester-actions :is(select,textarea)){width:100%;border:1px solid #d4ddd7;border-radius:9px;background:#fff;padding:10px;color:var(--intranet-ink);font:inherit}.page :global(.helpdesk-requester-actions button){border:0;border-radius:10px;background:var(--brand-primary);padding:12px;color:#fff;font-size:11px;font-weight:800}.page :global(.helpdesk-requester-actions button:disabled){opacity:.55}
 .page :global(.helpdesk-response-files){min-width:0}
-@media(max-width:760px){.page :global(.helpdesk-detail form>button){width:100%}}
+@media(max-width:760px){.page :global(.helpdesk-detail form>button){width:100%}.page :global(.helpdesk-requester-actions){right:10px;bottom:10px;width:calc(100vw - 20px);max-height:calc(100vh - 20px)}}
 /* Estados de navegación discretos, sin relieve ni saltos. */
 .tabs button{transition:background 150ms ease,color 150ms ease;border-color:transparent;background:transparent;color:var(--intranet-muted);box-shadow:none}
 .tabs button:hover:not(.activeTab){background:var(--gaia-accent-pale);border-color:transparent;color:var(--brand-primary)}

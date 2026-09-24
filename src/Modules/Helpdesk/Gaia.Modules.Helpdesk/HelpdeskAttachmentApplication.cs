@@ -10,7 +10,9 @@ public sealed record UploadHelpdeskAttachment(
     AttachmentVisibility Visibility,
     string OriginalName,
     string ContentType,
-    long Length);
+    long Length,
+    Guid? ManagementId = null,
+    Guid? ManagementFieldResponseId = null);
 
 public interface IHelpdeskAttachmentApplication
 {
@@ -73,7 +75,9 @@ public sealed class HelpdeskAttachmentApplication(
                 request.FieldResponseId,
                 request.UploadedByThirdPartyId,
                 request.Visibility,
-                stored), cancellationToken);
+                stored,
+                request.ManagementId,
+                request.ManagementFieldResponseId), cancellationToken);
             var historyEntry = new AppendHelpdeskHistory(created.RequestId, created.UploadedByThirdPartyId, attachmentId.ToString("D"),
                 HelpdeskHistoryMovement.FileAdded, policy.IsManager ? HelpdeskHistoryOrigin.HelpdeskAdministration : HelpdeskHistoryOrigin.RequesterPortal,
                 created.Visibility == AttachmentVisibility.Requester, uploadedAt);

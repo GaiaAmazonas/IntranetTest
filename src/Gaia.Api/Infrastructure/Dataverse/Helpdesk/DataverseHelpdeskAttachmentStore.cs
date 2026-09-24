@@ -17,6 +17,16 @@ internal sealed class DataverseHelpdeskAttachmentStore(IDataverseDelegatedClient
         var metadata = await DataverseMetadataResolver.TableAsync(client, Table, token);
         var request = await DataverseMetadataResolver.TableAsync(client, "gaia_solicitud", token);
         var thirdParty = await DataverseMetadataResolver.TableAsync(client, "gaia_terceros", token);
+        if(attachment.ManagementId.HasValue)
+        {
+            var management=await DataverseMetadataResolver.TableAsync(client,"gaia_gestionsolicitud",token);var managementRequest=management.Relationship("gaia_Solicitud","gaia_solicitud");var row=await DataverseMetadataResolver.ReadOneAsync(client,$"{management.EntitySetName}({attachment.ManagementId:D})?$select=_{managementRequest.ReferencingAttribute}_value,statecode",token);
+            if(row is null||DataverseJson.OptionalInt32(row.Value,"statecode")!=0||OptionalGuid(row.Value,$"_{managementRequest.ReferencingAttribute}_value")!=attachment.RequestId)throw new ArgumentException("La gestión del adjunto no pertenece a la solicitud.");
+        }
+        if(attachment.ManagementFieldResponseId.HasValue)
+        {
+            var answer=await DataverseMetadataResolver.TableAsync(client,"gaia_respuestacampogestion",token);var answerManagement=answer.Relationship("gaia_GestionSolicitud","gaia_gestionsolicitud");var row=await DataverseMetadataResolver.ReadOneAsync(client,$"{answer.EntitySetName}({attachment.ManagementFieldResponseId:D})?$select=_{answerManagement.ReferencingAttribute}_value,statecode",token);
+            if(row is null||DataverseJson.OptionalInt32(row.Value,"statecode")!=0||OptionalGuid(row.Value,$"_{answerManagement.ReferencingAttribute}_value")!=attachment.ManagementId)throw new ArgumentException("La respuesta del adjunto no pertenece a la gestión indicada.");
+        }
         var payload = new Dictionary<string, object?>
         {
             [metadata.PrimaryNameAttribute] = attachment.File.OriginalName,
@@ -39,6 +49,8 @@ internal sealed class DataverseHelpdeskAttachmentStore(IDataverseDelegatedClient
         };
         await BindOptional(client, metadata, payload, "gaia_ComentarioSolicitud", "gaia_comentariosolicitud", attachment.CommentId, token);
         await BindOptional(client, metadata, payload, "gaia_RespuestaCampo", "gaia_respuestacampo", attachment.FieldResponseId, token);
+        await BindOptional(client, metadata, payload, "gaia_GestionSolicitud", "gaia_gestionsolicitud", attachment.ManagementId, token);
+        await BindOptional(client, metadata, payload, "gaia_RespuestaCampoGestion", "gaia_respuestacampogestion", attachment.ManagementFieldResponseId, token);
 
         using var message = new HttpRequestMessage(HttpMethod.Patch, $"{metadata.EntitySetName}({attachment.Id:D})")
         { Content = JsonContent.Create(payload) };
@@ -102,7 +114,8 @@ internal sealed class DataverseHelpdeskAttachmentStore(IDataverseDelegatedClient
         m.Attribute("gaia_ETag"), m.Attribute("gaia_UrlWeb"), m.Attribute("gaia_RutaLogica"), m.Attribute("gaia_Visibilidad"),
         m.Attribute("gaia_FechaCarga"), "_" + m.Attribute("gaia_Solicitud") + "_value",
         "_" + m.Attribute("gaia_ComentarioSolicitud") + "_value", "_" + m.Attribute("gaia_RespuestaCampo") + "_value",
-        "_" + m.Attribute("gaia_CargadoPor") + "_value", "statecode"
+        "_" + m.Attribute("gaia_CargadoPor") + "_value", "_" + m.Attribute("gaia_GestionSolicitud") + "_value",
+        "_" + m.Attribute("gaia_RespuestaCampoGestion") + "_value", "statecode"
     });
 
     private static HelpdeskAttachment Map(JsonElement row, DataverseTableMetadata m)
@@ -120,7 +133,9 @@ internal sealed class DataverseHelpdeskAttachmentStore(IDataverseDelegatedClient
             OptionalGuid(row, "_" + m.Attribute("gaia_ComentarioSolicitud") + "_value"),
             OptionalGuid(row, "_" + m.Attribute("gaia_RespuestaCampo") + "_value"),
             GuidValue(row, "_" + m.Attribute("gaia_CargadoPor") + "_value"), visibility, stored,
-            (DataverseJson.OptionalInt32(row, "statecode") ?? 0) == 0);
+            (DataverseJson.OptionalInt32(row, "statecode") ?? 0) == 0,
+            OptionalGuid(row, "_" + m.Attribute("gaia_GestionSolicitud") + "_value"),
+            OptionalGuid(row, "_" + m.Attribute("gaia_RespuestaCampoGestion") + "_value"));
     }
 
     private static string Required(JsonElement row, string name) => Optional(row, name)

@@ -30,7 +30,7 @@ public sealed class HelpdeskRequestApplicationTests
     [Fact]
     public async Task RequiredDynamicFieldIsValidatedBeforePersistence()
     {
-        var fieldId=Guid.NewGuid();var store=new Store{Form=new(Guid.NewGuid(),1,"Datos",null,[new(fieldId,"detalle","Detalle",299540040,299540050,null,null,true,1,12,null,100,null,null,false,null,null,[])])};var service=new HelpdeskRequestApplication(store,store,TimeProvider.System);
+        var fieldId=Guid.NewGuid();var store=new Store{Form=new(Guid.NewGuid(),1,"Datos",null,[new(fieldId,"detalle","Detalle",299540040,299540050,null,null,true,1,12,null,100,null,null,false,null,null,true,[])])};var service=new HelpdeskRequestApplication(store,store,TimeProvider.System);
         await Assert.ThrowsAsync<ArgumentException>(()=>service.CreateAsync(new(Guid.NewGuid(),"Asunto válido","Descripción suficientemente larga",[]),Guid.NewGuid(),default));
         Assert.Null(store.Request);
     }

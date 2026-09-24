@@ -1,5 +1,7 @@
 # Informe técnico para montaje del servidor — Plataforma Gaia
 
+> **Informe histórico fechado.** No debe usarse como guía de despliegue sin una nueva auditoría. La sección que describe PostgreSQL corresponde a un estado anterior; la arquitectura vigente está en `Md/00_GOBIERNO_DOCUMENTAL_Y_ARQUITECTURA.md`.
+
 **Fecha:** 11 de agosto de 2026  
 **Propósito:** entregar al responsable de infraestructura la información necesaria para publicar la aplicación empresarial Gaia.
 

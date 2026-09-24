@@ -8,7 +8,9 @@ using Gaia.Modules.Helpdesk;
 
 namespace Gaia.Api.Infrastructure.Dataverse.Helpdesk;
 
-internal sealed class DataverseHelpdeskRequestStore(IDataverseDelegatedClientFactory clients) : IHelpdeskRequestStore
+internal sealed class DataverseHelpdeskRequestStore(
+    IDataverseDelegatedClientFactory clients,
+    DataverseHelpdeskWorkflowExecutionWriter workflow) : IHelpdeskRequestStore
 {
     public async Task<CreatedHelpdeskRequest> CreateAsync(CreateHelpdeskRequest request, Guid requesterId,
         DateTimeOffset now, CancellationToken token)
@@ -23,7 +25,7 @@ internal sealed class DataverseHelpdeskRequestStore(IDataverseDelegatedClientFac
 
         var serviceFields = ServiceFields.From(serviceTable);
         var service = await DataverseMetadataResolver.ReadOneAsync(client,
-            $"{serviceTable.EntitySetName}({request.ServiceId:D})?$select=statecode,{serviceFields.Visible},{serviceFields.Days},_{serviceFields.Unit}_value,_{serviceFields.Manager}_value,_{serviceFields.Form}_value", token);
+            $"{serviceTable.EntitySetName}({request.ServiceId:D})?$select=statecode,{serviceFields.Visible},{serviceFields.Days},_{serviceFields.Unit}_value,_{serviceFields.Manager}_value,_{serviceFields.Form}_value,_{serviceFields.Flow}_value", token);
         if (service is null || Int(service.Value, "statecode") != 0 || !Bool(service.Value, serviceFields.Visible))
             throw new ArgumentException("El servicio seleccionado no existe o no está disponible.");
 
@@ -76,6 +78,8 @@ internal sealed class DataverseHelpdeskRequestStore(IDataverseDelegatedClientFac
         {
             await PersistAnswers(client,requestTable,createdId,request.Answers??[],createdAnswers,token);
             await AppendHistory(client, createdId, requesterId, now, 299540102, "Solicitud radicada", token);
+            var flowId=OptionalGuid(service.Value,$"_{serviceFields.Flow}_value");
+            if(flowId.HasValue)await workflow.StartAsync(createdId,flowId.Value,requesterId,now,token);
         }
         catch
         {
@@ -173,8 +177,8 @@ internal sealed class DataverseHelpdeskRequestStore(IDataverseDelegatedClientFac
     private static bool Bool(JsonElement row,string name)=>row.TryGetProperty(name,out var value)&&value.ValueKind==JsonValueKind.True;
     private static Guid GuidValue(JsonElement row,string name)=>OptionalGuid(row,name)??throw new InvalidOperationException($"Dataverse no devolvió {name}.");
     private static Guid? OptionalGuid(JsonElement row,string name)=>Guid.TryParse(Text(row,name),out var id)?id:null;
-    private sealed record ServiceFields(string Visible,string Days,string Unit,string Manager,string Form)
+    private sealed record ServiceFields(string Visible,string Days,string Unit,string Manager,string Form,string Flow)
     {
-        public static ServiceFields From(DataverseTableMetadata table)=>new(table.Attribute("gaia_VisibleAlSolicitante"),table.Attribute("gaia_DiasGestionHabiles"),table.Attribute("gaia_UnidadResponsable"),table.Attribute("gaia_ResponsablePredeterminado"),table.Attribute("gaia_FormularioVigente"));
+        public static ServiceFields From(DataverseTableMetadata table)=>new(table.Attribute("gaia_VisibleAlSolicitante"),table.Attribute("gaia_DiasGestionHabiles"),table.Attribute("gaia_UnidadResponsable"),table.Attribute("gaia_ResponsablePredeterminado"),table.Attribute("gaia_FormularioVigente"),table.Attribute("gaia_FlujoVigente"));
     }
 }

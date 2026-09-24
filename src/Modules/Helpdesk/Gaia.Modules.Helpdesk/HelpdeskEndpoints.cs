@@ -13,10 +13,12 @@ public static class HelpdeskEndpoints
     {
         var group = endpoints.MapGroup("/api/helpdesk").WithTags("Helpdesk")
             .RequireAuthorization(AdminCorePermissions.IntranetHelpdeskVer);
+        group.MapGet("/portal/catalog", PortalCatalog);
         group.MapGet("/portal", Portal);
         group.MapGet("/services/{serviceId:guid}/form", ServiceForm);
         group.MapPost("/requests", CreateRequest);
         group.MapGet("/requests/{requestId:guid}", RequestDetail);
+        group.MapGet("/requests/{requestId:guid}/workflow",RequestWorkflow);
         group.MapPost("/requests/{requestId:guid}/comments", AddComment);
         group.MapPost("/requests/{requestId:guid}/transitions", ApplyTransition);
         group.MapPost("/requests/{requestId:guid}/observation-response", AttendObservation).DisableAntiforgery();
@@ -26,18 +28,51 @@ public static class HelpdeskEndpoints
         group.MapDelete("/attachments/{attachmentId:guid}", Deactivate);
         group.MapGet("/requests/{requestId:guid}/attachments/reconciliation", Reconcile);
         group.MapGet("/management/queue", ManagementQueue).RequireAuthorization(AdminCorePermissions.HelpdeskSolicitudesVer);
+        group.MapGet("/management/workflow-queue", WorkflowQueue).RequireAuthorization(AdminCorePermissions.HelpdeskSolicitudesVer);
         group.MapGet("/management/catalog", ManagementCatalog).RequireAuthorization(AdminCorePermissions.HelpdeskCatalogosVer);
         group.MapPut("/management/requests/{requestId:guid}/assignment", Reassign)
             .RequireAuthorization(AdminCorePermissions.HelpdeskSolicitudesReasignar);
+        group.MapPost("/management/workflows/{managementId:guid}/complete",CompleteWorkflowManagement)
+            .RequireAuthorization(AdminCorePermissions.HelpdeskSolicitudesReasignar);
+        group.MapGet("/management/workflows/{managementId:guid}/form",ReadManagementStageForm)
+            .RequireAuthorization(AdminCorePermissions.HelpdeskSolicitudesVer);
+        group.MapPut("/management/workflows/{managementId:guid}/form/responses",SaveManagementStageResponses)
+            .RequireAuthorization(AdminCorePermissions.HelpdeskSolicitudesReasignar);
+        group.MapPost("/management/workflows/{managementId:guid}/take",TakeWorkflowManagement)
+            .RequireAuthorization(AdminCorePermissions.HelpdeskSolicitudesVer);
+        group.MapPut("/management/workflows/{managementId:guid}/assignment",ReassignWorkflowManagement)
+            .RequireAuthorization(AdminCorePermissions.HelpdeskSolicitudesReasignar);
+        group.MapPost("/requests/{requestId:guid}/workflow/reopen",ReopenWorkflow)
+            .RequireAuthorization(AdminCorePermissions.HelpdeskSolicitudesReasignar);
+        group.MapPost("/workflows/{managementId:guid}/requester-response",ResumeWorkflowFromRequester);
         group.MapGet("/administration", Administration).RequireAuthorization(AdminCorePermissions.HelpdeskCatalogosVer);
+        group.MapGet("/administration/export", AdministrationExport).RequireAuthorization(AdminCorePermissions.HelpdeskCatalogosVer);
         group.MapPost("/administration/services", CreateService).RequireAuthorization(AdminCorePermissions.HelpdeskCatalogosAdministrar);
         group.MapPut("/administration/services/{id:guid}", UpdateService).RequireAuthorization(AdminCorePermissions.HelpdeskCatalogosAdministrar);
         group.MapPost("/administration/forms", CreateForm).RequireAuthorization(AdminCorePermissions.HelpdeskCatalogosAdministrar);
         group.MapPost("/administration/forms/{id:guid}/publish", PublishForm).RequireAuthorization(AdminCorePermissions.HelpdeskCatalogosAdministrar);
+        group.MapPost("/administration/workflows/{flowId:guid}/publish",PublishWorkflow).RequireAuthorization(AdminCorePermissions.HelpdeskCatalogosAdministrar);
+        group.MapGet("/administration/services/{serviceId:guid}/workflows",ListWorkflows).RequireAuthorization(AdminCorePermissions.HelpdeskCatalogosVer);
+        group.MapPost("/administration/workflows",CreateWorkflow).RequireAuthorization(AdminCorePermissions.HelpdeskCatalogosAdministrar);
+        group.MapGet("/administration/workflows/{flowId:guid}",ReadWorkflow).RequireAuthorization(AdminCorePermissions.HelpdeskCatalogosVer);
+        group.MapPost("/administration/workflows/{flowId:guid}/steps",CreateWorkflowStep).RequireAuthorization(AdminCorePermissions.HelpdeskCatalogosAdministrar);
+        group.MapPut("/administration/workflows/{flowId:guid}/steps/{stepId:guid}",UpdateWorkflowStep).RequireAuthorization(AdminCorePermissions.HelpdeskCatalogosAdministrar);
+        group.MapGet("/administration/workflow-steps/{stepId:guid}/form",ReadStageForm).RequireAuthorization(AdminCorePermissions.HelpdeskCatalogosVer);
+        group.MapPut("/administration/workflow-steps/{stepId:guid}/form",SaveStageForm).RequireAuthorization(AdminCorePermissions.HelpdeskCatalogosAdministrar);
+        group.MapPost("/administration/workflow-steps/{stepId:guid}/form/fields",CreateStageFormField).RequireAuthorization(AdminCorePermissions.HelpdeskCatalogosAdministrar);
+        group.MapPut("/administration/workflow-steps/{stepId:guid}/form/fields/{fieldId:guid}",UpdateStageFormField).RequireAuthorization(AdminCorePermissions.HelpdeskCatalogosAdministrar);
+        group.MapPost("/administration/workflows/{flowId:guid}/routes",CreateWorkflowRoute).RequireAuthorization(AdminCorePermissions.HelpdeskCatalogosAdministrar);
+        group.MapPut("/administration/workflows/{flowId:guid}/routes/{routeId:guid}",UpdateWorkflowRoute).RequireAuthorization(AdminCorePermissions.HelpdeskCatalogosAdministrar);
         group.MapGet("/administration/forms/{id:guid}", ReadAdminForm).RequireAuthorization(AdminCorePermissions.HelpdeskCatalogosVer);
         group.MapPost("/administration/forms/{formId:guid}/fields", CreateField).RequireAuthorization(AdminCorePermissions.HelpdeskCatalogosAdministrar);
         group.MapPut("/administration/forms/{formId:guid}/fields/{fieldId:guid}", UpdateField).RequireAuthorization(AdminCorePermissions.HelpdeskCatalogosAdministrar);
         return endpoints;
+    }
+
+    private static async Task<IResult> PortalCatalog(IHelpdeskPortalReader reader, CancellationToken token)
+    {
+        try { return Results.Ok(await reader.ReadCatalogAsync(token)); }
+        catch (Exception error) { return Problem(error); }
     }
 
     private static async Task<IResult> Portal(ClaimsPrincipal principal, ISecurityStore security,
@@ -69,6 +104,18 @@ public static class HelpdeskEndpoints
     {
         try { var managementAccess=await authorization.HasPermissionAsync(principal,AdminCorePermissions.HelpdeskSolicitudesVer,token);return Results.Ok(await application.ReadAsync(requestId,await Actor(security,principal,token),managementAccess,token)); }
         catch (Exception error) { return Problem(error); }
+    }
+    private static async Task<IResult> RequestWorkflow(Guid requestId,ClaimsPrincipal principal,ISecurityStore security,
+        IAdminCoreAuthorization authorization,HelpdeskWorkflowApplication application,CancellationToken token)
+    {
+        try{var management=await authorization.HasPermissionAsync(principal,AdminCorePermissions.HelpdeskSolicitudesVer,token);var value=await application.ReadRequestStateAsync(requestId,await Actor(security,principal,token),management,token);return value is null?Results.NoContent():Results.Ok(value);}
+        catch(Exception error){return Problem(error);}
+    }
+    private static async Task<IResult> WorkflowQueue(string? queue,ClaimsPrincipal principal,ISecurityStore security,
+        HelpdeskWorkflowApplication application,CancellationToken token)
+    {
+        try{return Results.Ok(await application.ReadWorkQueueAsync(await Actor(security,principal,token),queue??"mine",token));}
+        catch(Exception error){return Problem(error);}
     }
 
     private static async Task<IResult> AddComment(Guid requestId, AddHelpdeskComment request, ClaimsPrincipal principal,
@@ -123,11 +170,12 @@ public static class HelpdeskEndpoints
             if (file is null) return Invalid("Debes seleccionar un archivo.");
             var visibility = string.Equals(form["visibility"], "internal", StringComparison.OrdinalIgnoreCase)
                 ? AttachmentVisibility.Internal : AttachmentVisibility.Requester;
-            if (!OptionalGuid(form["commentId"], out var commentId) || !OptionalGuid(form["fieldResponseId"], out var fieldResponseId))
+            if (!OptionalGuid(form["commentId"], out var commentId) || !OptionalGuid(form["fieldResponseId"], out var fieldResponseId) || !OptionalGuid(form["managementId"],out var managementId)||!OptionalGuid(form["managementFieldResponseId"],out var managementFieldResponseId))
                 return Invalid("La relación opcional del adjunto no es válida.");
             await using var stream = file.OpenReadStream();
             var result = await application.UploadAsync(new(requestId, commentId, fieldResponseId, actor,
-                visibility, file.FileName, file.ContentType, file.Length), stream, token);
+                visibility, file.FileName, file.ContentType, file.Length,managementId,managementFieldResponseId), stream, token);
+            if(managementId.HasValue&&result.ManagementId!=managementId)throw new InvalidOperationException("No fue posible asociar el adjunto a la gestión.");
             return Results.Created($"/api/helpdesk/attachments/{result.Id:D}", result);
         }
         catch (Exception error) { return Problem(error); }
@@ -190,8 +238,74 @@ public static class HelpdeskEndpoints
         catch(Exception error){return Problem(error);}
     }
 
+    private static async Task<IResult> CompleteWorkflowManagement(Guid managementId,CompleteHelpdeskManagement request,
+        ClaimsPrincipal principal,ISecurityStore security,HelpdeskWorkflowApplication application,CancellationToken token)
+    {
+        try{await application.CompleteAsync(await Actor(security,principal,token),request with{ManagementId=managementId},token);return Results.NoContent();}
+        catch(Exception error){return Problem(error);}
+    }
+    private static async Task<IResult> ReadManagementStageForm(Guid managementId,ClaimsPrincipal principal,ISecurityStore security,HelpdeskWorkflowApplication application,CancellationToken token)
+    {try{return Results.Ok(await application.ReadManagementFormAsync(managementId,await Actor(security,principal,token),token));}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> SaveManagementStageResponses(Guid managementId,SaveHelpdeskManagementAnswers request,ClaimsPrincipal principal,ISecurityStore security,HelpdeskWorkflowApplication application,CancellationToken token)
+    {try{return Results.Ok(await application.SaveManagementAnswersAsync(managementId,await Actor(security,principal,token),request,token));}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> TakeWorkflowManagement(Guid managementId,ClaimsPrincipal principal,
+        ISecurityStore security,HelpdeskWorkflowApplication application,CancellationToken token)
+    {try{await application.TakeAsync(managementId,await Actor(security,principal,token),token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
+
+    private static async Task<IResult> ReassignWorkflowManagement(Guid managementId,ReassignHelpdeskManagement request,
+        ClaimsPrincipal principal,ISecurityStore security,HelpdeskWorkflowApplication application,CancellationToken token)
+    {
+        try{await application.ReassignAsync(managementId,await Actor(security,principal,token),request,token);return Results.NoContent();}
+        catch(Exception error){return Problem(error);}
+    }
+
+    private static async Task<IResult> ResumeWorkflowFromRequester(Guid managementId,ResumeHelpdeskWorkflowManagement request,
+        ClaimsPrincipal principal,ISecurityStore security,HelpdeskWorkflowApplication application,CancellationToken token)
+    {
+        try{await application.ResumeFromRequesterAsync(managementId,await Actor(security,principal,token),request.Comment??string.Empty,request.HasFile,token);return Results.NoContent();}
+        catch(Exception error){return Problem(error);}
+    }
+
+    private static async Task<IResult> ReopenWorkflow(Guid requestId,ClaimsPrincipal principal,ISecurityStore security,
+        HelpdeskWorkflowApplication application,CancellationToken token)
+    {
+        try{await application.ReopenAsync(requestId,await Actor(security,principal,token),token);return Results.NoContent();}
+        catch(Exception error){return Problem(error);}
+    }
+
+    private static async Task<IResult> PublishWorkflow(Guid flowId,ClaimsPrincipal principal,ISecurityStore security,
+        HelpdeskWorkflowApplication application,CancellationToken token)
+    {
+        try{await application.PublishAsync(flowId,await Actor(security,principal,token),token);return Results.NoContent();}
+        catch(Exception error){return Problem(error);}
+    }
+    private static async Task<IResult> ListWorkflows(Guid serviceId,HelpdeskWorkflowApplication application,CancellationToken token)
+    {try{return Results.Ok(await application.ListAsync(serviceId,token));}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> ReadWorkflow(Guid flowId,HelpdeskWorkflowApplication application,CancellationToken token)
+    {try{var value=await application.ReadAsync(flowId,token);return value is null?Results.NotFound():Results.Ok(value);}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> CreateWorkflow(CreateHelpdeskWorkflowDraft request,HelpdeskWorkflowApplication application,CancellationToken token)
+    {try{var id=await application.CreateDraftAsync(request,token);return Results.Created($"/api/helpdesk/administration/workflows/{id:D}",new{id});}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> CreateWorkflowStep(Guid flowId,SaveHelpdeskWorkflowStep request,HelpdeskWorkflowApplication application,CancellationToken token)
+    {try{var id=await application.SaveStepAsync(flowId,null,request,token);return Results.Created($"/api/helpdesk/administration/workflows/{flowId:D}/steps/{id:D}",new{id});}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> UpdateWorkflowStep(Guid flowId,Guid stepId,SaveHelpdeskWorkflowStep request,HelpdeskWorkflowApplication application,CancellationToken token)
+    {try{await application.SaveStepAsync(flowId,stepId,request,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> ReadStageForm(Guid stepId,HelpdeskWorkflowApplication application,CancellationToken token)
+    {try{var value=await application.ReadStageFormAsync(stepId,token);return value is null?Results.NoContent():Results.Ok(value);}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> SaveStageForm(Guid stepId,SaveHelpdeskStageForm request,HelpdeskWorkflowApplication application,CancellationToken token)
+    {try{var id=await application.SaveStageFormAsync(stepId,request,token);return Results.Ok(new{id});}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> CreateStageFormField(Guid stepId,SaveHelpdeskFormField request,HelpdeskWorkflowApplication application,CancellationToken token)
+    {try{var id=await application.SaveStageFormFieldAsync(stepId,null,request,token);return Results.Created($"/api/helpdesk/administration/workflow-steps/{stepId:D}/form/fields/{id:D}",new{id});}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> UpdateStageFormField(Guid stepId,Guid fieldId,SaveHelpdeskFormField request,HelpdeskWorkflowApplication application,CancellationToken token)
+    {try{await application.SaveStageFormFieldAsync(stepId,fieldId,request,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> CreateWorkflowRoute(Guid flowId,SaveHelpdeskWorkflowRoute request,HelpdeskWorkflowApplication application,CancellationToken token)
+    {try{var id=await application.SaveRouteAsync(flowId,null,request,token);return Results.Created($"/api/helpdesk/administration/workflows/{flowId:D}/routes/{id:D}",new{id});}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> UpdateWorkflowRoute(Guid flowId,Guid routeId,SaveHelpdeskWorkflowRoute request,HelpdeskWorkflowApplication application,CancellationToken token)
+    {try{await application.SaveRouteAsync(flowId,routeId,request,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
+
     private static async Task<IResult> Administration(IHelpdeskManagementApplication application,CancellationToken token)
     {try{return Results.Ok(await application.ReadAdministrationAsync(token));}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> AdministrationExport(IHelpdeskManagementApplication application,CancellationToken token)
+    {try{return Results.Ok(await application.ReadExportAsync(token));}catch(Exception error){return Problem(error);}}
     private static async Task<IResult> CreateService(SaveHelpdeskService request,IHelpdeskManagementApplication application,CancellationToken token)
     {try{var id=await application.SaveServiceAsync(null,request,token);return Results.Created($"/api/helpdesk/administration/services/{id:D}",new{id});}catch(Exception error){return Problem(error);}}
     private static async Task<IResult> UpdateService(Guid id,SaveHelpdeskService request,IHelpdeskManagementApplication application,CancellationToken token)

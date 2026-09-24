@@ -24,7 +24,7 @@ type PersonAvatarProps = { name: string; personId?: string; currentUser?: boolea
 export function PersonAvatar({ name, personId, currentUser = false, size = 48, className = "", imageUrl, alt }: PersonAvatarProps) {
   const containerRef = useRef<HTMLSpanElement>(null);
   const [visible, setVisible] = useState(currentUser || Boolean(imageUrl) || !personId);
-  const [failed, setFailed] = useState(false);
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const endpoint = profilePhotoPath(personId, currentUser, size);
 
   useEffect(() => {
@@ -38,18 +38,15 @@ export function PersonAvatar({ name, personId, currentUser = false, size = 48, c
     return () => observer.disconnect();
   }, [currentUser, endpoint, imageUrl]);
 
-  useEffect(() => {
-    setFailed(false);
-  }, [endpoint, imageUrl]);
-
   // Use the protected image endpoint directly. It avoids a cross-origin fetch/blob
   // conversion, while the browser still sends the authenticated session cookie.
   const photoUrl = imageUrl ?? (visible && endpoint ? `${apiUrl}${endpoint}` : null);
+  const failed = Boolean(photoUrl) && failedUrl === photoUrl;
 
   return <span aria-busy={visible && !photoUrl && Boolean(endpoint) || undefined} className={`gaia-person-avatar ${className}`} ref={containerRef}
     style={{ "--person-avatar-size": `${size}px` } as CSSProperties}>
     {photoUrl && !failed
-      ? <img alt={alt ?? `Fotografía de ${name}`} crossOrigin="use-credentials" onError={() => setFailed(true)} referrerPolicy="no-referrer" src={photoUrl} />
+      ? <img alt={alt ?? `Fotografía de ${name}`} crossOrigin="use-credentials" onError={() => setFailedUrl(photoUrl)} referrerPolicy="no-referrer" src={photoUrl} />
       : <span aria-label={alt ?? name}>{personInitials(name)}</span>}
   </span>;
 }

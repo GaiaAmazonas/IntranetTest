@@ -1,30 +1,55 @@
 import {
   CalendarDays,
+  CircleHelp,
   Grid2X2,
   GraduationCap,
   Home,
+  LayoutDashboard,
   LifeBuoy,
+  Search,
   Users,
   type LucideIcon,
 } from "lucide-react";
+import type { SecurityNavigationModule } from "@/components/security-context";
 
 export type IntranetNavigationItem = {
+  id: string;
+  code: string;
   href: string;
   label: string;
+  description: string;
   icon: LucideIcon;
-  permission: string;
   exact?: boolean;
   group?: "services";
+  order: number;
 };
 
-export const intranetNavigation: IntranetNavigationItem[] = [
-  { href: "/intranet", label: "Inicio", icon: Home, permission: "INT.INICIO.VER", exact: true },
-  { href: "/intranet/personas", label: "Personas", icon: Users, permission: "INT.PERSONAS.VER" },
-  { href: "/intranet/calendario", label: "Calendario", icon: CalendarDays, permission: "INT.CALENDARIO.VER" },
-  { href: "/intranet/aplicaciones", label: "Mis aplicaciones", group: "services", icon: Grid2X2, permission: "INT.APLICACIONES.VER" },
-  { href: "/intranet/helpdesk", label: "Mis solicitudes de ayuda", group: "services", icon: LifeBuoy, permission: "INT.HELPDESK.VER" },
-  { href: "/intranet/capacitaciones", label: "Mis capacitaciones", group: "services", icon: GraduationCap, permission: "INT.CAPACITACIONES.VER" },
-];
+const icons: Record<string, LucideIcon> = {
+  applications: Grid2X2, calendar: CalendarDays, helpdesk: LifeBuoy, home: Home,
+  intranet: LayoutDashboard, people: Users, search: Search, training: GraduationCap,
+};
+const primaryCodes = new Set(["INT.INICIO", "INT.PERSONAS", "INT.CALENDARIO"]);
+
+export function intranetNavigationFromModules(modules: readonly SecurityNavigationModule[]): IntranetNavigationItem[] {
+  return modules
+    .filter(module => {
+      const code = module.code.trim().toUpperCase();
+      return code.startsWith("INT.") && !code.startsWith("INT.APP.") && Boolean(module.route?.trim());
+    })
+    .map(module => {
+      const code = module.code.trim().toUpperCase();
+      const href = module.route.trim().replace(/\/$/, "") || "/intranet";
+      return {
+        id: module.id, code, href, label: module.name.trim(),
+        description: module.description?.trim() || "Acceso institucional autorizado.",
+        icon: icons[module.icon?.trim().toLowerCase() || ""] ?? CircleHelp,
+        exact: href === "/intranet",
+        group: primaryCodes.has(code) ? undefined : "services" as const,
+        order: module.order,
+      };
+    })
+    .sort((left, right) => left.order - right.order || left.label.localeCompare(right.label, "es"));
+}
 
 export function isIntranetRouteActive(
   pathname: string,

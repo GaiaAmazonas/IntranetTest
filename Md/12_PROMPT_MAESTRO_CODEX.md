@@ -1,5 +1,7 @@
 # Prompt maestro para iniciar en Codex
 
+> **Documento histórico.** Este prompt correspondía al diagnóstico inicial. No debe reiniciar fases ni reemplazar la arquitectura vigente. Usar en su lugar `Md/00_GOBIERNO_DOCUMENTAL_Y_ARQUITECTURA.md`.
+
 Analiza y continúa el desarrollo de la intranet de Fundación Gaia Amazonas usando este repositorio y los documentos `.md` adjuntos como especificación inicial.
 
 También recibirás:

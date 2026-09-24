@@ -23,6 +23,13 @@ internal sealed class DataverseOrganizationPositionStore(IDataverseDelegatedClie
 
     public Task<PositionWriteResult> CreateAsync(PositionWriteCommand command, CancellationToken token) => WriteAsync(null, command, token);
     public Task<PositionWriteResult> UpdateAsync(Guid id, PositionWriteCommand command, CancellationToken token) => WriteAsync(id, command, token);
+    public async Task<bool> DeleteAsync(Guid id,CancellationToken token)
+    {
+        var client=await clientFactory.CreateAsync();var metadata=await DataverseMetadataResolver.TableAsync(client,Table,token);
+        using var response=await client.DeleteAsync($"{metadata.EntitySetName}({id:D})",token);
+        if(response.StatusCode==HttpStatusCode.NotFound)return false;
+        await EnsureAsync(response,token);return true;
+    }
 
     private async Task<PositionWriteResult> WriteAsync(Guid? id, PositionWriteCommand command, CancellationToken token)
     {
@@ -74,7 +81,7 @@ internal sealed class DataverseOrganizationPositionStore(IDataverseDelegatedClie
     private static DateTimeOffset? Date(JsonElement item, string field) => DateTimeOffset.TryParse(String(item, field), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var value) ? value : null;
     private static string Escape(string value) => value.Replace("'", "''", StringComparison.Ordinal);
     private static Guid CreatedId(HttpResponseMessage response) { var uri=response.Headers.TryGetValues("OData-EntityId",out var values)?values.SingleOrDefault():null; var match=System.Text.RegularExpressions.Regex.Match(uri??"",@"\(([0-9a-f-]{36})\)$"); return match.Success?Guid.Parse(match.Groups[1].Value):throw new InvalidOperationException("Dataverse no devolvió el GUID del cargo."); }
-    private static async Task EnsureAsync(HttpResponseMessage response, CancellationToken token) { if (!response.IsSuccessStatusCode) throw new InvalidOperationException($"Dataverse rechazó el cargo ({(int)response.StatusCode}): {await response.Content.ReadAsStringAsync(token)}"); }
+    private static async Task EnsureAsync(HttpResponseMessage response, CancellationToken token) { if (!response.IsSuccessStatusCode){var detail=await response.Content.ReadAsStringAsync(token);throw new InvalidOperationException(response.RequestMessage?.Method==HttpMethod.Delete?$"El cargo no puede eliminarse porque está asociado a una o más asignaciones organizacionales. Retira primero esas relaciones o inactiva el cargo. Detalle técnico: {detail[..Math.Min(detail.Length,180)]}":$"Dataverse rechazó el cargo ({(int)response.StatusCode}): {detail}");} }
     private sealed record Fields(string Id,string Code,string Name,string Description)
     {
         public string Select => string.Join(',',Id,Code,Name,Description,"statecode","createdon","modifiedon","_createdby_value","_modifiedby_value");

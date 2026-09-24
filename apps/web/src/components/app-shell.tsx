@@ -36,7 +36,7 @@ const navigation = [
   ] },
   { label: "Helpdesk", icon: Headphones, permission: "HD.SOLICITUDES.VER|HD.CATALOGOS.VER", children: [
     { href: "/helpdesk/solicitudes", aliases: [], label: "Solicitudes", permission: "HD.SOLICITUDES.VER" },
-    { href: "/helpdesk/catalogos", aliases: ["/helpdesk/catalogos/formulario"], label: "Configuración", permission: "HD.CATALOGOS.VER" },
+    { href: "/helpdesk/servicios-y-flujos", aliases: ["/helpdesk/servicios-y-flujos/formulario", "/helpdesk/catalogos"], label: "Servicios y flujos", permission: "HD.CATALOGOS.VER" },
   ] },
   { href: "/capacitaciones/catalogo", label: "Capacitaciones", icon: GraduationCap, permission: "CAP.CATALOGO.VER" },
   { label: "Seguridad", icon: Settings, permission: "TI.USUARIOS.VER|TI.ROLES.VER|TI.MODULOS.VER", children: [

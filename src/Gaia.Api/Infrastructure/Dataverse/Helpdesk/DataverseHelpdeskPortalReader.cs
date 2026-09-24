@@ -1,18 +1,31 @@
 using System.Text.Json;
 using Gaia.Modules.Helpdesk;
+using Gaia.Modules.Organization;
 
 namespace Gaia.Api.Infrastructure.Dataverse.Helpdesk;
 
-internal sealed class DataverseHelpdeskPortalReader(IDataverseDelegatedClientFactory clients) : IHelpdeskPortalReader
+internal sealed class DataverseHelpdeskPortalReader(IDataverseDelegatedClientFactory clients,IOrganizationUnitReader unitReader) : IHelpdeskPortalReader
 {
-    public async Task<HelpdeskPortalSnapshot> ReadAsync(Guid actorId, CancellationToken token)
+    public async Task<HelpdeskPortalCatalog> ReadCatalogAsync(CancellationToken token)
     {
         var client = await clients.CreateAsync();
         var service = await DataverseMetadataResolver.TableAsync(client, "gaia_servicio", token);
+        var organization = await DataverseMetadataResolver.TableAsync(client, "gaia_organizacion", token);
+        var units = await unitReader.ListAsync(new(null,true,null),token);
+        var (areas, services) = await ReadServices(client, service, organization, units, token);
+        return new(
+            areas.OrderBy(x => x.Order).ThenBy(x => x.ShortName).ToArray(),
+            services.OrderBy(x => x.Order).ThenBy(x => x.Name).ToArray());
+    }
+
+    public async Task<HelpdeskPortalSnapshot> ReadAsync(Guid actorId, CancellationToken token)
+    {
+        var client = await clients.CreateAsync();
         var request = await DataverseMetadataResolver.TableAsync(client, "gaia_solicitud", token);
         var state = await DataverseMetadataResolver.TableAsync(client, "gaia_estadosolicitud", token);
 
-        var services = await ReadServices(client, service, token);
+        var catalog = await ReadCatalogAsync(token);
+        var services = catalog.Services;
         var states = await ReadStates(client, state, token);
         var requests = await ReadRequests(client, request, services.ToDictionary(x => x.Id), states, actorId, token);
         var recentThreshold = DateTimeOffset.UtcNow.AddDays(-30);
@@ -20,22 +33,32 @@ internal sealed class DataverseHelpdeskPortalReader(IDataverseDelegatedClientFac
             requests.Count(x => !x.IsFinal),
             requests.Count(x => !x.IsFinal && !string.Equals(x.Status, "Nuevo", StringComparison.OrdinalIgnoreCase)),
             requests.Count(x => x.IsFinal && x.SubmittedAt >= recentThreshold),
-            services.OrderBy(x => x.Order).ThenBy(x => x.Name).ToArray(),
+            catalog.Areas,
+            catalog.Services,
             requests.OrderByDescending(x => x.SubmittedAt).ToArray());
     }
 
-    private static async Task<List<HelpdeskPortalService>> ReadServices(HttpClient client, DataverseTableMetadata table,
-        CancellationToken token)
+    private static async Task<(List<HelpdeskPortalArea> Areas, List<HelpdeskPortalService> Services)> ReadServices(
+        HttpClient client, DataverseTableMetadata table, DataverseTableMetadata organization,
+        IReadOnlyList<UnitResponse> units, CancellationToken token)
     {
         var code = table.Attribute("gaia_Codigo"); var description = table.Attribute("gaia_Descripcion");
         var instructions = table.Attribute("gaia_Instrucciones"); var visible = table.Attribute("gaia_VisibleAlSolicitante");
         var allows = table.Attribute("gaia_PermiteAdjuntos"); var maximum = table.Attribute("gaia_MaximoAdjuntos");
         var maximumMb = table.Attribute("gaia_TamanoMaximoMB"); var order = table.Attribute("gaia_Orden");
+        var unit = table.Relationship("gaia_UnidadResponsable", organization.LogicalName);
         var rows = await DataverseJson.ReadAllAsync(client,
-            $"{table.EntitySetName}?$select={table.PrimaryIdAttribute},{table.PrimaryNameAttribute},{code},{description},{instructions},{allows},{maximum},{maximumMb},{order}&$filter=statecode eq 0 and {visible} eq true", token);
-        return rows.Select(row => new HelpdeskPortalService(GuidValue(row, table.PrimaryIdAttribute), Text(row, code) ?? "",
-            Text(row, table.PrimaryNameAttribute) ?? "Servicio", Text(row, description), Text(row, instructions),
-            Bool(row, allows), Int(row, maximum), Int(row, maximumMb), Int(row, order))).ToList();
+            $"{table.EntitySetName}?$select={table.PrimaryIdAttribute},{table.PrimaryNameAttribute},{code},{description},{instructions},{allows},{maximum},{maximumMb},{order},_{unit.ReferencingAttribute}_value&$filter=statecode eq 0 and {visible} eq true", token);
+        var areas = units.Where(item=>item.IsActive).Select(item => new HelpdeskPortalArea(item.Id,item.Name,
+            string.IsNullOrWhiteSpace(item.ShortName)?item.Name:item.ShortName,item.VisualOrder)).ToDictionary(area => area.Id);
+        var services = rows.Select(row => (Row: row, AreaId: OptionalGuid(row, $"_{unit.ReferencingAttribute}_value")))
+            .Where(item => item.AreaId.HasValue && areas.ContainsKey(item.AreaId.Value))
+            .Select(item => new HelpdeskPortalService(GuidValue(item.Row, table.PrimaryIdAttribute), item.AreaId!.Value,
+                Text(item.Row, code) ?? "", Text(item.Row, table.PrimaryNameAttribute) ?? "Servicio", Text(item.Row, description),
+                Text(item.Row, instructions), Bool(item.Row, allows), Int(item.Row, maximum), Int(item.Row, maximumMb), Int(item.Row, order)))
+            .ToList();
+        var usedAreas = services.Select(item => item.AreaId).ToHashSet();
+        return (areas.Values.Where(area => usedAreas.Contains(area.Id)).ToList(), services);
     }
 
     private static async Task<Dictionary<Guid, StateInfo>> ReadStates(HttpClient client, DataverseTableMetadata table,

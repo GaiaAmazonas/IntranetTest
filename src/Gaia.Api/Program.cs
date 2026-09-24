@@ -49,6 +49,7 @@ builder.Services.AddScoped<IDataverseDelegatedClientFactory, DataverseDelegatedC
 builder.Services.AddScoped<IOrganizationUnitReader, DataverseOrganizationUnitReader>();
 builder.Services.AddScoped<IOrganizationUnitCreator, DataverseOrganizationUnitCreator>();
 builder.Services.AddScoped<IOrganizationUnitUpdater, DataverseOrganizationUnitUpdater>();
+builder.Services.AddScoped<IOrganizationUnitDeleter, DataverseOrganizationUnitDeleter>();
 builder.Services.AddScoped<IOrganizationUnitTypeReader, DataverseOrganizationUnitTypeReader>();
 builder.Services.AddScoped<IOrganizationUnitTypeCreator, DataverseOrganizationUnitTypeCreator>();
 builder.Services.AddScoped<IOrganizationUnitTypeUpdater, DataverseOrganizationUnitTypeUpdater>();
@@ -80,6 +81,10 @@ builder.Services.AddScoped<IHelpdeskAttachmentStore, DataverseHelpdeskAttachment
 builder.Services.AddScoped<IHelpdeskAttachmentPolicyStore, DataverseHelpdeskAttachmentPolicyStore>();
 builder.Services.AddScoped<IHelpdeskHistoryStore, DataverseHelpdeskHistoryStore>();
 builder.Services.AddScoped<IHelpdeskPortalReader, DataverseHelpdeskPortalReader>();
+builder.Services.AddScoped<DataverseHelpdeskWorkflowDefinitionReader>();
+builder.Services.AddScoped<DataverseHelpdeskWorkflowExecutionWriter>();
+builder.Services.AddScoped<IHelpdeskWorkflowStore>(provider=>provider.GetRequiredService<DataverseHelpdeskWorkflowExecutionWriter>());
+builder.Services.AddScoped<HelpdeskWorkflowApplication>();
 builder.Services.AddScoped<IHelpdeskRequestStore, DataverseHelpdeskRequestStore>();
 builder.Services.AddScoped<IHelpdeskFormReader, DataverseHelpdeskFormReader>();
 builder.Services.AddScoped<IHelpdeskRequestApplication, HelpdeskRequestApplication>();

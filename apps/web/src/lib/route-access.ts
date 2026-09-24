@@ -14,6 +14,7 @@ export const routeAccessRules: RouteAccessRule[] = [
   { prefix: "/intranet", requirements: ["INTRANET.VER", "INT.INICIO.VER"], exact: true },
   { prefix: "/admincore", requirements: ["INT.APP.ADMINCORE.VER", "INICIO.VER"] },
   { prefix: "/helpdesk/solicitudes", requirements: ["INT.APP.ADMINCORE.VER", "HD.SOLICITUDES.VER"] },
+  { prefix: "/helpdesk/servicios-y-flujos", requirements: ["INT.APP.ADMINCORE.VER", "HD.CATALOGOS.VER"] },
   { prefix: "/helpdesk/catalogos", requirements: ["INT.APP.ADMINCORE.VER", "HD.CATALOGOS.VER"] },
   { prefix: "/capacitaciones/catalogo", requirements: ["INT.APP.ADMINCORE.VER", "CAP.CATALOGO.VER"] },
   { prefix: "/capacitaciones/contenido", requirements: ["INT.APP.ADMINCORE.VER", "CAP.CONTENIDO.VER"] },

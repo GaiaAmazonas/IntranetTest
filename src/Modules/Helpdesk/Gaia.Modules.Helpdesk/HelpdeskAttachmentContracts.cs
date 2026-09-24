@@ -18,8 +18,10 @@ public static class HelpdeskAttachmentRules
         if (value.File.Id.Provider != "SharePoint" || string.IsNullOrWhiteSpace(value.File.Sha256)
             || value.File.Sha256.Length != 64 || value.File.UploadedAt is null)
             throw new ArgumentException("Los metadatos técnicos del archivo están incompletos.");
-        if ((value.CommentId.HasValue ? 1 : 0) + (value.FieldResponseId.HasValue ? 1 : 0) > 1)
+        if ((value.CommentId.HasValue ? 1 : 0) + (value.FieldResponseId.HasValue ? 1 : 0) + (value.ManagementFieldResponseId.HasValue ? 1 : 0) > 1)
             throw new ArgumentException("Un adjunto no puede pertenecer simultáneamente a un comentario y a una respuesta de campo.");
+        if(value.ManagementFieldResponseId.HasValue&&!value.ManagementId.HasValue)
+            throw new ArgumentException("La respuesta de campo de gestión requiere identificar la gestión.");
     }
 }
 
@@ -30,7 +32,9 @@ public sealed record PersistHelpdeskAttachment(
     Guid? FieldResponseId,
     Guid UploadedByThirdPartyId,
     AttachmentVisibility Visibility,
-    StoredFile File);
+    StoredFile File,
+    Guid? ManagementId = null,
+    Guid? ManagementFieldResponseId = null);
 
 public sealed record HelpdeskAttachment(
     Guid Id,
@@ -40,7 +44,9 @@ public sealed record HelpdeskAttachment(
     Guid UploadedByThirdPartyId,
     AttachmentVisibility Visibility,
     StoredFile File,
-    bool IsActive);
+    bool IsActive,
+    Guid? ManagementId = null,
+    Guid? ManagementFieldResponseId = null);
 
 /// <summary>Persists only file metadata. Binary content never belongs in Dataverse.</summary>
 public interface IHelpdeskAttachmentStore

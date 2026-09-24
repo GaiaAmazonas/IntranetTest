@@ -8,7 +8,7 @@ import { useFeedback } from "@/components/feedback";
 import { useSecurity } from "@/components/security-context";
 import { exportOrganizationUnits } from "@/lib/exports/organization-units-export";
 import { OrganizationalAssignmentsExplorer } from "@/features/organization/organizational-assignments-explorer";
-import { Check, ChevronDown, ChevronRight, Download, FileSpreadsheet, LoaderCircle, Pencil, Plus, Search } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Download, FileSpreadsheet, LoaderCircle, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import Image from "next/image";
 
 const apiUrl = process.env.NEXT_PUBLIC_GAIA_API_URL ?? "https://localhost:7168";
@@ -317,6 +317,14 @@ export default function OrganizationPage() {
     }
   }
 
+  async function deleteRecord(kind:"units"|"positions",id:string,name:string) {
+    if(!window.confirm(`¿Eliminar definitivamente ${name}? Esta acción solo se completará si no existen registros relacionados.`))return;
+    setSaving(true);setError("");
+    try{await apiRequest(`/api/organization/${kind}/${id}`,{method:"DELETE"});notify({tone:"success",title:kind==="units"?"Unidad eliminada":"Cargo eliminado"});await loadData();}
+    catch(caught){setError(caught instanceof Error?caught.message:"No fue posible eliminar el registro.");}
+    finally{setSaving(false);}
+  }
+
   async function exportUnits() {
     if (exportingUnits) return;
     setExportingUnits(true);
@@ -455,7 +463,7 @@ export default function OrganizationPage() {
                           <Status active={unit.isActive} />
                         </td>
                         <td className="px-3 py-4 text-right">
-                          <IconButton label={`Editar ${unit.name}`} onClick={() => startUnit(unit)}><Pencil size={16} /></IconButton>
+                          <span className="inline-flex gap-1"><IconButton label={`Editar ${unit.name}`} onClick={() => startUnit(unit)}><Pencil size={16} /></IconButton>{can("ORG.UNIDADES.ACTUALIZAR")&&<IconButton label={`Eliminar ${unit.name}`} onClick={()=>void deleteRecord("units",unit.id,unit.name)}><Trash2 size={16}/></IconButton>}</span>
                         </td>
                       </tr>
                     );})}
@@ -491,7 +499,7 @@ export default function OrganizationPage() {
                   </div>
                   <div className="flex items-center gap-4">
                     <Status active={position.isActive} />
-                    <IconButton label={`Editar ${position.name}`} onClick={() => startPosition(position)}><Pencil size={16} /></IconButton>
+                    <span className="inline-flex gap-1"><IconButton label={`Editar ${position.name}`} onClick={() => startPosition(position)}><Pencil size={16} /></IconButton>{can("ORG.CARGOS.ACTUALIZAR")&&<IconButton label={`Eliminar ${position.name}`} onClick={()=>void deleteRecord("positions",position.id,position.name)}><Trash2 size={16}/></IconButton>}</span>
                   </div>
                 </article>
               ))}

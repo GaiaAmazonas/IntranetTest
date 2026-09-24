@@ -32,11 +32,15 @@ internal static class OrganizationEndpoints
             .RequireAuthorization(AdminCorePermissions.OrgUnidadesCrear);
         group.MapPut("/units/{id:guid}", UpdateUnitAsync)
             .RequireAuthorization(AdminCorePermissions.OrgUnidadesActualizar);
+        group.MapDelete("/units/{id:guid}", DeleteUnitAsync)
+            .RequireAuthorization(AdminCorePermissions.OrgUnidadesActualizar);
 
         group.MapGet("/positions", ListPositionsAsync).RequireAuthorization(AdminCorePermissions.OrgCargosVer);
         group.MapPost("/positions", CreatePositionAsync)
             .RequireAuthorization(AdminCorePermissions.OrgCargosCrear);
         group.MapPut("/positions/{id:guid}", UpdatePositionAsync)
+            .RequireAuthorization(AdminCorePermissions.OrgCargosActualizar);
+        group.MapDelete("/positions/{id:guid}", DeletePositionAsync)
             .RequireAuthorization(AdminCorePermissions.OrgCargosActualizar);
     }
 
@@ -240,6 +244,18 @@ internal static class OrganizationEndpoints
         IOrganizationPositionStore store,
         CancellationToken cancellationToken) =>
         Results.Ok(await store.ListAsync(cancellationToken));
+
+    private static async Task<IResult> DeleteUnitAsync(Guid id,IOrganizationUnitDeleter deleter,CancellationToken token)
+    {
+        try{return await deleter.DeleteAsync(id,token)?Results.NoContent():Results.NotFound();}
+        catch(InvalidOperationException exception){return Results.Problem(exception.Message,statusCode:409,title:"No se puede eliminar la unidad");}
+    }
+
+    private static async Task<IResult> DeletePositionAsync(Guid id,IOrganizationPositionStore store,CancellationToken token)
+    {
+        try{return await store.DeleteAsync(id,token)?Results.NoContent():Results.NotFound();}
+        catch(InvalidOperationException exception){return Results.Problem(exception.Message,statusCode:409,title:"No se puede eliminar el cargo");}
+    }
 
     private static async Task<IResult> CreatePositionAsync(
         [FromBody] PositionRequest request,

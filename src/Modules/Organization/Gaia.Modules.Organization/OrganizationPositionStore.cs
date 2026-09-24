@@ -5,6 +5,12 @@ public interface IOrganizationPositionStore
     Task<IReadOnlyList<PositionResponse>> ListAsync(CancellationToken cancellationToken);
     Task<PositionWriteResult> CreateAsync(PositionWriteCommand command, CancellationToken cancellationToken);
     Task<PositionWriteResult> UpdateAsync(Guid id, PositionWriteCommand command, CancellationToken cancellationToken);
+    Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken);
+}
+
+public interface IOrganizationUnitDeleter
+{
+    Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken);
 }
 
 public sealed record PositionResponse(

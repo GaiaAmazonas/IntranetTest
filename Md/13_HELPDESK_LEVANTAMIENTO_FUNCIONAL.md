@@ -1,5 +1,7 @@
 # Helpdesk — levantamiento funcional previo a implementación
 
+> **Documento histórico.** Conserva el levantamiento previo, pero Helpdesk ya está implementado. El estado vigente se encuentra en `Md/modulos/helpdesk.md` y `docs/helpdesk-workflow-acceptance.md`. Las afirmaciones siguientes sobre la inexistencia del módulo no describen el código actual.
+
 ## Estado confirmado
 
 Helpdesk será el espacio de autoservicio de los colaboradores dentro de la Intranet Gaia. Debe permitir crear solicitudes, consultar las propias, atender devoluciones o correcciones y revisar su trazabilidad.

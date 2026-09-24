@@ -1,5 +1,7 @@
 # Gaia — calidad y preparación para producción
 
+> **Informe histórico fechado.** Sus hallazgos deben volver a comprobarse antes de usarlos. En particular, el repositorio actual ya no referencia Entity Framework ni Npgsql y la persistencia vigente es Dataverse. Consultar `Md/00_GOBIERNO_DOCUMENTAL_Y_ARQUITECTURA.md`.
+
 Fecha de revisión: 18 de agosto de 2026.
 
 ## Dictamen

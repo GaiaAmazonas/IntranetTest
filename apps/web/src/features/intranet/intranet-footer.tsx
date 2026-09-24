@@ -1,17 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useSecurity } from "@/components/security-context";
-import { intranetNavigation } from "./intranet-navigation";
+import type { IntranetNavigationItem } from "./intranet-navigation";
 
-export function IntranetFooter() {
-  const security = useSecurity();
+export function IntranetFooter({ navigation }: { navigation: readonly IntranetNavigationItem[] }) {
   return (
     <footer className="intranet-footer">
       <strong>Gaia Amazonas · Intranet institucional</strong>
       <nav aria-label="Enlaces de la Intranet">
-        {intranetNavigation.filter(item => security.can(item.permission)).map(item => (
-          <Link href={item.href} key={item.href}>{item.label}</Link>
+        {navigation.map(item => (
+          <Link href={item.href} key={item.id}>{item.label}</Link>
         ))}
       </nav>
       <span>

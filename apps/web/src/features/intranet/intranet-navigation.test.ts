@@ -1,25 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { intranetNavigation, isIntranetRouteActive } from "./intranet-navigation";
+import { intranetNavigationFromModules, isIntranetRouteActive } from "./intranet-navigation";
 
-describe("intranetNavigation", () => {
-  it("agrupa servicios sin cambiar rutas ni permisos", () => {
-    expect(intranetNavigation.filter(x=>x.group==="services").map(x=>x.permission)).toEqual(["INT.APLICACIONES.VER","INT.HELPDESK.VER","INT.CAPACITACIONES.VER"]);
-    expect(intranetNavigation.filter(x=>!x.group).map(x=>x.label)).toEqual(["Inicio","Personas","Calendario"]);
+const modules = [
+  { id:"people", code:"INT.PERSONAS", name:"Directorio", description:"Personas de Gaia", route:"/intranet/personas", icon:"people", order:7 },
+  { id:"home", code:"INT.INICIO", name:"Portada", description:"Inicio", route:"/intranet", icon:"home", order:6 },
+  { id:"help", code:"INT.HELPDESK", name:"Mis solicitudes", description:"Consulta tus casos", route:"/intranet/helpdesk", icon:"helpdesk", order:10 },
+  { id:"app", code:"INT.APP.ADMINCORE", name:"AdminCore", description:"Administración", route:"/admincore", icon:"admincore", order:11 },
+];
+
+describe("intranetNavigationFromModules", () => {
+  it("construye y ordena el menú usando los datos recibidos de seguridad", () => {
+    const navigation = intranetNavigationFromModules(modules);
+    expect(navigation.map(item => item.label)).toEqual(["Portada", "Directorio", "Mis solicitudes"]);
+    expect(navigation[0].exact).toBe(true);
+    expect(navigation[2].group).toBe("services");
   });
-  it("mantiene las opciones principales aprobadas", () => {
-    expect(intranetNavigation.map(item => item.label)).toEqual([
-      "Inicio",
-      "Personas",
-      "Calendario",
-      "Mis aplicaciones",
-      "Mis solicitudes de ayuda",
-      "Mis capacitaciones",
-    ]);
+
+  it("separa las aplicaciones del menú de navegación", () => {
+    expect(intranetNavigationFromModules(modules).some(item => item.code === "INT.APP.ADMINCORE")).toBe(false);
   });
 
   it("no activa Inicio en las rutas internas", () => {
-    expect(isIntranetRouteActive("/intranet", intranetNavigation[0])).toBe(true);
-    expect(isIntranetRouteActive("/intranet/personas", intranetNavigation[0])).toBe(false);
-    expect(isIntranetRouteActive("/intranet/personas/123", intranetNavigation[1])).toBe(true);
+    const navigation = intranetNavigationFromModules(modules);
+    expect(isIntranetRouteActive("/intranet", navigation[0])).toBe(true);
+    expect(isIntranetRouteActive("/intranet/personas", navigation[0])).toBe(false);
+    expect(isIntranetRouteActive("/intranet/personas/123", navigation[1])).toBe(true);
   });
 });

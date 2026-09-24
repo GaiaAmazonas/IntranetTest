@@ -6,7 +6,7 @@ Los Excel, datos personales, credenciales y configuraciones reales de una organi
 
 ## Arquitectura actual
 
-Para continuar el desarrollo en una nueva conversación, empezar por [Contexto para un nuevo chat](Md/CONTEXTO_PARA_NUEVO_CHAT.md). Incluye arquitectura verificada, seguridad, decisiones vigentes y una receta para crear módulos.
+Antes de modificar el proyecto, leer [Gobierno documental y arquitectura canónica](Md/00_GOBIERNO_DOCUMENTAL_Y_ARQUITECTURA.md). Para continuar el desarrollo en una nueva conversación, seguir después con [Contexto para un nuevo chat](Md/CONTEXTO_PARA_NUEVO_CHAT.md). Estos documentos establecen qué fuentes son vigentes y cuáles son solamente antecedentes.
 
 - Frontend: Next.js 16, React 19, TypeScript y Tailwind CSS.
 - API: ASP.NET Core sobre .NET 10.
@@ -20,7 +20,7 @@ Para continuar el desarrollo en una nueva conversación, empezar por [Contexto p
 
 - `apps/web`: frontend AdminCore e intranet.
 - `src/Gaia.Api`: API y adaptadores de Dataverse.
-- `src/Modules`: módulos de dominio y persistencia local.
+- `src/Modules`: contratos, reglas y endpoints de los módulos de dominio.
 - `tests`: pruebas automatizadas.
 - `Md`: documentación funcional y arquitectónica.
 - `apps/web/public`: recursos visuales utilizados por la aplicación.

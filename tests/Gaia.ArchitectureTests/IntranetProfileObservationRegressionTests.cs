@@ -21,6 +21,22 @@ public sealed class IntranetProfileObservationRegressionTests
         Assert.True(document.RootElement.GetProperty("isObservationReturn").GetBoolean());
     }
     [Fact]
+    public void RequesterReceivesConfiguredTransitionsOutsideObservationFlow()
+    {
+        var source=Read("src","Gaia.Api","Infrastructure","Dataverse","Helpdesk","DataverseHelpdeskConversationStore.cs");
+        Assert.Contains("if(isManager)availableTransitions.AddRange",source);
+        Assert.Contains("if(isRequester)availableTransitions.AddRange",source);
+        Assert.Contains("ReadTransitions(client,state,stateId,299540010,token)",source);
+    }
+    [Fact]
+    public void IntranetRendersRequesterStateActions()
+    {
+        var source=Read("apps","web","src","features","intranet","intranet-helpdesk.tsx");
+        Assert.Contains("function RequesterStateActions",source);
+        Assert.Contains("Cerrar solicitud",source);
+        Assert.Contains("selected?.requestsRating",source);
+    }
+    [Fact]
     public void ProfileUsesOnlyTheAuthenticatedLinkedPerson()
     {
         var source=Read("src","Modules","ThirdParties","Gaia.Modules.ThirdParties","ThirdPartiesEndpoints.cs");

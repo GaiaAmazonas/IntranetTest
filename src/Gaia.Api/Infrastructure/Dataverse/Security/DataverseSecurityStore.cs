@@ -347,16 +347,34 @@ internal sealed class DataverseSecurityStore(
             var applicationsContainerId = moduleRows
                 .Where(row => string.Equals(StringValue(row,moduleMeta.Attribute("gaia_Codigo")),"INT.APLICACIONES",StringComparison.OrdinalIgnoreCase))
                 .Select(row => (Guid?)GuidValue(row,moduleMeta.PrimaryIdAttribute)).FirstOrDefault();
+            var intranetContainerId = moduleRows
+                .Where(row => string.Equals(StringValue(row,moduleMeta.Attribute("gaia_Codigo")),"INTRANET",StringComparison.OrdinalIgnoreCase))
+                .Select(row => (Guid?)GuidValue(row,moduleMeta.PrimaryIdAttribute)).FirstOrDefault();
+            var authorizedIntranetNavigationIds = moduleRows
+                .Where(row => assignedModuleIds.Contains(GuidValue(row,moduleMeta.PrimaryIdAttribute))
+                    && (StringValue(row,moduleMeta.Attribute("gaia_Codigo"))??"").StartsWith("INT.",StringComparison.OrdinalIgnoreCase)
+                    && !(StringValue(row,moduleMeta.Attribute("gaia_Codigo"))??"").StartsWith("INT.APP.",StringComparison.OrdinalIgnoreCase))
+                .Select(row => GuidValue(row,moduleMeta.PrimaryIdAttribute))
+                .ToHashSet();
             var applicationModuleIds = moduleRows
                 .Where(row => (StringValue(row, moduleMeta.Attribute("gaia_Codigo")) ?? "").StartsWith("INT.APP.", StringComparison.OrdinalIgnoreCase)
                     || (applicationsContainerId.HasValue && OptionalGuid(row,$"_{moduleParent}_value")==applicationsContainerId.Value))
                 .Select(row => GuidValue(row, moduleMeta.PrimaryIdAttribute))
                 .ToHashSet();
+            if (intranetContainerId.HasValue && authorizedRootIds.Contains(intranetContainerId.Value))
+            {
+                foreach (var homeId in moduleRows
+                    .Where(row => string.Equals(StringValue(row,moduleMeta.Attribute("gaia_Codigo")),"INT.INICIO",StringComparison.OrdinalIgnoreCase))
+                    .Select(row => GuidValue(row,moduleMeta.PrimaryIdAttribute)))
+                    authorizedIntranetNavigationIds.Add(homeId);
+            }
             var authorizedApplicationIds = applicationModuleIds
                 .Where(assignedModuleIds.Contains)
                 .ToHashSet();
             navigationModules = moduleRows
-                .Where(row => authorizedRootIds.Contains(GuidValue(row, moduleMeta.PrimaryIdAttribute)) || authorizedApplicationIds.Contains(GuidValue(row, moduleMeta.PrimaryIdAttribute)))
+                .Where(row => authorizedRootIds.Contains(GuidValue(row, moduleMeta.PrimaryIdAttribute))
+                    || authorizedApplicationIds.Contains(GuidValue(row, moduleMeta.PrimaryIdAttribute))
+                    || authorizedIntranetNavigationIds.Contains(GuidValue(row, moduleMeta.PrimaryIdAttribute)))
                 .Where(row => effectiveActiveModuleIds.Contains(GuidValue(row, moduleMeta.PrimaryIdAttribute)))
                 .Where(row => moduleVisible is null || BoolValue(row, moduleVisible))
                 .Select(row => new SecurityNavigationModule(
@@ -370,7 +388,8 @@ internal sealed class DataverseSecurityStore(
                     StringValue(row, moduleMeta.Attribute("gaia_Icono")),
                     DataverseJson.OptionalInt32(row, moduleMeta.Attribute("gaia_Orden")) ?? 0))
                 .Where(module => !string.IsNullOrWhiteSpace(module.Route) &&
-                    (module.Code.StartsWith("INT.APP.", StringComparison.OrdinalIgnoreCase) || (module.Route != "/admincore" && module.Route != "/intranet")))
+                    (module.Code.StartsWith("INT.APP.", StringComparison.OrdinalIgnoreCase) ||
+                     (!string.Equals(module.Code, "INTRANET", StringComparison.OrdinalIgnoreCase) && module.Route != "/admincore")))
                 .OrderBy(module => module.Order)
                 .ToArray();
         }
@@ -838,7 +857,7 @@ internal sealed class DataverseSecurityStore(
         new("INT.APP.ADMINCORE","AdminCore","FUNCIONALIDAD","INT.APLICACIONES","/admincore","admincore",11,true,"Espacio de administración de la plataforma Gaia."),
         new("HD","Helpdesk","MÓDULO",null,"/helpdesk","helpdesk",60,true,"Gestión operativa y configuración de solicitudes."),
         new("HD.SOLICITUDES","Bandeja Helpdesk","SUBMÓDULO","HD","/helpdesk/solicitudes","helpdesk",61,true,"Bandeja global de solicitudes."),
-        new("HD.CATALOGOS","Configuración Helpdesk","SUBMÓDULO","HD","/helpdesk/catalogos","catalog",62,true,"Servicios, estados y formularios de Helpdesk."),
+        new("HD.CATALOGOS","Servicios y flujos","SUBMÓDULO","HD","/helpdesk/servicios-y-flujos","catalog",62,true,"Servicios, formularios y flujos de Helpdesk."),
         new("CAP","Capacitaciones","MÓDULO",null,"/capacitaciones/catalogo","training",70,true,"Diseño, publicación y seguimiento de capacitaciones."),
         new("CAP.CATALOGO","Catálogo","SUBMÓDULO","CAP","/capacitaciones/catalogo","catalog",71,true,"Categorías y capacitaciones."),
         new("CAP.CONTENIDO","Contenido y versiones","SUBMÓDULO","CAP","/capacitaciones/contenido","content",72,true,"Versiones, secciones, bloques, recursos y evaluaciones."),

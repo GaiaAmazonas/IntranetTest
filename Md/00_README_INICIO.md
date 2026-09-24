@@ -1,5 +1,7 @@
 # Especificación inicial para Codex — Intranet Gaia Amazonas
 
+> **Documento histórico.** Describe el punto de partida anterior a la implementación actual. No gobierna cambios nuevos. Consultar primero `Md/00_GOBIERNO_DOCUMENTAL_Y_ARQUITECTURA.md` y `Md/CONTEXTO_PARA_NUEVO_CHAT.md`.
+
 ## Propósito
 
 Este paquete define la base funcional, técnica y de datos para continuar el desarrollo de la intranet de Fundación Gaia Amazonas. Codex debe usar estos documentos como fuente de verdad inicial y contrastarlos con los archivos suministrados por el usuario:
