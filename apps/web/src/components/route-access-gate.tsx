@@ -11,6 +11,7 @@ import { routeRuleFor } from "@/lib/route-access";
 
 const loginTransitionMinimumMs = 300;
 const apiUrl = process.env.NEXT_PUBLIC_GAIA_API_URL ?? "https://localhost:7168";
+const loginConfigurationCacheKey = "gaia:public-login-configuration";
 
 type PublicLoginConfiguration = { platformName?: string | null; eyebrow: string; description?: string | null; lowerLeftText?: string | null; footerTitle?: string | null; footerDescription?: string | null; imageAlt?: string | null; desktopImageUrl: string; tabletImageUrl: string; mobileImageUrl: string; socialNetworks: { name: string; label: string; order: number; url: string }[] };
 
@@ -62,13 +63,17 @@ const gaiaSocialNetworks = [
 
 export function AccessState({ action, description, href, icon, notice, onAction, title }: { action?: string; description?: string; href?: string; icon?: "login" | "loading"; notice?: string; onAction?: () => void; title: string }) {
   const Icon = icon === "login" ? LogIn : LockKeyhole;
-  const [loginConfiguration, setLoginConfiguration] = useState<PublicLoginConfiguration | null>(null);
+  const [loginConfiguration, setLoginConfiguration] = useState<PublicLoginConfiguration | null>(() => {
+    if (typeof window === "undefined") return null;
+    try { return JSON.parse(window.localStorage.getItem(loginConfigurationCacheKey) ?? "null") as PublicLoginConfiguration | null; }
+    catch { return null; }
+  });
   useEffect(() => {
     if (icon !== "login") return;
     const controller = new AbortController();
     fetch(`${apiUrl}/api/public/login-configuration`, { signal: controller.signal })
       .then(async response => response.ok && response.status !== 204 ? await response.json() as PublicLoginConfiguration : null)
-      .then(value => { if (value) setLoginConfiguration(value); })
+      .then(value => { if (value) { setLoginConfiguration(value); try { window.localStorage.setItem(loginConfigurationCacheKey, JSON.stringify(value)); } catch { /* El login continúa sin caché cuando el navegador la bloquea. */ } } })
       .catch(() => undefined);
     return () => controller.abort();
   }, [icon]);

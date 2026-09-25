@@ -1,7 +1,7 @@
 "use client";
 
 import { Building2, ChevronDown, ChevronLeft, ChevronRight, Mail, MapPin, Phone, Search, Users } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { apiRequest } from "@/lib/api-client";
 import { PersonAvatar } from "@/components/person-avatar";
 
@@ -54,7 +54,13 @@ export function IntranetPeople() {
 }
 
 function peoplePath(page:number,pageSize:number,search:string,unitId:string,includeDescendants:boolean){const params=new URLSearchParams({page:String(page),pageSize:String(pageSize),search,includeDescendants:String(includeDescendants)});if(unitId)params.set("organizationUnitId",unitId);return `/api/intranet/people?${params}`;}
-function PersonCard({person}:{person:Person}){return <article className="intranet-person-card"><header className="intranet-person-identity"><PersonAvatar className="intranet-person-avatar" imageUrl={person.photoUrl} name={person.fullName} personId={person.id} size={64}/><div><h2>{title(person.fullName)}</h2><p>{person.jobTitle??"Colaborador Gaia"}</p></div></header><div className="intranet-person-team"><Building2 size={15}/><span><strong>{person.organizationUnit??"Equipo Gaia"}</strong>{person.site&&<small><MapPin size={12}/>{person.site}</small>}</span></div><footer><span>Contacto corporativo</span><div>{person.institutionalEmail&&<a aria-label={`Enviar correo a ${person.fullName}`} href={`mailto:${person.institutionalEmail}`} title={person.institutionalEmail}><Mail size={16}/><span>{person.institutionalEmail}</span></a>}{person.visiblePhone&&<a aria-label={`Llamar a ${person.fullName}`} href={`tel:${person.visiblePhone}`} title={person.visiblePhone}><Phone size={16}/><span>{person.visiblePhone}</span></a>}{!person.institutionalEmail&&!person.visiblePhone&&<small>Contacto corporativo aún no publicado</small>}</div></footer></article>}
+function PersonCard({person}:{person:Person}){
+  const isMobile=useSyncExternalStore(subscribeMobile,()=>window.matchMedia("(max-width: 760px)").matches,()=>false);
+  const[contactPreference,setContactPreference]=useState<boolean|null>(null);
+  const expanded=contactPreference??isMobile;
+  return <article className={`intranet-person-card${expanded?" is-contact-expanded":""}`}><header className="intranet-person-identity"><PersonAvatar className="intranet-person-avatar" imageUrl={person.photoUrl} name={person.fullName} personId={person.id} size={64}/><div><h2>{title(person.fullName)}</h2><p>{person.jobTitle??"Colaborador Gaia"}</p></div></header><div className="intranet-person-team"><Building2 size={15}/><span><strong>{person.organizationUnit??"Equipo Gaia"}</strong>{person.site&&<small><MapPin size={12}/>{person.site}</small>}</span></div><footer><button aria-expanded={expanded} className="intranet-person-contact-toggle" onClick={()=>setContactPreference(!expanded)} type="button"><span>Contacto corporativo</span><ChevronDown aria-hidden="true" size={16}/></button>{expanded&&<div className="intranet-person-contact-details">{person.institutionalEmail&&<a aria-label={`Enviar correo a ${person.fullName}`} href={`mailto:${person.institutionalEmail}`} title={person.institutionalEmail}><Mail size={16}/><span>{person.institutionalEmail}</span></a>}{person.visiblePhone&&<a aria-label={`Llamar a ${person.fullName}`} href={`tel:${person.visiblePhone}`} title={person.visiblePhone}><Phone size={16}/><span>{person.visiblePhone}</span></a>}{!person.institutionalEmail&&!person.visiblePhone&&<small>Contacto corporativo aún no publicado</small>}</div>}</footer></article>
+}
+function subscribeMobile(onChange:()=>void){const media=window.matchMedia("(max-width: 760px)");media.addEventListener("change",onChange);return()=>media.removeEventListener("change",onChange);}
 function toggle(current:Set<string>,id:string){const next=new Set(current);if(next.has(id))next.delete(id);else next.add(id);return next;}
 function organizationTree(units:OrganizationUnit[],collapsed:Set<string>){const ids=new Set(units.map(unit=>unit.id));const children=new Map<string,OrganizationUnit[]>();for(const unit of units){const parent=unit.parentId&&ids.has(unit.parentId)?unit.parentId:"";children.set(parent,[...(children.get(parent)??[]),unit]);}children.forEach(rows=>rows.sort((a,b)=>a.visualOrder-b.visualOrder||a.name.localeCompare(b.name,"es")));const result:{unit:OrganizationUnit;depth:number;hasChildren:boolean}[]=[];const visit=(parent:string,depth:number)=>{for(const unit of children.get(parent)??[]){const hasChildren=(children.get(unit.id)?.length??0)>0;result.push({unit,depth,hasChildren});if(hasChildren&&!collapsed.has(unit.id))visit(unit.id,depth+1);}};visit("",0);return result;}
 

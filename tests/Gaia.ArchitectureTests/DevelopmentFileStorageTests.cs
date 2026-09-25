@@ -11,14 +11,14 @@ namespace Gaia.ArchitectureTests;
 public sealed class DevelopmentFileStorageTests
 {
     [Fact]
-    public void ExplicitDevelopmentProviderWinsOverPersistedSharePointSettings()
+    public void ExplicitDevelopmentProviderWinsOverServerSharePointSettings()
     {
         var root = Path.Combine(Path.GetTempPath(), "gaia-storage-tests", Guid.NewGuid().ToString("N"));
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["FileStorage:Development:Enabled"] = "true",
             ["FileStorage:SharePoint:Enabled"] = "true",
-            ["FileStorage:SharePoint:ConfigurationSource"] = "Dataverse"
+            ["FileStorage:SharePoint:ConfigurationSource"] = "Server"
         }).Build();
         var services = new ServiceCollection();
         services.AddLogging();
@@ -26,11 +26,32 @@ public sealed class DevelopmentFileStorageTests
         services.AddSingleton<IConfiguration>(configuration);
         services.AddSingleton<IHostEnvironment>(new TestEnvironment(root));
         services.AddGaiaFileStorage(configuration, "Development");
+        Assert.Contains(services, descriptor =>
+            descriptor.ServiceType == typeof(ISharePointRepositoryReader)
+            && descriptor.ImplementationType == typeof(DataverseSharePointConfigurationReader));
         using var provider = services.BuildServiceProvider();
         using var scope = provider.CreateScope();
 
         Assert.IsType<DevelopmentFileStorage>(scope.ServiceProvider.GetRequiredService<IFileStorage>());
         Assert.IsType<DevelopmentFileStorage>(scope.ServiceProvider.GetRequiredService<IFileStorageDiagnostics>());
+    }
+
+    [Fact]
+    public void ExplicitDataverseProviderCannotBeOverriddenByDevelopmentStorage()
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["FileStorage:Development:Enabled"] = "true",
+            ["FileStorage:SharePoint:ConfigurationSource"] = "Dataverse"
+        }).Build();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddRouting();
+
+        services.AddGaiaFileStorage(configuration, "Development");
+
+        Assert.Contains(services, descriptor => descriptor.ServiceType == typeof(DataverseConfiguredFileStorage));
+        Assert.DoesNotContain(services, descriptor => descriptor.ServiceType == typeof(DevelopmentFileStorage));
     }
 
     [Fact]

@@ -22,7 +22,7 @@ function HomeContent() {
     if (!security.loading && security.user) window.location.replace("/intranet/");
   }, [security.loading, security.user]);
 
-  if (security.loading || security.user) return <AccessState icon="loading" title={security.user ? "Abriendo la Intranet Gaia…" : "Verificando tu acceso…"} />;
+  if (security.user) return <AccessState icon="loading" title="Abriendo la Intranet Gaia…" />;
 
-  return <AccessState action="Iniciar sesión" description="Ingresa con tu cuenta institucional para continuar." icon="login" notice={logoutNotice} onAction={() => startLogin(`${window.location.origin}/intranet`)} title="" />;
+  return <AccessState action={security.loading ? undefined : "Iniciar sesión"} description={security.loading ? "Estamos comprobando tu sesión mientras preparamos el acceso institucional." : "Ingresa con tu cuenta institucional para continuar."} icon="login" notice={logoutNotice} onAction={security.loading ? undefined : () => startLogin(`${window.location.origin}/intranet`)} title="" />;
 }

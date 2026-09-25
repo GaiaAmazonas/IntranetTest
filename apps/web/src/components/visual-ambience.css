@@ -14,7 +14,7 @@
 .visual-ambience-top{position:absolute;display:flex;align-items:flex-start;justify-content:space-around;background:linear-gradient(180deg,color-mix(in srgb,var(--ambience-primary),transparent 72%),transparent)}
 .visual-ambience-top::after{position:absolute;inset:0;background:linear-gradient(90deg,rgb(5 20 16 / 46%),rgb(5 20 16 / 58%) 38%,rgb(5 20 16 / 52%) 72%,rgb(5 20 16 / 42%));content:""}
 .visual-ambience-top>span{width:9px;height:9px;margin-top:9px;border-radius:50%;background:var(--ambience-accent);box-shadow:0 0 12px var(--ambience-accent)}
-.visual-ambience-top picture,.visual-ambience-top img{width:100%;height:100%;object-fit:cover;object-position:center}
+.visual-ambience-top picture,.visual-ambience-top img{width:100%;height:100%;object-fit:fill;object-position:center}
 .visual-ambience.is-animated .visual-ambience-top img{animation:ambience-image-drift 18s ease-in-out infinite alternate}
 .visual-ambience-message{position:fixed;right:24px;bottom:22px;display:flex;max-width:min(420px,calc(100vw - 32px));align-items:center;gap:8px;border:1px solid rgb(255 255 255 / 55%);border-radius:999px;background:color-mix(in srgb,var(--ambience-primary),#fff 14%);padding:10px 17px;color:#fff;font-size:12px;font-weight:720;box-shadow:0 10px 28px rgb(15 42 38 / 22%);pointer-events:auto}
 .visual-ambience-message:hover{box-shadow:0 14px 34px rgb(15 42 38 / 30%);transform:translateY(-2px)}
@@ -38,7 +38,7 @@ html[data-gaia-ambience-surface="intranet"] .intranet-desktop-nav>a svg{color:#f
 html[data-gaia-ambience-surface="intranet"] .intranet-brand img{filter:brightness(0) invert(1) drop-shadow(0 1px 2px rgb(0 0 0 / 28%))}
 
 @keyframes ambience-fall{from{transform:translate3d(0,-20px,0) rotate(0)}to{transform:translate3d(45px,105vh,0) rotate(300deg)}}
-@keyframes ambience-image-drift{from{transform:scale(1.01) translateX(-.4%)}to{transform:scale(1.055) translateX(.4%)}}
+@keyframes ambience-image-drift{from{transform:scaleX(1.005) translateX(-.2%)}to{transform:scaleX(1.025) translateX(.2%)}}
 @keyframes ambience-burst{0%{opacity:0;transform:rotate(var(--burst-angle)) translateX(0) scale(.25)}22%{opacity:1}100%{opacity:0;transform:rotate(var(--burst-angle)) translateX(var(--burst-distance)) scale(1.12)}}
 @media(prefers-reduced-motion:reduce){.visual-ambience-particles i,.visual-ambience-top img,.visual-ambience-burst i{animation:none!important}.visual-ambience-message{transition:none!important}}
 @media(max-width:760px){.visual-ambience-message{right:16px;bottom:14px}html[data-gaia-ambience-surface="admincore"] .visual-ambience-top{top:0;left:0;height:var(--gaia-topbar-height)}html[data-gaia-ambience-surface="intranet"] .visual-ambience-top{top:0;left:0;height:68px}html[data-gaia-ambience-surface="intranet"] .intranet-header{height:68px}}

@@ -7,10 +7,15 @@ internal static class FileStorageRegistration
     public static IServiceCollection AddGaiaFileStorage(this IServiceCollection services, IConfiguration configuration, string environment)
     {
         var source = configuration["FileStorage:SharePoint:ConfigurationSource"] ?? "Server";
-        var useDevelopmentStorage = environment.Equals("Development", StringComparison.OrdinalIgnoreCase)
+        var useDevelopmentStorage = source != "Dataverse"
+            && environment.Equals("Development", StringComparison.OrdinalIgnoreCase)
             && configuration.GetValue("FileStorage:Development:Enabled", false);
         services.AddFileStorageDiagnostics(registerServer: source != "Dataverse" && !useDevelopmentStorage);
         services.AddSingleton(TimeProvider.System);
+        // PublicLoginSnapshotStore always needs repository metadata when an administrator
+        // publishes the login experience, regardless of the storage provider used for
+        // ordinary files in the current environment.
+        services.AddScoped<ISharePointRepositoryReader, DataverseSharePointConfigurationReader>();
         if (useDevelopmentStorage)
         {
             services.AddScoped<DevelopmentFileStorage>();
@@ -27,7 +32,6 @@ internal static class FileStorageRegistration
             }).RemoveAllLoggers(); // Signed transfer URLs must never enter default HttpClient logs.
         if (source == "Dataverse")
         {
-            services.AddScoped<ISharePointRepositoryReader, DataverseSharePointConfigurationReader>();
             services.AddScoped<ISharePointConfigurationValidationRecorder, DataverseSharePointValidationRecorder>();
             services.AddScoped<DataverseConfiguredFileStorage>();
             services.AddScoped<IFileStorage>(provider => provider.GetRequiredService<DataverseConfiguredFileStorage>());

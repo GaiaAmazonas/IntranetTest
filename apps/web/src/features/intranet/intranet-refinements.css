@@ -38,6 +38,17 @@
 .intranet-home-support .intranet-home-training-action{margin-top:8px}
 .intranet-home-support .intranet-home-training:has(>.intranet-home-pager){padding-bottom:56px}
 @media(max-width:1100px) and (min-width:769px){.intranet-home-support .intranet-home-week>div{gap:5px}.intranet-home-support .intranet-home-week strong{font-size:9px}.intranet-home-support .intranet-home-week-photo{width:42px!important;height:42px!important}}
+
+/* Ajustes de composición de la portada: los controles no deben quedar bajo los accesos. */
+.intranet-event-controls{z-index:8;bottom:54px}
+.intranet-event-copy{transform:translateY(-22px)}
+.intranet-home-redesign .intranet-home-actions{height:80px;padding-block:0}
+.intranet-home-redesign .intranet-home-actions>a{height:80px;padding-top:10px;padding-bottom:10px}
+.intranet-home-support .intranet-home-week>div{grid-template-columns:repeat(3,minmax(0,1fr));width:100%;justify-items:center;gap:16px}
+.intranet-home-support .intranet-home-week>div>span{width:100%;justify-items:center}
+.intranet-home-support .intranet-home-week .intranet-home-pager{justify-self:center;margin-top:10px}
+.intranet-directory-layout .intranet-person-team{grid-template-columns:30px minmax(0,1fr);gap:9px}
+@media(max-width:768px){.intranet-event-controls{bottom:42px}.intranet-event-copy{transform:translateY(-12px)}.intranet-home-redesign .intranet-home-actions{height:auto;margin:16px auto 0;padding:7px}.intranet-home-redesign .intranet-home-actions>a{height:64px;padding-top:10px;padding-bottom:10px}.intranet-home-redesign .intranet-home-primary>.intranet-agenda{height:auto;min-height:0}.intranet-home-primary .intranet-home-birthdays.has-celebrations>.intranet-home-celebration-icon{position:absolute;top:11px;right:11px;z-index:3}.intranet-home-support .intranet-home-week>header{display:grid;grid-template-columns:minmax(0,1fr) 52px;align-items:start}.intranet-home-support .intranet-home-week>header>span{min-width:0}.intranet-home-support .intranet-home-week>header h2{font-size:18px;line-height:1.2;white-space:nowrap}.intranet-home-support .intranet-home-week>header>a{max-width:52px;justify-content:flex-end;line-height:1.3;text-align:right;white-space:normal}.intranet-home-support .intranet-home-week>div{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.intranet-home-redesign .intranet-home-support>.intranet-home-apps,.intranet-home-redesign .intranet-home-support>.intranet-home-training{height:auto;min-height:0;padding-bottom:20px}.intranet-home-redesign .intranet-home-apps>.intranet-home-pager{position:static;margin-top:14px}}
 /* Mi espacio: panel de navegación, no acciones sin implementar. */
 .intranet-desktop-nav .intranet-service-nav{margin-left:12px;padding-left:16px;border-left:1px solid var(--gaia-line)}
 .intranet-service-nav>button{position:relative;border-radius:28px;padding:12px 18px;min-height:46px;font-size:13px;transition:background 160ms ease,border-color 160ms ease}
