@@ -8,7 +8,7 @@ public sealed record HelpdeskQueueItem(Guid Id,string Number,string Subject,stri
     DateOnly? DueDate,bool IsOverdue);
 public sealed record HelpdeskQueuePage(int Total,int Page,int PageSize,IReadOnlyList<HelpdeskQueueItem> Items,
     bool HasNextPage=false,int? TotalCount=null,string? ContinuationToken=null);
-public sealed record HelpdeskManagementOption(Guid Id,string Name,string? Code=null);
+public sealed record HelpdeskManagementOption(Guid Id,string Name,string? Code=null,IReadOnlyList<Guid>? UnitIds=null);
 public sealed record HelpdeskManagementCatalog(IReadOnlyList<HelpdeskManagementOption> Services,
     IReadOnlyList<HelpdeskManagementOption> States,IReadOnlyList<HelpdeskManagementOption> Responsibles,
     IReadOnlyList<HelpdeskManagementOption> Units);

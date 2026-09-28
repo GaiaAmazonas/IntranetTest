@@ -15,7 +15,8 @@ internal sealed partial class DataverseHelpdeskManagementStore(IDataverseDelegat
     public async Task<HelpdeskManagementCatalog> ReadCatalogAsync(CancellationToken token)
     {
         var client=await clients.CreateAsync();var service=await DataverseMetadataResolver.TableAsync(client,"gaia_servicio",token);var state=await DataverseMetadataResolver.TableAsync(client,"gaia_estadosolicitud",token);var third=await DataverseMetadataResolver.TableAsync(client,"gaia_terceros",token);var unit=await DataverseMetadataResolver.TableAsync(client,"gaia_organizacion",token);
-        return new((await Options(client,service,"gaia_Codigo",token)).Values.OrderBy(x=>x.Name).ToArray(),(await Options(client,state,"gaia_Codigo",token)).Values.OrderBy(x=>x.Name).ToArray(),(await Options(client,third,null,token)).Values.OrderBy(x=>x.Name).ToArray(),(await Options(client,unit,null,token)).Values.OrderBy(x=>x.Name).ToArray());
+        var people=(await Options(client,third,null,token)).Values;var currentDate=DateOnly.FromDateTime(DateTime.UtcNow);var assignments=(await assignmentStore.ListAsync(token)).Where(x=>x.IsActive&&(!x.StartDate.HasValue||x.StartDate<=currentDate)&&(!x.EndDate.HasValue||x.EndDate>=currentDate)).ToArray();var responsibles=people.Select(person=>person with{UnitIds=assignments.Where(x=>x.ThirdPartyId==person.Id).Select(x=>x.OrganizationalUnitId).Distinct().ToArray()}).OrderBy(x=>x.Name).ToArray();
+        return new((await Options(client,service,"gaia_Codigo",token)).Values.OrderBy(x=>x.Name).ToArray(),(await Options(client,state,"gaia_Codigo",token)).Values.OrderBy(x=>x.Name).ToArray(),responsibles,(await Options(client,unit,null,token)).Values.OrderBy(x=>x.Name).ToArray());
     }
 
     public async Task ReassignAsync(Guid requestId,Guid actorId,ReassignHelpdeskRequest change,DateTimeOffset now,CancellationToken token)

@@ -63,19 +63,24 @@ const gaiaSocialNetworks = [
 
 export function AccessState({ action, description, href, icon, notice, onAction, title }: { action?: string; description?: string; href?: string; icon?: "login" | "loading"; notice?: string; onAction?: () => void; title: string }) {
   const Icon = icon === "login" ? LogIn : LockKeyhole;
-  const [loginConfiguration, setLoginConfiguration] = useState<PublicLoginConfiguration | null>(() => {
-    if (typeof window === "undefined") return null;
-    try { return JSON.parse(window.localStorage.getItem(loginConfigurationCacheKey) ?? "null") as PublicLoginConfiguration | null; }
-    catch { return null; }
-  });
+  // Keep the server render and the browser's first render identical. Reading
+  // localStorage in the state initializer made the browser render <picture>
+  // while SSR rendered the fallback <Image>, which caused hydration to fail.
+  const [loginConfiguration, setLoginConfiguration] = useState<PublicLoginConfiguration | null>(null);
   useEffect(() => {
     if (icon !== "login") return;
+    const cacheTimer = window.setTimeout(() => {
+      try {
+        const cached = JSON.parse(window.localStorage.getItem(loginConfigurationCacheKey) ?? "null") as PublicLoginConfiguration | null;
+        if (cached) setLoginConfiguration(cached);
+      } catch { /* El login continúa con la imagen base si la caché no es válida. */ }
+    }, 0);
     const controller = new AbortController();
     fetch(`${apiUrl}/api/public/login-configuration`, { signal: controller.signal })
       .then(async response => response.ok && response.status !== 204 ? await response.json() as PublicLoginConfiguration : null)
       .then(value => { if (value) { setLoginConfiguration(value); try { window.localStorage.setItem(loginConfigurationCacheKey, JSON.stringify(value)); } catch { /* El login continúa sin caché cuando el navegador la bloquea. */ } } })
       .catch(() => undefined);
-    return () => controller.abort();
+    return () => { window.clearTimeout(cacheTimer); controller.abort(); };
   }, [icon]);
   if (icon === "loading") {
     return <main className="gaia-access-loading"><div className="gaia-access-loading-brand"><Image alt="Gaia Amazonas" height={54} priority src="/brand/logo-gaia.svg" width={98} /><span>ECOSISTEMA DIGITAL GAIA</span></div><div className="gaia-access-loading-orbit"><i /><i /><i /><span><ShieldCheck size={26} /></span></div><h1>{title}</h1><p>Estamos preparando tu espacio institucional.</p><div className="gaia-access-loading-progress"><span /></div></main>;

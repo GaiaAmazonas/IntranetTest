@@ -25,6 +25,12 @@ internal sealed class DataverseSharePointConfigurationReader(IDataverseDelegated
     private static readonly Action<ILogger, Guid, string, string, string, string, Exception?> LogCandidate =
         LoggerMessage.Define<Guid, string, string, string, string>(LogLevel.Warning, new EventId(4301, "SharePointConfigurationCandidate"),
             "SharePoint configuration candidate {Id}: state={State}, environment={Environment}, provider={Provider}, default={Default}");
+    private static readonly Action<ILogger, int, Exception?> LogQueryRejected =
+        LoggerMessage.Define<int>(LogLevel.Warning, new EventId(4304, "SharePointConfigurationQueryRejected"),
+            "Dataverse rejected the SharePoint configuration query with HTTP {StatusCode}.");
+    private static readonly Action<ILogger, int, Exception?> LogQueryResult =
+        LoggerMessage.Define<int>(LogLevel.Information, new EventId(4305, "SharePointConfigurationQueryResult"),
+            "Dataverse returned {RowCount} matching SharePoint configuration row(s).");
 
     internal static int EnvironmentValue(string name) => name switch
     {
@@ -61,11 +67,18 @@ internal sealed class DataverseSharePointConfigurationReader(IDataverseDelegated
                 && (client.BaseAddress is null || !client.BaseAddress.IsBaseOf(uri)))
                 throw new FileStorageException(FileStorageError.FileUnauthorized);
             using var response = await client.GetAsync(next, token);
-            if (!response.IsSuccessStatusCode) throw new FileStorageException(FileStorageError.MissingConfiguration);
+            if (!response.IsSuccessStatusCode)
+            {
+                LogQueryRejected(logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<DataverseSharePointConfigurationReader>.Instance,
+                    (int)response.StatusCode, null);
+                throw new FileStorageException(FileStorageError.MissingConfiguration);
+            }
             using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(token));
             rows.AddRange(document.RootElement.GetProperty("value").EnumerateArray().Take(2 - rows.Count).Select(row => row.Clone()));
             next = document.RootElement.TryGetProperty("@odata.nextLink", out var link) ? link.GetString() : null;
         }
+        LogQueryResult(logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<DataverseSharePointConfigurationReader>.Instance,
+            rows.Count, null);
         if (rows.Count != 1)
         {
             var diagnosticFields = DiagnosticFields

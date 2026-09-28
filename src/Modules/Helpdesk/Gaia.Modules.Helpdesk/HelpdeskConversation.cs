@@ -4,10 +4,12 @@ public sealed record HelpdeskComment(Guid Id, string Content, DateTimeOffset Pub
     bool IsMine, string AuthorRole);
 public sealed record HelpdeskTransition(Guid Id, Guid TargetStateId, string TargetState, bool RequiresComment,
     bool RequiresReason, bool RequiresSolution, bool RequestsRating, bool IsObservationReturn = false);
+public sealed record HelpdeskHistoryEvent(Guid Id,string Title,string? Detail,DateTimeOffset OccurredAt,
+    string Actor,int Movement,int Origin,bool VisibleToRequester);
 public sealed record HelpdeskRequestDetail(Guid Id, string Number, string Subject, string Description,
     string Service, string Status, string? StatusColor, DateTimeOffset? SubmittedAt, DateOnly? DueDate,
     bool AllowsRequesterComments, bool IsManager, IReadOnlyList<HelpdeskComment> Comments,
-    IReadOnlyList<HelpdeskTransition> Transitions);
+    IReadOnlyList<HelpdeskTransition> Transitions,IReadOnlyList<HelpdeskHistoryEvent>? History=null);
 public sealed record AddHelpdeskComment(string Content, bool Internal = false);
 public sealed record ApplyHelpdeskTransition(Guid TransitionId, string? Comment, string? Reason, string? Solution,
     int? Rating=null,string? RatingComment=null);

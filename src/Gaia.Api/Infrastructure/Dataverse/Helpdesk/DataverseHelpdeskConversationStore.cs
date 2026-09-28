@@ -41,7 +41,11 @@ internal sealed class DataverseHelpdeskConversationStore(IDataverseDelegatedClie
             var previous=await ReadReturnState(client,request,state,requestId,stateId,token);
             transitions=[..transitions.Where(item=>item.Id!=previous.Id),new HelpdeskTransition(previous.Id,previous.Id,previous.Name,true,false,false,false,true)];
         }
-        return new(requestId,Text(row.Value,request.PrimaryNameAttribute)??"",Text(row.Value,fields.Subject)??"",Text(row.Value,fields.Description)??"",Text(serviceRow.Value,service.PrimaryNameAttribute)??"Servicio",stateName,Text(stateRow.Value,color),Date(row.Value,fields.Submitted),DateOnlyValue(row.Value,fields.Due),isManager||requesterCanReply,isManager,comments,transitions);
+        var historyTable=await DataverseMetadataResolver.TableAsync(client,"gaia_historialsolicitud",token);var actorTable=await DataverseMetadataResolver.TableAsync(client,"gaia_terceros",token);var historyRequest=historyTable.Relationship("gaia_Solicitud","gaia_solicitud");var historyActor=historyTable.Relationship("gaia_Actor","gaia_terceros");var movement=historyTable.Attribute("gaia_TipoMovimiento");var origin=historyTable.Attribute("gaia_Origen");var detail=historyTable.Attribute("gaia_Detalle");var visible=historyTable.Attribute("gaia_VisibleAlSolicitante");var occurred=historyTable.Attribute("gaia_FechaEvento");
+        var historyFilter=$"statecode eq 0 and _{historyRequest.ReferencingAttribute}_value eq {requestId:D}"+(isManager?"":$" and {visible} eq true");
+        var historyRows=await DataverseJson.ReadAllAsync(client,$"{historyTable.EntitySetName}?$select={historyTable.PrimaryIdAttribute},{historyTable.PrimaryNameAttribute},{movement},{origin},{detail},{visible},{occurred},_{historyActor.ReferencingAttribute}_value&$expand={historyActor.NavigationProperty}($select={actorTable.PrimaryNameAttribute})&$filter={historyFilter}&$orderby={occurred} asc&$top=500",token);
+        var events=historyRows.Select(item=>new HelpdeskHistoryEvent(GuidValue(item,historyTable.PrimaryIdAttribute),Text(item,historyTable.PrimaryNameAttribute)??"Actividad registrada",Text(item,detail),Date(item,occurred)??DateTimeOffset.MinValue,Text(Nested(item,historyActor.NavigationProperty),actorTable.PrimaryNameAttribute)??"Sistema",Int(item,movement),Int(item,origin),Bool(item,visible))).ToArray();
+        return new(requestId,Text(row.Value,request.PrimaryNameAttribute)??"",Text(row.Value,fields.Subject)??"",Text(row.Value,fields.Description)??"",Text(serviceRow.Value,service.PrimaryNameAttribute)??"Servicio",stateName,Text(stateRow.Value,color),Date(row.Value,fields.Submitted),DateOnlyValue(row.Value,fields.Due),isManager||requesterCanReply,isManager,comments,transitions,events);
     }
 
     public async Task<HelpdeskComment> AddAsync(Guid requestId,Guid actorId,string content,bool internalOnly,bool managementAccess,DateTimeOffset now,CancellationToken token)
@@ -187,6 +191,7 @@ internal sealed class DataverseHelpdeskConversationStore(IDataverseDelegatedClie
     static string? Text(JsonElement x,string p)=>x.TryGetProperty(p,out var v)&&v.ValueKind==JsonValueKind.String?v.GetString():null;
     static int Int(JsonElement x,string p)=>DataverseJson.OptionalEncodedInt32(x,p)??0;
     static bool Bool(JsonElement x,string p)=>x.TryGetProperty(p,out var v)&&v.ValueKind==JsonValueKind.True;
+    static JsonElement Nested(JsonElement x,string p)=>x.TryGetProperty(p,out var v)&&v.ValueKind==JsonValueKind.Object?v:JsonSerializer.SerializeToElement(new{});
     static Guid GuidValue(JsonElement x,string lookup)=>Guid.TryParse(Text(x,lookup)??Text(x,lookup.StartsWith('_')?lookup:$"_{lookup}_value"),out var id)?id:Guid.Empty;
     static DateTimeOffset? Date(JsonElement x,string p)=>DateTimeOffset.TryParse(Text(x,p),CultureInfo.InvariantCulture,DateTimeStyles.AssumeUniversal,out var d)?d:null;
     static DateOnly? DateOnlyValue(JsonElement x,string p)=>DateOnly.TryParse(Text(x,p),out var d)?d:null;

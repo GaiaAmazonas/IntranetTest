@@ -38,11 +38,17 @@ public sealed record SaveHelpdeskWorkflowStep(string Code,int Type,int Order,boo
 public sealed record SaveHelpdeskWorkflowRoute(string Code,Guid SourceStepId,Guid TargetStepId,int RequiredResult,int Order,bool Active=true);
 public sealed record HelpdeskWorkflowManagementItem(Guid Id,Guid StepId,string StepCode,int Execution,int Status,int? Result,
     string? Observation,Guid? UnitId,Guid? ResponsibleId,DateTimeOffset? AvailableAt,DateTimeOffset? CompletedAt,
-    bool RequiresDecision,bool RequiresObservation,bool RequiresFile,bool AllowsRequesterReturn,bool Final);
+    bool RequiresDecision,bool RequiresObservation,bool RequiresFile,bool AllowsRequesterReturn,bool Final,
+    int? TargetDays,DateOnly? TargetDueDate,string? UnitName,string? ResponsibleName,string? FormTitle,IReadOnlyList<HelpdeskWorkflowAnswerItem> Answers,
+    IReadOnlyList<HelpdeskWorkflowNextAction> NextActions);
+public sealed record HelpdeskWorkflowAnswerItem(Guid FieldId,string Label,string? Value,IReadOnlyList<string> Options);
+public sealed record HelpdeskWorkflowNextAction(int Result,IReadOnlyList<HelpdeskWorkflowDestination> Destinations);
+public sealed record HelpdeskWorkflowDestination(Guid StepId,string Code,string Name,bool Final);
 public sealed record HelpdeskRequestWorkflowState(Guid InstanceId,Guid FlowId,int Version,int Status,
     IReadOnlyList<HelpdeskWorkflowManagementItem> Managements);
 public sealed record HelpdeskWorkflowQueueItem(Guid ManagementId,Guid RequestId,string RequestNumber,string Subject,
-    string StepCode,int Execution,int Status,Guid? UnitId,Guid? ResponsibleId,DateTimeOffset? AvailableAt,bool RequiresDecision);
+    string StepCode,int Execution,int Status,Guid? UnitId,string? UnitName,Guid? ResponsibleId,DateTimeOffset? AvailableAt,
+    int? TargetDays,DateOnly? TargetDueDate,bool IsOverdue,bool RequiresDecision);
 public sealed record HelpdeskStageForm(Guid Id,Guid StepId,string Title,string? Instructions,
     IReadOnlyList<HelpdeskFormField> Fields);
 public sealed record SaveHelpdeskStageForm(string Title,string? Instructions);

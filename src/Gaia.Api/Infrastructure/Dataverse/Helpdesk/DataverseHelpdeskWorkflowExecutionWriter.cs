@@ -2,12 +2,14 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Gaia.Modules.Helpdesk;
+using Gaia.Modules.ThirdParties;
 
 namespace Gaia.Api.Infrastructure.Dataverse.Helpdesk;
 
 internal sealed partial class DataverseHelpdeskWorkflowExecutionWriter(
     IDataverseDelegatedClientFactory clients,
-    DataverseHelpdeskWorkflowDefinitionReader definitions) : IHelpdeskWorkflowStore
+    DataverseHelpdeskWorkflowDefinitionReader definitions,
+    IOrganizationalAssignmentStore assignmentStore) : IHelpdeskWorkflowStore
 {
     public Task<HelpdeskWorkflowDefinition?> ReadFlowAsync(Guid flowId,CancellationToken token)=>definitions.ReadAsync(flowId,token);
     public async Task<IReadOnlyList<string>> ValidateForPublicationAsync(Guid flowId,CancellationToken token)
@@ -93,9 +95,37 @@ internal sealed partial class DataverseHelpdeskWorkflowExecutionWriter(
     {
         var client=await clients.CreateAsync();var request=await DataverseMetadataResolver.TableAsync(client,"gaia_solicitud",token);var requester=request.Relationship("gaia_Solicitante","gaia_terceros");var requestRow=await DataverseMetadataResolver.ReadOneAsync(client,$"{request.EntitySetName}({requestId:D})?$select=_{requester.ReferencingAttribute}_value,statecode",token)??throw new KeyNotFoundException("La solicitud no existe.");if(!managementAccess&&OptionalGuid(requestRow,$"_{requester.ReferencingAttribute}_value")!=actorId)throw new UnauthorizedAccessException("No puedes consultar el flujo de esta solicitud.");
         var instance=await DataverseMetadataResolver.TableAsync(client,"gaia_instanciaflujo",token);var requestRelation=instance.Relationship("gaia_Solicitud","gaia_solicitud");var flowRelation=instance.Relationship("gaia_FlujoGestion","gaia_flujogestion");var state=instance.Attribute("gaia_Estado");var rows=await DataverseJson.ReadAllAsync(client,$"{instance.EntitySetName}?$select={instance.PrimaryIdAttribute},{state},_{flowRelation.ReferencingAttribute}_value&$filter=statecode eq 0 and _{requestRelation.ReferencingAttribute}_value eq {requestId:D}&$top=2",token);if(rows.Count==0)return null;if(rows.Count>1)throw new InvalidOperationException("La solicitud tiene más de una instancia de flujo.");var instanceRow=rows[0];var instanceId=RequiredGuid(instanceRow,instance.PrimaryIdAttribute);var flowId=RequiredGuid(instanceRow,$"_{flowRelation.ReferencingAttribute}_value");var definition=await definitions.ReadAsync(flowId,token)??throw new InvalidOperationException("No fue posible leer el flujo utilizado.");
-        var management=await DataverseMetadataResolver.TableAsync(client,"gaia_gestionsolicitud",token);var managementInstance=management.Relationship("gaia_InstanciaFlujo","gaia_instanciaflujo");var managementStep=management.Relationship("gaia_PasoFlujo","gaia_pasoflujo");var unit=management.Relationship("gaia_UnidadResponsable","gaia_organizacion");var responsible=management.Relationship("gaia_Responsable","gaia_terceros");var status=management.Attribute("gaia_Estado");var result=management.Attribute("gaia_Resultado");var number=management.Attribute("gaia_NumeroEjecucion");var observation=management.Attribute("gaia_Observacion");var available=management.Attribute("gaia_FechaDisponibilidad");var completed=management.Attribute("gaia_FechaFinalizacion");
-        var managementRows=await DataverseJson.ReadAllAsync(client,$"{management.EntitySetName}?$select={management.PrimaryIdAttribute},{number},{status},{result},{observation},{available},{completed},_{managementStep.ReferencingAttribute}_value,_{unit.ReferencingAttribute}_value,_{responsible.ReferencingAttribute}_value&$filter=statecode eq 0 and _{managementInstance.ReferencingAttribute}_value eq {instanceId:D}&$orderby={number} asc",token);
-        var values=managementRows.Select(x=>{var stepId=RequiredGuid(x,$"_{managementStep.ReferencingAttribute}_value");var configured=definition.Steps.Single(s=>s.Id==stepId);return new HelpdeskWorkflowManagementItem(RequiredGuid(x,management.PrimaryIdAttribute),stepId,configured.Code,Int(x,number),Int(x,status),NullableInt(x,result),Text(x,observation),OptionalGuid(x,$"_{unit.ReferencingAttribute}_value"),OptionalGuid(x,$"_{responsible.ReferencingAttribute}_value"),DateTimeValue(x,available),DateTimeValue(x,completed),configured.RequiresDecision,configured.RequiresObservation,configured.RequiresFile,configured.AllowsRequesterReturn,configured.Final);}).ToArray();
+        var management=await DataverseMetadataResolver.TableAsync(client,"gaia_gestionsolicitud",token);var stepTable=await DataverseMetadataResolver.TableAsync(client,"gaia_pasoflujo",token);var unitTable=await DataverseMetadataResolver.TableAsync(client,"gaia_organizacion",token);var thirdTable=await DataverseMetadataResolver.TableAsync(client,"gaia_terceros",token);var managementInstance=management.Relationship("gaia_InstanciaFlujo","gaia_instanciaflujo");var managementStep=management.Relationship("gaia_PasoFlujo","gaia_pasoflujo");var unit=management.Relationship("gaia_UnidadResponsable","gaia_organizacion");var responsible=management.Relationship("gaia_Responsable","gaia_terceros");var status=management.Attribute("gaia_Estado");var result=management.Attribute("gaia_Resultado");var number=management.Attribute("gaia_NumeroEjecucion");var observation=management.Attribute("gaia_Observacion");var available=management.Attribute("gaia_FechaDisponibilidad");var completed=management.Attribute("gaia_FechaFinalizacion");
+        var managementRows=await DataverseJson.ReadAllAsync(client,$"{management.EntitySetName}?$select={management.PrimaryIdAttribute},{number},{status},{result},{observation},{available},{completed},_{managementStep.ReferencingAttribute}_value,_{unit.ReferencingAttribute}_value,_{responsible.ReferencingAttribute}_value&$expand={managementStep.NavigationProperty}($select={stepTable.PrimaryNameAttribute}),{unit.NavigationProperty}($select={unitTable.PrimaryNameAttribute}),{responsible.NavigationProperty}($select={thirdTable.PrimaryNameAttribute})&$filter=statecode eq 0 and _{managementInstance.ReferencingAttribute}_value eq {instanceId:D}&$orderby={number} asc",token);
+        var holidays=new HashSet<DateOnly>();
+        if(managementAccess&&definition.Steps.Any(step=>step.TargetDays.HasValue))
+        {
+            var starts=managementRows.Select(row=>DateTimeValue(row,available)).Where(value=>value.HasValue).Select(value=>value!.Value).ToArray();
+            if(starts.Length>0)
+            {
+                var maxDays=definition.Steps.Max(step=>step.TargetDays??0);var until=DateOnly.FromDateTime(starts.Max().UtcDateTime).AddDays(maxDays*3+14);
+                var holidayTable=await DataverseMetadataResolver.TableAsync(client,"gaia_dianolaborable",token);var holidayDate=holidayTable.Attribute("gaia_Fecha");
+                var holidayRows=await DataverseJson.ReadAllAsync(client,$"{holidayTable.EntitySetName}?$select={holidayDate}&$filter=statecode eq 0 and {holidayDate} le {until:yyyy-MM-dd}",token);
+                holidays=holidayRows.Select(row=>DateOnly.TryParse(Text(row,holidayDate),out var value)?value:(DateOnly?)null).Where(value=>value.HasValue).Select(value=>value!.Value).ToHashSet();
+            }
+        }
+        var formCache=new Dictionary<Guid,HelpdeskStageForm?>();
+        async Task<HelpdeskStageForm?> StageForm(Guid stepId){if(formCache.TryGetValue(stepId,out var cached))return cached;var loaded=await ReadStageFormAsync(stepId,token);formCache[stepId]=loaded;return loaded;}
+        var values=new List<HelpdeskWorkflowManagementItem>();
+        foreach(var row in managementRows)
+        {
+            var managementId=RequiredGuid(row,management.PrimaryIdAttribute);var stepId=RequiredGuid(row,$"_{managementStep.ReferencingAttribute}_value");var configured=definition.Steps.Single(s=>s.Id==stepId);var form=managementAccess?await StageForm(stepId):null;var answers=form is null?[]:await ReadManagementAnswers(client,managementId,form,token);var fields=form?.Fields.ToDictionary(x=>x.Id)??[];
+            var answerItems=answers.Select(answer=>{var field=fields[answer.FieldId];var optionLabels=field.Options.Where(option=>answer.OptionIds.Contains(option.Id)).OrderBy(option=>option.Order).Select(option=>option.Label).ToArray();var value=field.DataType==299540045?answer.Value switch{"true"=>"Sí","false"=>"No",_=>answer.Value}:answer.Value;return new HelpdeskWorkflowAnswerItem(field.Id,field.Label,value,optionLabels);}).ToArray();
+            var nextActions=new List<HelpdeskWorkflowNextAction>();
+            if(managementAccess)foreach(var routes in definition.Routes.Where(route=>route.Active&&route.SourceStepId==stepId).GroupBy(route=>route.RequiredResult))
+            {
+                var destinations=new List<HelpdeskWorkflowDestination>();
+                foreach(var route in routes){var target=definition.Steps.Single(step=>step.Id==route.TargetStepId);var targetForm=await StageForm(target.Id);destinations.Add(new(target.Id,target.Code,targetForm?.Title??target.Code,target.Final));}
+                nextActions.Add(new(routes.Key,destinations));
+            }
+            var availableAt=DateTimeValue(row,available);var completedAt=DateTimeValue(row,completed);var targetDueDate=managementAccess?BusinessDueDate(availableAt,configured.TargetDays,holidays):null;
+            values.Add(new HelpdeskWorkflowManagementItem(managementId,stepId,configured.Code,Int(row,number),Int(row,status),NullableInt(row,result),Text(row,observation),OptionalGuid(row,$"_{unit.ReferencingAttribute}_value"),OptionalGuid(row,$"_{responsible.ReferencingAttribute}_value"),availableAt,completedAt,configured.RequiresDecision,configured.RequiresObservation,configured.RequiresFile,configured.AllowsRequesterReturn,configured.Final,configured.TargetDays,targetDueDate,managementAccess?Text(Nested(row,unit.NavigationProperty),unitTable.PrimaryNameAttribute):null,managementAccess?Text(Nested(row,responsible.NavigationProperty),thirdTable.PrimaryNameAttribute):null,form?.Title,answerItems,nextActions));
+        }
         return new(instanceId,flowId,definition.Version,Int(instanceRow,state),values);
     }
 
@@ -105,6 +135,7 @@ internal sealed partial class DataverseHelpdeskWorkflowExecutionWriter(
         var management=await DataverseMetadataResolver.TableAsync(client,"gaia_gestionsolicitud",token);
         var request=await DataverseMetadataResolver.TableAsync(client,"gaia_solicitud",token);
         var step=await DataverseMetadataResolver.TableAsync(client,"gaia_pasoflujo",token);
+        var unitTable=await DataverseMetadataResolver.TableAsync(client,"gaia_organizacion",token);
         var requestRelation=management.Relationship("gaia_Solicitud","gaia_solicitud");
         var stepRelation=management.Relationship("gaia_PasoFlujo","gaia_pasoflujo");
         var unitRelation=management.Relationship("gaia_UnidadResponsable","gaia_organizacion");
@@ -121,16 +152,18 @@ internal sealed partial class DataverseHelpdeskWorkflowExecutionWriter(
             var units=string.Join(" or ",actorUnits.Select(id=>$"_{unitRelation.ReferencingAttribute}_value eq {id:D}"));
             access=actorUnits.Count==0?$"_{responsibleRelation.ReferencingAttribute}_value eq {actorId:D}":$"(_{responsibleRelation.ReferencingAttribute}_value eq {actorId:D} or (_{responsibleRelation.ReferencingAttribute}_value eq null and ({units})))";
         }
-        var filter=queue switch{"mine"=>$"statecode eq 0 and {active} and ({access})","unit"=>$"statecode eq 0 and {active} and _{responsibleRelation.ReferencingAttribute}_value eq null and ({string.Join(" or ",actorUnits.Select(id=>$"_{unitRelation.ReferencingAttribute}_value eq {id:D}"))})","approvals"=>$"statecode eq 0 and {active} and ({access})",_=>$"statecode eq 0 and ({access})"};
         var requestNav=requestRelation.NavigationProperty;var stepNav=stepRelation.NavigationProperty;
-        var subject=request.Attribute("gaia_Asunto");var code=step.Attribute("gaia_Codigo");var decision=step.Attribute("gaia_RequiereDecision");
-        var path=$"{management.EntitySetName}?$select={management.PrimaryIdAttribute},{execution},{status},{available},_{unitRelation.ReferencingAttribute}_value,_{responsibleRelation.ReferencingAttribute}_value&$expand={requestNav}($select={request.PrimaryIdAttribute},{request.PrimaryNameAttribute},{subject}),{stepNav}($select={step.PrimaryIdAttribute},{code},{decision})&$filter={Uri.EscapeDataString(filter)}&$orderby={available} asc&$top=200";
+        var subject=request.Attribute("gaia_Asunto");var code=step.Attribute("gaia_Codigo");var decision=step.Attribute("gaia_RequiereDecision");var targetDays=step.Attribute("gaia_DiasObjetivo");
+        var filter=queue switch{"mine"=>$"statecode eq 0 and {active} and ({access})","unit"=>$"statecode eq 0 and {active} and _{responsibleRelation.ReferencingAttribute}_value eq null and ({string.Join(" or ",actorUnits.Select(id=>$"_{unitRelation.ReferencingAttribute}_value eq {id:D}"))})","approvals"=>$"statecode eq 0 and {active} and ({access}) and {stepNav}/{decision} eq true",_=>$"statecode eq 0 and ({access})"};
+        var path=$"{management.EntitySetName}?$select={management.PrimaryIdAttribute},{execution},{status},{available},_{unitRelation.ReferencingAttribute}_value,_{responsibleRelation.ReferencingAttribute}_value&$expand={requestNav}($select={request.PrimaryIdAttribute},{request.PrimaryNameAttribute},{subject}),{stepNav}($select={step.PrimaryIdAttribute},{code},{decision},{targetDays}),{unitRelation.NavigationProperty}($select={unitTable.PrimaryNameAttribute})&$filter={Uri.EscapeDataString(filter)}&$orderby={available} asc&$top=200";
         var rows=await DataverseJson.ReadAllAsync(client,path,token);
-        return rows.Select(row=>
+        var holidays=new HashSet<DateOnly>();var starts=rows.Select(row=>DateTimeValue(row,available)).Where(value=>value.HasValue).Select(value=>value!.Value).ToArray();var targets=rows.Select(row=>NullableInt(Nested(row,stepNav),targetDays)).Where(value=>value.HasValue).Select(value=>value!.Value).ToArray();
+        if(starts.Length>0&&targets.Length>0){var until=DateOnly.FromDateTime(starts.Max().UtcDateTime).AddDays(targets.Max()*3+14);var holidayTable=await DataverseMetadataResolver.TableAsync(client,"gaia_dianolaborable",token);var holidayDate=holidayTable.Attribute("gaia_Fecha");var holidayRows=await DataverseJson.ReadAllAsync(client,$"{holidayTable.EntitySetName}?$select={holidayDate}&$filter=statecode eq 0 and {holidayDate} le {until:yyyy-MM-dd}",token);holidays=holidayRows.Select(row=>DateOnly.TryParse(Text(row,holidayDate),out var value)?value:(DateOnly?)null).Where(value=>value.HasValue).Select(value=>value!.Value).ToHashSet();}
+        var today=DateOnly.FromDateTime(DateTime.UtcNow);return rows.Select(row=>
         {
-            var requestRow=Nested(row,requestNav);var stepRow=Nested(row,stepNav);
-            return new HelpdeskWorkflowQueueItem(RequiredGuid(row,management.PrimaryIdAttribute),RequiredGuid(requestRow,request.PrimaryIdAttribute),Text(requestRow,request.PrimaryNameAttribute)??"",Text(requestRow,subject)??"",Text(stepRow,code)??"Paso",Int(row,execution),Int(row,status),OptionalGuid(row,$"_{unitRelation.ReferencingAttribute}_value"),OptionalGuid(row,$"_{responsibleRelation.ReferencingAttribute}_value"),DateTimeValue(row,available),Bool(stepRow,decision));
-        }).Where(item=>queue!="approvals"||item.RequiresDecision).ToArray();
+            var requestRow=Nested(row,requestNav);var stepRow=Nested(row,stepNav);var availableAt=DateTimeValue(row,available);var target=NullableInt(stepRow,targetDays);var due=BusinessDueDate(availableAt,target,holidays);
+            return new HelpdeskWorkflowQueueItem(RequiredGuid(row,management.PrimaryIdAttribute),RequiredGuid(requestRow,request.PrimaryIdAttribute),Text(requestRow,request.PrimaryNameAttribute)??"",Text(requestRow,subject)??"",Text(stepRow,code)??"Paso",Int(row,execution),Int(row,status),OptionalGuid(row,$"_{unitRelation.ReferencingAttribute}_value"),Text(Nested(row,unitRelation.NavigationProperty),unitTable.PrimaryNameAttribute),OptionalGuid(row,$"_{responsibleRelation.ReferencingAttribute}_value"),availableAt,target,due,due.HasValue&&due.Value<today,Bool(stepRow,decision));
+        }).Where(item=>queue!="approvals"||item.RequiresDecision).OrderByDescending(item=>item.IsOverdue).ThenBy(item=>item.TargetDueDate??DateOnly.MaxValue).ThenBy(item=>item.AvailableAt).ToArray();
     }
 
     public async Task<Guid> StartAsync(Guid requestId,Guid flowId,Guid actorId,DateTimeOffset now,CancellationToken token)
@@ -266,11 +299,16 @@ internal sealed partial class DataverseHelpdeskWorkflowExecutionWriter(
         var requestRelation=management.Relationship("gaia_Solicitud","gaia_solicitud");var responsible=management.Relationship("gaia_Responsable","gaia_terceros");var unit=management.Relationship("gaia_UnidadResponsable","gaia_organizacion");var state=management.Attribute("gaia_Estado");
         var row=await DataverseMetadataResolver.ReadOneAsync(client,$"{management.EntitySetName}({managementId:D})?$select={state},_{requestRelation.ReferencingAttribute}_value,_{responsible.ReferencingAttribute}_value,_{unit.ReferencingAttribute}_value,statecode",token)??throw new KeyNotFoundException("La gestión no existe.");
         if(Int(row,"statecode")!=0||Int(row,state) is HelpdeskWorkflowValues.ManagementCompleted or HelpdeskWorkflowValues.ManagementCancelled)throw new InvalidOperationException("La gestión ya no admite reasignación.");
-        HelpdeskWorkflowAuthorization.Demand(actorId,OptionalGuid(row,$"_{responsible.ReferencingAttribute}_value"),OptionalGuid(row,$"_{unit.ReferencingAttribute}_value"),await ActorUnits(client,actorId,token),false);
+        // El endpoint ya exige HD.SOLICITUDES.REASIGNAR. Quien tiene ese permiso puede redistribuir
+        // cualquier gestión activa visible en la bandeja general, aunque no pertenezca a su unidad.
+        HelpdeskWorkflowAuthorization.Demand(actorId,OptionalGuid(row,$"_{responsible.ReferencingAttribute}_value"),OptionalGuid(row,$"_{unit.ReferencingAttribute}_value"),await ActorUnits(client,actorId,token),true);
         if(command.ResponsibleId.HasValue)
         {
             var person=await DataverseMetadataResolver.ReadOneAsync(client,$"{third.EntitySetName}({command.ResponsibleId:D})?$select={third.PrimaryIdAttribute},statecode",token);
             if(person is null||Int(person.Value,"statecode")!=0)throw new ArgumentException("El nuevo responsable no existe o está inactivo.");
+            var unitId=OptionalGuid(row,$"_{unit.ReferencingAttribute}_value");var currentDate=DateOnly.FromDateTime(now.UtcDateTime);
+            if(unitId.HasValue&&!(await assignmentStore.ListAsync(token)).Any(item=>item.IsActive&&item.ThirdPartyId==command.ResponsibleId.Value&&item.OrganizationalUnitId==unitId.Value&&(!item.StartDate.HasValue||item.StartDate<=currentDate)&&(!item.EndDate.HasValue||item.EndDate>=currentDate)))
+                throw new ArgumentException("La persona seleccionada no tiene una asignación vigente en la unidad responsable de esta etapa.");
         }
         await Patch(client,management.EntitySetName,managementId,new Dictionary<string,object?>
         {
@@ -579,6 +617,12 @@ internal sealed partial class DataverseHelpdeskWorkflowExecutionWriter(
     private static Guid RequiredGuid(JsonElement row,string name)=>OptionalGuid(row,name)??throw new InvalidOperationException($"Dataverse no devolvió {name}.");
     private static Guid? OptionalGuid(JsonElement row,string name)=>Guid.TryParse(Text(row,name),out var id)?id:null;
     private static DateTimeOffset? DateTimeValue(JsonElement row,string name)=>DateTimeOffset.TryParse(Text(row,name),out var value)?value:null;
+    private static DateOnly? BusinessDueDate(DateTimeOffset? start,int? targetDays,HashSet<DateOnly> holidays)
+    {
+        if(!start.HasValue||!targetDays.HasValue)return null;var current=DateOnly.FromDateTime(start.Value.UtcDateTime);var remaining=targetDays.Value;
+        while(remaining>0){current=current.AddDays(1);if(current.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday||holidays.Contains(current))continue;remaining--;}
+        return current;
+    }
     private static bool Bool(JsonElement row,string name)=>row.TryGetProperty(name,out var value)&&value.ValueKind is JsonValueKind.True;
     private static JsonElement Nested(JsonElement row,string name)=>row.TryGetProperty(name,out var value)&&value.ValueKind==JsonValueKind.Object?value:JsonSerializer.SerializeToElement(new{});
     private static string Normalize(string? value)=>string.Concat((value??string.Empty).Where(char.IsLetterOrDigit)).ToUpperInvariant();
