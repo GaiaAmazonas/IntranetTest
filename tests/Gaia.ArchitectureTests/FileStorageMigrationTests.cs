@@ -13,7 +13,7 @@ public sealed class FileStorageMigrationTests
     {
         var storage = new Storage(corruptDestination: false);
         var receipt = await new FileStorageMigration(storage, storage, TimeProvider.System).CopyAndVerifyAsync(
-            new(SourceId, "\"source-etag\"", new("Helpdesk", "request-id"), "evidence.pdf", Guid.NewGuid()), default);
+            new(SourceId, "\"source-etag\"", new("Solicitudes", "request-id"), "evidence.pdf", Guid.NewGuid()), default);
         Assert.Equal(SourceId, receipt.Source);
         Assert.Equal(DestinationId, receipt.Destination.Id);
         Assert.Empty(storage.Deleted);
@@ -25,7 +25,7 @@ public sealed class FileStorageMigrationTests
         var storage = new Storage(corruptDestination: true);
         var error = await Assert.ThrowsAsync<FileStorageException>(() =>
             new FileStorageMigration(storage, storage, TimeProvider.System).CopyAndVerifyAsync(
-                new(SourceId, "\"source-etag\"", new("Helpdesk", "request-id"), "evidence.pdf", Guid.NewGuid()), default));
+                new(SourceId, "\"source-etag\"", new("Solicitudes", "request-id"), "evidence.pdf", Guid.NewGuid()), default));
         Assert.Equal(FileStorageError.VersionConflict, error.Code);
         Assert.Equal(DestinationId, Assert.Single(storage.Deleted));
     }
@@ -36,7 +36,7 @@ public sealed class FileStorageMigrationTests
         var storage = new Storage(corruptDestination: false);
         var error = await Assert.ThrowsAsync<FileStorageException>(() =>
             new FileStorageMigration(storage, storage, TimeProvider.System).CopyAndVerifyAsync(
-                new(SourceId, "\"stale\"", new("Helpdesk", "request-id"), "evidence.pdf", Guid.NewGuid()), default));
+                new(SourceId, "\"stale\"", new("Solicitudes", "request-id"), "evidence.pdf", Guid.NewGuid()), default));
         Assert.Equal(FileStorageError.VersionConflict, error.Code);
         Assert.Equal(0, storage.Uploads);
     }

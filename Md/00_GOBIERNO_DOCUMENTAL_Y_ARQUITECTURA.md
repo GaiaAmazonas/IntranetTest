@@ -94,7 +94,7 @@ Antes de modificar código:
 Los módulos backend vigentes son:
 
 - Communications
-- Helpdesk
+- Solicitudes
 - Identity
 - Inventory
 - Organization
@@ -115,13 +115,13 @@ La API registra sus contratos y compone los adaptadores. Crear un módulo nuevo 
 - `Md/continuidad/02_SEGURIDAD.md`: sesión, tokens y permisos.
 - `Md/continuidad/03_CREAR_MODULO.md`: proceso de implementación.
 - `Md/continuidad/04_ARCHIVOS_SHAREPOINT.md`: infraestructura de archivos.
-- `Md/continuidad/05_PREPARACION_ADJUNTOS_HELPDESK.md`: antecedentes de integración de adjuntos.
+- `Md/continuidad/05_PREPARACION_ADJUNTOS_SOLICITUDES.md`: antecedentes de integración de adjuntos.
 - `Md/continuidad/06_FOTOS_PERFIL_ENTRA.md`: fotografías delegadas de perfil.
 - `Md/continuidad/07_AUTENTICACION_DATAVERSE_SHAREPOINT.md`: separación de identidades y caso pre-login.
-- `Md/modulos/helpdesk.md`: comportamiento vigente de Helpdesk.
+- `Md/modulos/solicitudes.md`: comportamiento vigente de Solicitudes.
 - `Md/modulos/CAPACITACIONES.md`: comportamiento vigente de Capacitaciones.
 - `Md/31_CAPACITACIONES_FLUJO_Y_PRUEBAS.md`: flujo y pruebas funcionales de Capacitaciones.
-- `docs/helpdesk-workflow-acceptance.md`: aceptación técnica fechada del motor de flujos; sus cifras de pruebas son una fotografía, no un valor permanente.
+- `docs/solicitudes-workflow-acceptance.md`: aceptación técnica fechada del motor de flujos; sus cifras de pruebas son una fotografía, no un valor permanente.
 
 ### Especificaciones base útiles, subordinadas al estado vigente
 
@@ -144,7 +144,7 @@ Conservan reglas funcionales y de diseño útiles. Cuando describan tecnología 
 
 - `Md/00_README_INICIO.md`: paquete inicial anterior a la implementación actual.
 - `Md/12_PROMPT_MAESTRO_CODEX.md`: prompt de diagnóstico inicial.
-- `Md/13_HELPDESK_LEVANTAMIENTO_FUNCIONAL.md`: levantamiento anterior al Helpdesk ya implementado.
+- `Md/13_SOLICITUDES_LEVANTAMIENTO_FUNCIONAL.md`: levantamiento anterior al Solicitudes ya implementado.
 - `Md/15_CALIDAD_Y_PREPARACION_PRODUCCION.md`: dictamen fechado que todavía describía PostgreSQL y módulos inexistentes.
 - `entregables/Informe_tecnico_montaje_servidor_Gaia.md`: informe de infraestructura fechado; debe regenerarse antes de un montaje productivo.
 - `apps/web/README.md`: README genérico de Next.js; no describe la arquitectura Gaia.
@@ -155,7 +155,7 @@ Los históricos no deben eliminarse porque explican decisiones y evolución, per
 
 1. Los 31 Markdown existentes fueron inventariados; sus enlaces relativos no presentan destinos rotos.
 2. No se encontraron secretos ni GUID de credenciales incrustados en los Markdown auditados.
-3. `Md/13_HELPDESK_LEVANTAMIENTO_FUNCIONAL.md` afirma que Helpdesk no existe; el módulo, adaptadores y documentación funcional actuales demuestran que esa afirmación quedó histórica.
+3. `Md/13_SOLICITUDES_LEVANTAMIENTO_FUNCIONAL.md` afirma que Solicitudes no existe; el módulo, adaptadores y documentación funcional actuales demuestran que esa afirmación quedó histórica.
 4. `Md/15_CALIDAD_Y_PREPARACION_PRODUCCION.md` y el informe de servidor describen una dependencia de PostgreSQL. Los proyectos actuales no referencian Entity Framework ni Npgsql; Dataverse es la persistencia vigente.
 5. `Md/00_README_INICIO.md` y `Md/12_PROMPT_MAESTRO_CODEX.md` son instrucciones de arranque, no órdenes permanentes para reiniciar el proyecto.
 6. La documentación de continuidad es más reciente que varias especificaciones generales, pero las cifras de pruebas y fechas siguen siendo fotografías y deben volver a verificarse.

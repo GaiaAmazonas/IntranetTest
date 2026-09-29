@@ -25,7 +25,7 @@ export type IntranetNavigationItem = {
 };
 
 const icons: Record<string, LucideIcon> = {
-  applications: Grid2X2, calendar: CalendarDays, helpdesk: LifeBuoy, home: Home,
+  applications: Grid2X2, calendar: CalendarDays, solicitudes: LifeBuoy, home: Home,
   intranet: LayoutDashboard, people: Users, search: Search, training: GraduationCap,
 };
 const primaryCodes = new Set(["INT.INICIO", "INT.PERSONAS", "INT.CALENDARIO"]);

@@ -13,7 +13,7 @@ const loginTransitionMinimumMs = 300;
 const apiUrl = process.env.NEXT_PUBLIC_GAIA_API_URL ?? "https://localhost:7168";
 const loginConfigurationCacheKey = "gaia:public-login-configuration";
 
-type PublicLoginConfiguration = { platformName?: string | null; eyebrow: string; description?: string | null; lowerLeftText?: string | null; footerTitle?: string | null; footerDescription?: string | null; imageAlt?: string | null; desktopImageUrl: string; tabletImageUrl: string; mobileImageUrl: string; socialNetworks: { name: string; label: string; order: number; url: string }[] };
+type PublicLoginConfiguration = { platformName?: string | null; eyebrow: string; description?: string | null; lowerLeftText?: string | null; footerTitle?: string | null; footerDescription?: string | null; imageAlt?: string | null; desktopImageUrl: string; tabletImageUrl?: string | null; mobileImageUrl?: string | null; desktopMediaType?: string | null; socialNetworks: { name: string; label: string; order: number; url: string }[] };
 
 export function RouteAccessGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -87,11 +87,10 @@ export function AccessState({ action, description, href, icon, notice, onAction,
   }
   if (icon === "login") {
     const configuredSocials = loginConfiguration?.socialNetworks.map(network => ({ label: network.label, mark: socialMark(network.name || network.label), href: network.url })) ?? gaiaSocialNetworks;
-    const imageUrl = (path: string | undefined) => path ? `${apiUrl}${path}` : undefined;
     return (
       <main className="gaia-access-portal">
         <section className="gaia-access-story">
-          {loginConfiguration ? <picture className="gaia-access-story-picture"><source media="(max-width: 520px)" srcSet={imageUrl(loginConfiguration.mobileImageUrl)} /><source media="(max-width: 900px)" srcSet={imageUrl(loginConfiguration.tabletImageUrl)} /><img alt={loginConfiguration.imageAlt || "Paisaje de la Amazonía colombiana junto a un río"} src={imageUrl(loginConfiguration.desktopImageUrl)} /></picture> : <Image alt="Paisaje de la Amazonía colombiana junto a un río" fill priority sizes="(max-width: 820px) 100vw, 62vw" src="/brand/intranet/evento-amazonia-gaia2.jpg" />}
+          {loginConfiguration ? <LoginMedia configuration={loginConfiguration}/> : <Image alt="Paisaje de la Amazonía colombiana junto a un río" fill priority sizes="(max-width: 820px) 100vw, 62vw" src="/brand/intranet/evento-amazonia-gaia2.jpg" />}
           <div className="gaia-access-story-shade" />
           <header><Image alt="Gaia Amazonas" height={48} src="/brand/logo-gaia.svg" width={88} /><span><small>{loginConfiguration?.platformName || "Ecosistema digital institucional"}</small></span></header>
           <div className="gaia-access-story-copy">
@@ -126,6 +125,14 @@ export function AccessState({ action, description, href, icon, notice, onAction,
   }
   return <main className="gaia-route-state"><span><Icon aria-hidden="true" size={25} /></span><h1>{title}</h1>{description && <p>{description}</p>}{href && action ? <Link href={href}>{action}</Link> : action ? <button onClick={onAction} type="button">{action}</button> : <RotateCcw aria-hidden="true" className="gaia-spin" size={18} />}</main>;
 }
+
+function LoginMedia({configuration}:{configuration:PublicLoginConfiguration}) {
+  const video=configuration.desktopMediaType?.startsWith("video/")??false;
+  const fallback="/brand/intranet/evento-amazonia-gaia2.jpg";
+  return <><picture className="gaia-access-story-picture">{configuration.mobileImageUrl&&<source media="(max-width: 520px)" srcSet={loginMediaUrl(configuration.mobileImageUrl)}/>} {configuration.tabletImageUrl&&<source media="(max-width: 900px)" srcSet={loginMediaUrl(configuration.tabletImageUrl)}/>}<img alt={configuration.imageAlt||"Paisaje de la Amazonía colombiana junto a un río"} src={video?fallback:loginMediaUrl(configuration.desktopImageUrl)}/></picture>{video&&<video aria-label={configuration.imageAlt||"Video institucional de Gaia Amazonas"} autoPlay className="gaia-access-story-video" loop muted playsInline preload="metadata" src={loginMediaUrl(configuration.desktopImageUrl)}/>}</>;
+}
+
+const loginMediaUrl=(path:string)=>`${apiUrl}${path}`;
 
 function socialMark(value: string) {
   const normalized = value.toLocaleLowerCase();

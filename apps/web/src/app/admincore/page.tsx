@@ -8,7 +8,7 @@ import { apiRequest } from "@/lib/api-client";
 import { useEffect, useMemo, useState } from "react";
 
 type Birthday={id:string;fullName:string;day:number;month:number;photoUrl:string|null};
-const moduleIcons={organization:Building2,people:Users,inventory:PackageSearch,security:LockKeyhole,communications:Megaphone,calendar:CalendarDays,helpdesk:Headphones,training:GraduationCap} as const;
+const moduleIcons={organization:Building2,people:Users,inventory:PackageSearch,security:LockKeyhole,communications:Megaphone,calendar:CalendarDays,solicitudes:Headphones,training:GraduationCap} as const;
 
 export default function AdminCoreHomePage() {
   const security = useSecurity();
@@ -21,7 +21,7 @@ export default function AdminCoreHomePage() {
   const firstName = user?.name.split(" ").filter(Boolean)[0] ?? "";
   const priorityModules=useMemo(()=>{
     const priorities=[
-      {words:["helpdesk","solicitud"],title:"Revisar solicitudes",description:"Consulta casos nuevos, vencimientos y gestiones que requieren seguimiento.",icon:Headphones},
+      {words:["solicitudes","solicitud"],title:"Revisar solicitudes",description:"Consulta casos nuevos, vencimientos y gestiones que requieren seguimiento.",icon:Headphones},
       {words:["comunic"],title:"Actualizar comunicaciones",description:"Verifica publicaciones, destacados y contenido visible en la Intranet.",icon:Megaphone},
       {words:["talento","persona"],title:"Mantener el equipo al día",description:"Revisa la información institucional de personas y estructura organizacional.",icon:Users},
       {words:["seguridad"],title:"Revisar accesos",description:"Administra permisos y módulos disponibles para cada responsabilidad.",icon:ShieldCheck},

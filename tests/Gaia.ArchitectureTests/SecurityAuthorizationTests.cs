@@ -14,7 +14,7 @@ public sealed class SecurityAuthorizationTests
         Assert.Contains(AdminCorePermissions.IntranetPersonasVer, DefaultRolePermissions.Consulta);
         Assert.Contains(AdminCorePermissions.IntranetCalendarioVer, DefaultRolePermissions.Consulta);
         Assert.Contains(AdminCorePermissions.IntranetAplicacionesVer, DefaultRolePermissions.Consulta);
-        Assert.Contains(AdminCorePermissions.IntranetHelpdeskVer, DefaultRolePermissions.Consulta);
+        Assert.Contains(AdminCorePermissions.IntranetSolicitudesVer, DefaultRolePermissions.Consulta);
         Assert.DoesNotContain(AdminCorePermissions.IntranetAdminCoreVer, DefaultRolePermissions.Consulta);
         Assert.DoesNotContain(AdminCorePermissions.OrgUnidadesVer, DefaultRolePermissions.Consulta);
     }

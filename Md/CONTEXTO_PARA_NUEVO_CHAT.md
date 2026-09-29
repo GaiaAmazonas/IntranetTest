@@ -1,6 +1,6 @@
 # Gaia: contexto de continuidad para un nuevo chat
 
-Fecha de revisión documental: **22 de septiembre de 2026**. Documento basado en el código local, no solamente en conversaciones anteriores. Raíz del proyecto: `Proyecto Gaia Aplicacion`.
+Fecha de revisión documental: **29 de septiembre de 2026**. Documento basado en el código local, no solamente en conversaciones anteriores. Raíz del proyecto: `Proyecto Gaia Aplicacion`.
 
 ## Cómo usar este documento
 
@@ -10,7 +10,7 @@ Lee primero [Gobierno documental y arquitectura canónica](00_GOBIERNO_DOCUMENTA
 2. [Seguridad, autenticación y tokens](continuidad/02_SEGURIDAD.md).
 3. [Receta para módulos, diseño y verificación](continuidad/03_CREAR_MODULO.md).
 4. Para infraestructura de archivos: [Estado por fases de Graph / SharePoint](continuidad/04_ARCHIVOS_SHAREPOINT.md). Fundación, adaptador, diagnóstico, prueba controlada, configuración Dataverse y copia verificada entre repositorios están implementados; Staging fue validado. Falta integrar los puertos desde cada módulo y construir lotes cuando exista su inventario de referencias. Consultar allí nombres de tabla, opciones y credenciales por alias antes de continuar.
-5. Para Helpdesk y sus adjuntos: [Módulo Helpdesk](modulos/helpdesk.md) y [Preparación de adjuntos](continuidad/05_PREPARACION_ADJUNTOS_HELPDESK.md). Los endpoints, la persistencia funcional y la integración con SharePoint ya existen; el segundo documento conserva las decisiones de infraestructura. La fuente contractual del modelo sigue siendo `model/gaia-helpdesk-model.json`.
+5. Para Solicitudes y sus adjuntos: [Módulo Solicitudes](modulos/solicitudes.md) y [Preparación de adjuntos](continuidad/05_PREPARACION_ADJUNTOS_SOLICITUDES.md). Los endpoints, la persistencia funcional y la integración con SharePoint ya existen; el segundo documento conserva las decisiones de infraestructura. La fuente contractual del modelo sigue siendo `model/gaia-solicitudes-model.json`.
 6. Para fotos institucionales de perfil: [Microsoft Entra / Graph](continuidad/06_FOTOS_PERFIL_ENTRA.md). No almacenar fotos en Dataverse, no usar nombres para resolver identidades y completar primero el consentimiento delegado mínimo de Graph.
 7. Para separar identidades de Dataverse y SharePoint, y especialmente para configuración anterior al login: [Autenticación Dataverse y SharePoint](continuidad/07_AUTENTICACION_DATAVERSE_SHAREPOINT.md).
 8. Para campañas decorativas de Intranet y AdminCore: [Ambientación visual](modulos/ambientacion-visual.md). Dataverse conserva configuración y vigencia; SharePoint conserva imágenes; el tema es texto abierto y los efectos respetan reducción de movimiento.
@@ -36,7 +36,8 @@ Son una fotografía del estado revisado. La solicitud actual del usuario delimit
 | Seguridad | Usuarios, asignaciones temporales de roles, permisos y árbol de módulos. Proteger también cada endpoint, no solo los botones. |
 | Comunicaciones | Eventos, tipos de evento y destacados/banners con estados, vigencia e imágenes. |
 | Inventario | Existe estructura, pero sus endpoints responden 503: aún no tiene implementación Dataverse operativa. No presentarlo como terminado. |
-| Helpdesk | Módulo funcional en Intranet y AdminCore: catálogos, formularios versionados, radicación, bandeja, reasignación, conversación, transiciones, SLA y adjuntos en SharePoint. Consultar `Md/modulos/helpdesk.md` para estado, límites y pruebas vigentes. |
+| Solicitudes | Módulo funcional en Intranet y AdminCore: catálogos, formularios versionados, radicación, bandeja general, gestión por etapa/unidad, responsables históricos y actual, conversación, transiciones, SLA y adjuntos en SharePoint. Rutas vigentes: `/intranet/solicitudes`, `/solicitudes`, `/solicitudes/catalogos` y API `/api/solicitudes`. Consultar `Md/modulos/solicitudes.md` para estado, límites y pruebas vigentes. |
+| Login institucional | La configuración pública se sirve desde una instantánea publicada. Escritorio admite imagen o video MP4/WebM; móvil y tableta siguen usando imagen. Los archivos permanecen en el proveedor SharePoint/Graph configurado y no se almacenan localmente. Ver `continuidad/07_AUTENTICACION_DATAVERSE_SHAREPOINT.md`. |
 | Banners de Inicio | Textos, vigencia y acciones desde Dataverse. La administración usa una tabla responsive; las imágenes se almacenan en SharePoint mediante `IFileStorage` y la portada consume las URLs de API. Ver `modulos/destacados.md` para el contrato de referencias y la validación de columnas. |
 | Cumpleaños | Nombres y fechas desde Dataverse. Ilustraciones SVG de prueba en `public/people/temporary-avatar-*.svg`; no son fotos reales. No inventar cumpleaños ni personas. |
 | Aplicaciones | Configuradas según módulos autorizados `INT.APP.*`. Accesos fijos Teams, Outlook y Drive; logos temporales de AdminCore/Plan View. Drive abre la cuenta que esté iniciada en Google, no garantiza por sí mismo la cuenta institucional. |
@@ -71,9 +72,9 @@ Son una fotografía del estado revisado. La solicitud actual del usuario delimit
 
 > Lee `Md/CONTEXTO_PARA_NUEVO_CHAT.md` y los tres documentos de continuidad que enlaza. Revisa el estado del repositorio y solo los archivos relacionados con mi solicitud. Crea el módulo [NOMBRE] para [INTRANET / ADMINCORE] con estas capacidades: [REQUISITOS]. Reutiliza arquitectura, seguridad, cliente Dataverse y diseño; no cambies módulos ajenos. Identifica cualquier tabla/columna/privilegio que deba preparar antes de depender de él. Verifica permisos, compilación, pruebas y responsive. Actualiza esta documentación con las decisiones nuevas.
 
-Para continuar específicamente Helpdesk en otro chat puede usarse:
+Para continuar específicamente Solicitudes en otro chat puede usarse:
 
-> Trabaja en `C:\Users\Edgar Munar\Documents\Proyecto Gaia Aplicacion`. Antes de modificar código, lee completos `Md/CONTEXTO_PARA_NUEVO_CHAT.md` y `Md/modulos/helpdesk.md`; luego revisa `git status` y el último commit de `main`. Mi cambio solicitado es: [DESCRIBIR CAMBIO]. Conserva la arquitectura modular, seguridad, Dataverse y SharePoint documentados; no modifiques otros módulos, no publiques sin mi autorización y ejecuta las validaciones indicadas en la documentación.
+> Trabaja en `C:\Users\Edgar Munar\Documents\Proyecto Gaia Aplicacion`. Antes de modificar código, lee completos `Md/CONTEXTO_PARA_NUEVO_CHAT.md` y `Md/modulos/solicitudes.md`; luego revisa `git status` y el último commit de `main`. Mi cambio solicitado es: [DESCRIBIR CAMBIO]. Conserva la arquitectura modular, seguridad, Dataverse y SharePoint documentados; no modifiques otros módulos, no publiques sin mi autorización y ejecuta las validaciones indicadas en la documentación.
 
 ## Mantenimiento de la memoria
 

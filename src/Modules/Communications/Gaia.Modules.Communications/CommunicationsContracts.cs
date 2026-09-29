@@ -18,7 +18,8 @@ public sealed record LoginConfigurationWriteRequest(string Name,string Code,stri
 public sealed record LoginSocialWriteRequest(string Name,string Label,int Order,string Url);
 public sealed record PublicLoginSocialDto(string Name,string Label,int Order,string Url);
 public sealed record PublicLoginConfigurationDto(string? PlatformName,string Eyebrow,string? Description,string? LowerLeftText,
- string? FooterTitle,string? FooterDescription,string? ImageAlt,string DesktopImageUrl,string TabletImageUrl,string MobileImageUrl,
+ string? FooterTitle,string? FooterDescription,string? ImageAlt,string DesktopImageUrl,string? TabletImageUrl,string? MobileImageUrl,
+ string? DesktopMediaType,
  IReadOnlyList<PublicLoginSocialDto> SocialNetworks);
 public sealed record VisualAmbienceDto(Guid Id,string Name,string Code,string? Description,int Scope,string Theme,int Effect,
  int PublicationStatus,DateTimeOffset StartsAt,DateTimeOffset EndsAt,int Intensity,string? PrimaryColor,string? SecondaryColor,

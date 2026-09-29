@@ -16,7 +16,7 @@ appsettings.Development.json
 secrets.json
 *.user
 src/Gaia.Api/App_Data/public-login/
-src/Gaia.Api/App_Data/helpdesk-files/
+src/Gaia.Api/App_Data/solicitudes-files/
 
 # .NET
 bin/

@@ -8,7 +8,7 @@ Revisado: 2026-09-02. Rutas relativas a la raíz del repositorio.
 apps/web/src/
   app/                         rutas Next App Router, layouts y globals.css
   components/                  shells, seguridad, feedback y componentes compartidos
-  features/intranet/           Inicio, Personas, Calendario, aplicaciones, Helpdesk, footer
+  features/intranet/           Inicio, Personas, Calendario, aplicaciones, Solicitudes, footer
   features/communications/     administración de comunicaciones
   features/organization/      interfaces organizacionales
   features/talent/            interfaces de talento humano

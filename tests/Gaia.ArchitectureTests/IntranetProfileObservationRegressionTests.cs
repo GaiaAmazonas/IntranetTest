@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Gaia.Modules.Helpdesk;
+using Gaia.Modules.Solicitudes;
 namespace Gaia.ArchitectureTests;
 public sealed class IntranetProfileObservationRegressionTests
 {
@@ -7,7 +7,7 @@ public sealed class IntranetProfileObservationRegressionTests
     [Fact]
     public void RequesterReturnIsNotSuppressedByAdministrativeAccess()
     {
-        var source=Read("src","Gaia.Api","Infrastructure","Dataverse","Helpdesk","DataverseHelpdeskConversationStore.cs");
+        var source=Read("src","Gaia.Api","Infrastructure","Dataverse","Solicitudes","DataverseSolicitudesConversationStore.cs");
         Assert.Contains("if(requesterCanReply) {",source);
         Assert.DoesNotContain("if(requesterCanReply&&!managementAccess)",source);
         Assert.Contains("..transitions.Where(item=>item.Id!=previous.Id)",source);
@@ -16,14 +16,14 @@ public sealed class IntranetProfileObservationRegressionTests
     public void ReturnFlagIsExposedToTheWebClient()
     {
         var id=Guid.NewGuid();
-        var json=JsonSerializer.Serialize(new HelpdeskTransition(id,id,"Radicada",true,false,false,false,true),WebOptions);
+        var json=JsonSerializer.Serialize(new SolicitudesTransition(id,id,"Radicada",true,false,false,false,true),WebOptions);
         using var document=JsonDocument.Parse(json);
         Assert.True(document.RootElement.GetProperty("isObservationReturn").GetBoolean());
     }
     [Fact]
     public void RequesterReceivesConfiguredTransitionsOutsideObservationFlow()
     {
-        var source=Read("src","Gaia.Api","Infrastructure","Dataverse","Helpdesk","DataverseHelpdeskConversationStore.cs");
+        var source=Read("src","Gaia.Api","Infrastructure","Dataverse","Solicitudes","DataverseSolicitudesConversationStore.cs");
         Assert.Contains("if(isManager)availableTransitions.AddRange",source);
         Assert.Contains("if(isRequester)availableTransitions.AddRange",source);
         Assert.Contains("ReadTransitions(client,state,stateId,299540010,token)",source);
@@ -31,7 +31,7 @@ public sealed class IntranetProfileObservationRegressionTests
     [Fact]
     public void IntranetRendersRequesterStateActions()
     {
-        var source=Read("apps","web","src","features","intranet","intranet-helpdesk.tsx");
+        var source=Read("apps","web","src","features","intranet","intranet-solicitudes.tsx");
         Assert.Contains("function RequesterStateActions",source);
         Assert.Contains("Cerrar solicitud",source);
         Assert.Contains("selected?.requestsRating",source);

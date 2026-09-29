@@ -63,7 +63,7 @@ public sealed class DevelopmentFileStorageTests
         {
             var environment = new TestEnvironment(root);
             var first = new DevelopmentFileStorage(environment);
-            var content = "%PDF-1.4\nGaia Helpdesk observation evidence\n%%EOF"u8.ToArray();
+            var content = "%PDF-1.4\nGaia Solicitudes observation evidence\n%%EOF"u8.ToArray();
             var fileId = Guid.NewGuid();
             var upload = new FileUpload(new(Guid.NewGuid().ToString("D")), "evidencia-observacion.pdf",
                 "application/pdf", content.Length, fileId, DateTimeOffset.UtcNow);
@@ -73,7 +73,7 @@ public sealed class DevelopmentFileStorageTests
             Assert.Equal("SharePoint", stored.Id.Provider);
             Assert.Equal("development-local", stored.Id.RepositoryId);
             Assert.Equal(Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant(), stored.Sha256);
-            Assert.True(File.Exists(Path.Combine(root, "App_Data", "helpdesk-files", stored.StoredName)));
+            Assert.True(File.Exists(Path.Combine(root, "App_Data", "solicitudes-files", stored.StoredName)));
 
             var restarted = new DevelopmentFileStorage(environment);
             var metadata = await restarted.GetMetadataAsync(stored.Id, default);

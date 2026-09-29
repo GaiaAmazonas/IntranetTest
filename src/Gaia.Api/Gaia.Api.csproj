@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -16,7 +16,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Modules\Communications\Gaia.Modules.Communications\Gaia.Modules.Communications.csproj" />
     <ProjectReference Include="..\Modules\Identity\Gaia.Modules.Identity\Gaia.Modules.Identity.csproj" />
-    <ProjectReference Include="..\Modules\Helpdesk\Gaia.Modules.Helpdesk\Gaia.Modules.Helpdesk.csproj" />
+    <ProjectReference Include="..\Modules\Solicitudes\Gaia.Modules.Solicitudes\Gaia.Modules.Solicitudes.csproj" />
     <ProjectReference Include="..\Modules\Organization\Gaia.Modules.Organization\Gaia.Modules.Organization.csproj" />
     <ProjectReference Include="..\Modules\ThirdParties\Gaia.Modules.ThirdParties\Gaia.Modules.ThirdParties.csproj" />
     <ProjectReference Include="..\Modules\Inventory\Gaia.Modules.Inventory\Gaia.Modules.Inventory.csproj" />

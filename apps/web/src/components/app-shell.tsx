@@ -34,9 +34,9 @@ const navigation = [
     { href: "/configuracion/login", aliases: [], label: "Login institucional", permission: "COM.DESTACADOS.VER" },
     { href: "/configuracion/ambientacion", aliases: [], label: "Ambientación visual", permission: "COM.DESTACADOS.VER" },
   ] },
-  { label: "Helpdesk", icon: Headphones, permission: "HD.SOLICITUDES.VER|HD.CATALOGOS.VER", children: [
-    { href: "/helpdesk/solicitudes", aliases: [], label: "Solicitudes", permission: "HD.SOLICITUDES.VER" },
-    { href: "/helpdesk/servicios-y-flujos", aliases: ["/helpdesk/servicios-y-flujos/formulario", "/helpdesk/catalogos"], label: "Servicios y flujos", permission: "HD.CATALOGOS.VER" },
+  { label: "Solicitudes", icon: Headphones, permission: "HD.SOLICITUDES.VER|HD.CATALOGOS.VER", children: [
+    { href: "/solicitudes", aliases: [], label: "Solicitudes", permission: "HD.SOLICITUDES.VER" },
+    { href: "/solicitudes/servicios-y-flujos", aliases: ["/solicitudes/servicios-y-flujos/formulario", "/solicitudes/catalogos"], label: "Servicios y flujos", permission: "HD.CATALOGOS.VER" },
   ] },
   { href: "/capacitaciones/catalogo", label: "Capacitaciones", icon: GraduationCap, permission: "CAP.CATALOGO.VER" },
   { label: "Seguridad", icon: Settings, permission: "TI.USUARIOS.VER|TI.ROLES.VER|TI.MODULOS.VER", children: [

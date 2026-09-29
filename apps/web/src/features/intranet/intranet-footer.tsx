@@ -14,7 +14,7 @@ export function IntranetFooter({ navigation }: { navigation: readonly IntranetNa
       </nav>
       <span>
         <a href="https://gaiaamazonas.org/politica-de-datos/" rel="noopener noreferrer" target="_blank">Política de tratamiento de datos</a>
-        <Link href="/intranet/helpdesk">Ayuda técnica</Link>
+        <Link href="/intranet/solicitudes">Ayuda técnica</Link>
         <small>© Fundación Gaia Amazonas</small>
       </span>
     </footer>

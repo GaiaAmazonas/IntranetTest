@@ -1,6 +1,6 @@
 # Infraestructura de archivos Graph / SharePoint
 
-Actualizado: 2026-09-03. Implementación independiente de Helpdesk. No se han modificado Dataverse, GAIAHelpdesk, modelos de solicitudes ni repositorios de configuración de datos.
+Actualizado: 2026-09-03. Implementación independiente de Solicitudes. No se han modificado Dataverse, GAIASolicitudes, modelos de solicitudes ni repositorios de configuración de datos.
 
 ## Entrega por fases y punto de continuación
 

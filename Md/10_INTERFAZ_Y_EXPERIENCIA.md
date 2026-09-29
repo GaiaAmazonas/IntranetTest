@@ -160,7 +160,7 @@ Las preguntas se contienen completamente en su superficie, con título dentro de
 El estado de carga y el error de una consulta no equivalen a cero asignaciones. Conservar esa distinción en Inicio, catálogo y resultados. Véase `31_CAPACITACIONES_FLUJO_Y_PRUEBAS.md` para reglas y pruebas funcionales.
 ## 10. Portada y navegación de Intranet
 
-- Inicio, Personas y Calendario permanecen en primer nivel. Mi espacio agrupa Mis aplicaciones, Mis solicitudes de ayuda y Mis capacitaciones; cada acceso conserva su permiso y ruta. No mostrar Helpdesk como etiqueta principal al colaborador.
+- Inicio, Personas y Calendario permanecen en primer nivel. Mi espacio agrupa Mis aplicaciones, Mis solicitudes de ayuda y Mis capacitaciones; cada acceso conserva su permiso y ruta. No mostrar Solicitudes como etiqueta principal al colaborador.
 - Accesos rápidos: una sola fila, navegación anterior/siguiente, sin scrollbar. En móvil se muestra un acceso por página; escritorio muestra cuatro. El bloque omite Explorar aplicaciones; ese acceso permanece en Mi espacio. La fila de accesos tiene 102 px. Orden: Buscador de personas, Mis solicitudes, Mis capacitaciones, Consultar agenda. No ocultar accesos sin ofrecer navegación.
 - Celebraciones y Agenda comparten altura en cada breakpoint. Agenda muestra máximo dos eventos por página.
 - La fila inferior conserva orden Cumpleaños, Herramientas, Capacitaciones (derecha), con tarjetas compactas de 270 px y navegación paginada. Cumpleaños muestra cuatro personas por página, en una sola fila. No reintroducir una cuarta tarjeta de soporte ni barras de scroll.

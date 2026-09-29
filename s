@@ -20,8 +20,8 @@ M	apps/web/src/features/training/training-preview-dialog.tsx
 A	apps/web/src/features/training/training-results.tsx
 M	apps/web/src/features/training/training-tracking-manager.tsx
 M	apps/web/src/features/training/training-version-manager.tsx
-A	src/Gaia.Api/App_Data/helpdesk-files/.metadata/d30c0eb79e0c483c9ebcb64f771f4546.json
-A	src/Gaia.Api/App_Data/helpdesk-files/d30c0eb79e0c483c9ebcb64f771f4546.pdf
+A	src/Gaia.Api/App_Data/solicitudes-files/.metadata/d30c0eb79e0c483c9ebcb64f771f4546.json
+A	src/Gaia.Api/App_Data/solicitudes-files/d30c0eb79e0c483c9ebcb64f771f4546.pdf
 M	src/Gaia.Api/Infrastructure/Dataverse/Training/DataverseTrainingAdministrationReader.cs
 A	src/Gaia.Api/Infrastructure/Dataverse/Training/DataverseTrainingAssessments.cs
 M	src/Gaia.Api/Infrastructure/Dataverse/Training/DataverseTrainingOperations.cs

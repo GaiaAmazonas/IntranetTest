@@ -14,7 +14,7 @@ type Event={id:string;name:string;type:string;color:string;startsAt:string;allDa
 type Birthday={id:string;fullName:string;day:number;month:number;photoUrl?:string|null};
 type Home={banners:Banner[];upcomingEvents:Event[];birthdays:Birthday[]};
 const apiUrl=process.env.NEXT_PUBLIC_GAIA_API_URL??"https://localhost:7168";
-const actions=[{href:"/intranet/personas",label:"Buscador de personas",detail:"Directorio interno",icon:Search,permission:"INT.PERSONAS.VER"},{href:"/intranet/helpdesk",label:"Solicitudes",detail:"Consulta su estado",icon:LifeBuoy,permission:"INT.HELPDESK.VER"},{href:"/intranet/capacitaciones",label:"Capacitaciones",detail:"Continúa tu aprendizaje",icon:GraduationCap,permission:"INT.CAPACITACIONES.VER"},{href:"/intranet/calendario",label:"Consultar agenda",detail:"Eventos de Gaia",icon:CalendarDays,permission:"INT.CALENDARIO.VER"}] as const;
+const actions=[{href:"/intranet/personas",label:"Buscador de personas",detail:"Directorio interno",icon:Search,permission:"INT.PERSONAS.VER"},{href:"/intranet/solicitudes",label:"Solicitudes",detail:"Consulta su estado",icon:LifeBuoy,permission:"INT.SOLICITUDES.VER"},{href:"/intranet/capacitaciones",label:"Capacitaciones",detail:"Continúa tu aprendizaje",icon:GraduationCap,permission:"INT.CAPACITACIONES.VER"},{href:"/intranet/calendario",label:"Consultar agenda",detail:"Eventos de Gaia",icon:CalendarDays,permission:"INT.CALENDARIO.VER"}] as const;
 
 export function IntranetHome(){
  const{can,user,modules}=useSecurity();

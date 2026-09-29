@@ -8,8 +8,8 @@
   </Folder>
   <Folder Name="/src/Modules/" />
   <Folder Name="/src/Modules/Security/"><Project Path="src/Modules/Security/Gaia.Modules.Security/Gaia.Modules.Security.csproj" /></Folder>
-  <Folder Name="/src/Modules/Helpdesk/">
-    <Project Path="src/Modules/Helpdesk/Gaia.Modules.Helpdesk/Gaia.Modules.Helpdesk.csproj" />
+  <Folder Name="/src/Modules/Solicitudes/">
+    <Project Path="src/Modules/Solicitudes/Gaia.Modules.Solicitudes/Gaia.Modules.Solicitudes.csproj" />
   </Folder>
   <Folder Name="/src/Modules/Identity/">
     <Project Path="src/Modules/Identity/Gaia.Modules.Identity/Gaia.Modules.Identity.csproj" />

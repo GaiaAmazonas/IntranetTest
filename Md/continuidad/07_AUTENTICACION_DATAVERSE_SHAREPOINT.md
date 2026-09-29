@@ -163,6 +163,23 @@ El proyecto ya documenta y utiliza la separación entre acceso delegado a Datave
 
 Tampoco está resuelto automáticamente el acceso previo al login para tablas nuevas creadas en otra rama o máquina virtual. Ese caso debe implementar una de las alternativas de la sección 4 y validar los nombres lógicos reales antes de asignar permisos.
 
+## 11. Publicación y medios del login
+
+La configuración anónima del login no consulta Dataverse durante cada visita. AdminCore publica una instantánea local controlada con únicamente los datos públicos necesarios; el endpoint público consume esa instantánea. Después de cambiar textos, redes o medios se debe ejecutar **Actualizar publicación** para que el login use la nueva versión.
+
+Los binarios continúan almacenándose mediante el proveedor `IFileStorage` configurado para el ambiente —actualmente SharePoint/Graph—. No se implementó almacenamiento local para el video: esa alternativa queda aplazada hasta medir el rendimiento real con el mecanismo vigente.
+
+Reglas actuales de medios:
+
+- Escritorio admite imágenes JPG, PNG o WebP de hasta 8 MB, y video MP4 o WebM de hasta 100 MB.
+- Tableta y móvil admiten únicamente imágenes.
+- El video de escritorio se reproduce automáticamente, silenciado, en bucle y con `playsInline`; en pantallas de hasta 900 px se oculta y se utiliza la imagen correspondiente.
+- Si el video no puede reproducirse, se conserva una imagen institucional de respaldo.
+- El streaming de medios soporta solicitudes por rango para evitar descargar nuevamente el archivo completo durante la reproducción.
+- La respuesta pública identifica `desktopMediaType`; las URLs de tableta y móvil pueden ser nulas cuando no se configuraron variantes.
+
+Los límites de tamaño se validan tanto en la administración como en la API. No se deben ampliar sin revisar los límites de ASP.NET, proxy/IIS, Graph y SharePoint del ambiente de destino.
+
 ## Documentos y componentes relacionados
 
 - `Md/continuidad/02_SEGURIDAD.md`

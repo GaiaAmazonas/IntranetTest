@@ -64,7 +64,7 @@ Debe cerrarse la migración funcional del módulo de Inventario antes de afirmar
 
 Personas todavía no puede mostrar de manera confiable cargo, unidad y sede porque falta implementar o conectar la relación real de Asignación Organizacional.
 
-### 4. Helpdesk
+### 4. Solicitudes
 
 Permanece pendiente del levantamiento funcional. No existen aún trámites, flujos, tablas ni endpoints aprobados.
 
@@ -117,4 +117,4 @@ Estas pruebas requieren dominios, proxy, certificado y usuarios reales; no puede
 
 El piloto puede prepararse cuando exista infraestructura de pruebas, configuración segura y decisión formal sobre PostgreSQL. La producción definitiva exige además cerrar Inventario, ejecutar pruebas integrales en el dominio real y aprobar los pendientes de seguridad y operación.
 
-Helpdesk y contenidos pueden entregarse después como módulos independientes siempre que las pantallas de referencia permanezcan claramente identificadas y no presenten datos ficticios como información real.
+Solicitudes y contenidos pueden entregarse después como módulos independientes siempre que las pantallas de referencia permanezcan claramente identificadas y no presenten datos ficticios como información real.

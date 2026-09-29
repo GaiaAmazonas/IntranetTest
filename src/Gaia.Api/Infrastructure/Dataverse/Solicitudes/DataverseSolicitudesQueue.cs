@@ -1,0 +1,162 @@
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using Microsoft.AspNetCore.DataProtection;
+using Gaia.Modules.Solicitudes;
+
+namespace Gaia.Api.Infrastructure.Dataverse.Solicitudes;
+
+internal sealed partial class DataverseSolicitudesManagementStore
+{
+    public async Task<SolicitudesQueuePage> ReadQueueAsync(SolicitudesQueueFilter filter, CancellationToken token)
+    {
+        var client = await clients.CreateAsync();
+        var request = await DataverseMetadataResolver.TableAsync(client, "gaia_solicitud", token);
+        var service = await DataverseMetadataResolver.TableAsync(client, "gaia_servicio", token);
+        var state = await DataverseMetadataResolver.TableAsync(client, "gaia_estadosolicitud", token);
+        var third = await DataverseMetadataResolver.TableAsync(client, "gaia_terceros", token);
+        var unit = await DataverseMetadataResolver.TableAsync(client, "gaia_organizacion", token);
+        var path = BuildQueueQuery(filter, request, service, state, third, unit, DateOnly.FromDateTime(DateTime.UtcNow));
+        var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{client.BaseAddress}|{filter.PageSize}|{path}")));
+        var protector = protection.CreateProtector("Gaia.Solicitudes.Queue.v1");
+        var currentPage = 1;
+        int? cursorTotal = null;
+        if (!string.IsNullOrEmpty(filter.ContinuationToken))
+        {
+            try
+            {
+                var cursor = JsonSerializer.Deserialize<QueueCursor>(protector.Unprotect(filter.ContinuationToken));
+                if (cursor is null || cursor.Query != fingerprint || cursor.Page != filter.Page)
+                    throw new ArgumentException("La continuación no corresponde a estos filtros o página.");
+                path = cursor.Path;
+                currentPage = cursor.Page;
+                cursorTotal = cursor.TotalCount;
+            }
+            catch (Exception error) when (error is CryptographicException or JsonException)
+            { throw new ArgumentException("La continuación no es válida.", error); }
+        }
+
+        // A direct URL/reload may lack a cursor. Walk bounded server pages, never read the whole queue.
+        while (true)
+        {
+            using var message = new HttpRequestMessage(HttpMethod.Get, path);
+            message.Headers.TryAddWithoutValidation("Prefer", $"odata.maxpagesize={filter.PageSize},odata.include-annotations=\"Microsoft.Dynamics.CRM.totalrecordcount,Microsoft.Dynamics.CRM.totalrecordcountlimitexceeded\"");
+            using var response = await client.SendAsync(message, token);
+            await Ensure(response, token);
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(token));
+            var root = document.RootElement;
+            var next = Text(root, "@odata.nextLink");
+            var total = ReliableQueueTotal(root) ?? cursorTotal;
+            if (currentPage < filter.Page)
+            {
+                if (next is null) return new(total ?? -1, filter.Page, filter.PageSize, [], false, total);
+                path = next;
+                currentPage++;
+                continue;
+            }
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var serviceNav = request.Relationship("gaia_Servicio", service.LogicalName).NavigationProperty;
+            var stateNav = request.Relationship("gaia_EstadoActual", state.LogicalName).NavigationProperty;
+            var requesterNav = request.Relationship("gaia_Solicitante", third.LogicalName).NavigationProperty;
+            var responsibleNav = request.Relationship("gaia_ResponsableInterno", third.LogicalName).NavigationProperty;
+            var unitNav = request.Relationship("gaia_UnidadResponsable", unit.LogicalName).NavigationProperty;
+            var items = root.GetProperty("value").EnumerateArray().Select(row =>
+            {
+                var status = Nested(row, stateNav);
+                var statusCode = Text(status, state.Attribute("gaia_Codigo"));
+                var due = Date(row, request.Attribute("gaia_FechaLimiteActual"));
+                return new SolicitudesQueueItem(RequiredGuid(row, request.PrimaryIdAttribute), Text(row, request.PrimaryNameAttribute) ?? "",
+                    Text(row, request.Attribute("gaia_Asunto")) ?? "", Text(Nested(row, serviceNav), service.PrimaryNameAttribute) ?? "Servicio",
+                    Text(status, state.PrimaryNameAttribute) ?? "Sin estado", Text(status, state.Attribute("gaia_Color")),
+                    Text(Nested(row, requesterNav), third.PrimaryNameAttribute) ?? "Sin solicitante",
+                    Text(Nested(row, responsibleNav), third.PrimaryNameAttribute), Text(Nested(row, unitNav), unit.PrimaryNameAttribute),
+                    DateTimeValue(row, request.Attribute("gaia_FechaRadicacion")), due,
+                    !Bool(status, state.Attribute("gaia_EsFinal")) && due.HasValue && due < today,
+                    string.Equals(statusCode,"RESUELTA",StringComparison.OrdinalIgnoreCase));
+            }).ToArray();
+            var activeAssignments = await ReadActiveAssignments(client, items.Select(item => item.Id).ToArray(), token);
+            items = items.Select(item => activeAssignments.TryGetValue(item.Id, out var assignment)
+                ? item with { Responsible = assignment.Responsible, Unit = assignment.Unit }
+                : item with { Responsible = null, Unit = null }).ToArray();
+            var continuation = next is null ? null : protector.Protect(JsonSerializer.Serialize(new QueueCursor(fingerprint, filter.Page + 1, next, total)));
+            return new(total ?? -1, filter.Page, filter.PageSize, items, next is not null, total, continuation);
+        }
+    }
+
+    private static async Task<IReadOnlyDictionary<Guid, ActiveAssignment>> ReadActiveAssignments(
+        HttpClient client, Guid[] requestIds, CancellationToken token)
+    {
+        if (requestIds.Length == 0) return new Dictionary<Guid, ActiveAssignment>();
+        var management = await DataverseMetadataResolver.TableAsync(client, "gaia_gestionsolicitud", token);
+        var request = management.Relationship("gaia_Solicitud", "gaia_solicitud");
+        var responsible = management.Relationship("gaia_Responsable", "gaia_terceros");
+        var unit = management.Relationship("gaia_UnidadResponsable", "gaia_organizacion");
+        var third = await DataverseMetadataResolver.TableAsync(client, "gaia_terceros", token);
+        var organization = await DataverseMetadataResolver.TableAsync(client, "gaia_organizacion", token);
+        var status = management.Attribute("gaia_Estado");
+        var activeStates = new[]
+        {
+            SolicitudesWorkflowValues.ManagementAvailable,
+            SolicitudesWorkflowValues.ManagementInProgress,
+            SolicitudesWorkflowValues.ManagementWaiting
+        }.Select(value => management.EncodedIntegerValue("gaia_Estado", value)).ToArray();
+        var requestFilter = string.Join(" or ", requestIds.Select(id => $"_{request.ReferencingAttribute}_value eq {id:D}"));
+        var stateFilter = string.Join(" or ", activeStates.Select(value => $"{status} eq {value}"));
+        var rows = await DataverseJson.ReadAllAsync(client,
+            $"{management.EntitySetName}?$select={management.PrimaryIdAttribute},{status},_{request.ReferencingAttribute}_value,_{responsible.ReferencingAttribute}_value,_{unit.ReferencingAttribute}_value&$expand={responsible.NavigationProperty}($select={third.PrimaryNameAttribute}),{unit.NavigationProperty}($select={organization.PrimaryNameAttribute})&$filter=statecode eq 0 and ({requestFilter}) and ({stateFilter})", token);
+        return rows.GroupBy(row => RequiredGuid(row, $"_{request.ReferencingAttribute}_value")).ToDictionary(
+            group => group.Key,
+            group => new ActiveAssignment(
+                JoinDistinct(group.Select(row => Text(Nested(row, responsible.NavigationProperty), third.PrimaryNameAttribute))),
+                JoinDistinct(group.Select(row => Text(Nested(row, unit.NavigationProperty), organization.PrimaryNameAttribute)))));
+    }
+
+    private static string? JoinDistinct(IEnumerable<string?> values)
+    {
+        var result = values.Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        return result.Length == 0 ? null : string.Join(" · ", result);
+    }
+
+    internal static int? ReliableQueueTotal(JsonElement root)
+    {
+        var count = DataverseJson.OptionalInt32(root, "@odata.count");
+        if (count is null or < 0 || Bool(root, "@Microsoft.Dynamics.CRM.totalrecordcountlimitexceeded")) return null;
+        // Dataverse caps counts. Without an explicit assurance, never present the cap as an exact total.
+        return count < 5000 || root.TryGetProperty("@Microsoft.Dynamics.CRM.totalrecordcountlimitexceeded", out var exceeded)
+            && exceeded.ValueKind == JsonValueKind.False ? count : null;
+    }
+
+    internal static string BuildQueueQuery(SolicitudesQueueFilter filter, DataverseTableMetadata request,
+        DataverseTableMetadata service, DataverseTableMetadata state, DataverseTableMetadata third,
+        DataverseTableMetadata unit, DateOnly today)
+    {
+        var serviceNav = request.Relationship("gaia_Servicio", service.LogicalName).NavigationProperty;
+        var stateNav = request.Relationship("gaia_EstadoActual", state.LogicalName).NavigationProperty;
+        var requesterNav = request.Relationship("gaia_Solicitante", third.LogicalName).NavigationProperty;
+        var responsibleNav = request.Relationship("gaia_ResponsableInterno", third.LogicalName).NavigationProperty;
+        var unitNav = request.Relationship("gaia_UnidadResponsable", unit.LogicalName).NavigationProperty;
+        var subject = request.Attribute("gaia_Asunto");
+        var submitted = request.Attribute("gaia_FechaRadicacion");
+        var due = request.Attribute("gaia_FechaLimiteActual");
+        var final = $"{stateNav}/{state.Attribute("gaia_EsFinal")}";
+        var clauses = new List<string> { "statecode eq 0" };
+        foreach (var (schema, id) in new[] { ("gaia_Servicio", filter.ServiceId), ("gaia_EstadoActual", filter.StateId), ("gaia_ResponsableInterno", filter.ResponsibleId) })
+            if (id.HasValue) clauses.Add($"_{request.Attribute(schema)}_value eq {id.Value:D}");
+        var date = today.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        if (filter.Overdue == true) clauses.Add($"({due} ne null and {due} lt {date} and ({final} eq false or {final} eq null))");
+        if (filter.Overdue == false) clauses.Add($"({due} eq null or {due} ge {date} or {final} eq true)");
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            var term = filter.Search.Trim().Replace("'", "''");
+            clauses.Add($"(contains({request.PrimaryNameAttribute},'{term}') or contains({subject},'{term}') or contains({requesterNav}/{third.PrimaryNameAttribute},'{term}') or contains({serviceNav}/{service.PrimaryNameAttribute},'{term}'))");
+        }
+        var expand = $"{serviceNav}($select={service.PrimaryNameAttribute}),{stateNav}($select={state.Attribute("gaia_Codigo")},{state.PrimaryNameAttribute},{state.Attribute("gaia_Color")},{state.Attribute("gaia_EsFinal")}),{requesterNav}($select={third.PrimaryNameAttribute}),{responsibleNav}($select={third.PrimaryNameAttribute}),{unitNav}($select={unit.PrimaryNameAttribute})";
+        return $"{request.EntitySetName}?$select={request.PrimaryIdAttribute},{request.PrimaryNameAttribute},{subject},{submitted},{due}&$expand={expand}&$filter={Uri.EscapeDataString(string.Join(" and ", clauses))}&$orderby={submitted} desc,{request.PrimaryIdAttribute} desc&$count=true";
+    }
+
+    private static JsonElement Nested(JsonElement row, string name) =>
+        row.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Object ? value : EmptyObject;
+    private static readonly JsonElement EmptyObject = JsonSerializer.SerializeToElement(new { });
+    private sealed record ActiveAssignment(string? Responsible, string? Unit);
+    private sealed record QueueCursor(string Query, int Page, string Path, int? TotalCount);
+}

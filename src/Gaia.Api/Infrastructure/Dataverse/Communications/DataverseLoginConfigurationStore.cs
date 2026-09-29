@@ -240,12 +240,12 @@ internal sealed class DataverseLoginConfigurationStore(
     public async Task<MediaContent?> ReadPublicImageAsync(Guid id, string variant, CancellationToken token)
         => await publicSnapshot.ReadImageAsync(variant, token);
 
-    private static PublicLoginConfigurationDto Public(LoginConfigurationDto item, string version)
+    private static PublicLoginConfigurationDto Public(LoginConfigurationDto item, string version, string desktopMediaType)
     {
         string Image(string variant) => $"/api/public/login-configuration/{item.Id:D}/images/{variant}?v={Uri.EscapeDataString(version)}";
         return new(item.PlatformName, item.Eyebrow, item.Description, item.LowerLeftText, item.FooterTitle,
-            item.FooterDescription, item.ImageAlt, Image("desktop"), item.HasTabletImage ? Image("tablet") : Image("desktop"),
-            item.HasMobileImage ? Image("mobile") : item.HasTabletImage ? Image("tablet") : Image("desktop"),
+            item.FooterDescription, item.ImageAlt, Image("desktop"), item.HasTabletImage ? Image("tablet") : null,
+            item.HasMobileImage ? Image("mobile") : null, desktopMediaType,
             item.SocialNetworks.Select(x => new PublicLoginSocialDto(x.Name, x.Label, x.Order, x.Url)).ToArray());
     }
 
@@ -260,7 +260,8 @@ internal sealed class DataverseLoginConfigurationStore(
         if (Text(row, fields.Tablet) is { Length: > 0 } tablet) images["tablet"] = Decode(tablet);
         if (Text(row, fields.Mobile) is { Length: > 0 } mobile) images["mobile"] = Decode(mobile);
         var version = Text(row, "modifiedon") ?? DateTimeOffset.UtcNow.UtcTicks.ToString(CultureInfo.InvariantCulture);
-        await publicSnapshot.PublishAsync(Public(item, version), images, token);
+        var desktopMetadata=await storage.GetMetadataAsync(images["desktop"],token);
+        await publicSnapshot.PublishAsync(Public(item, version, desktopMetadata.ContentType), images, token);
     }
 
     private static async Task<IReadOnlyList<LoginConfigurationDto>> ReadAllConfigurations(HttpClient client, CancellationToken token)

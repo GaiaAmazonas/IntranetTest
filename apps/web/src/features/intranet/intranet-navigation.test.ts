@@ -4,7 +4,7 @@ import { intranetNavigationFromModules, isIntranetRouteActive } from "./intranet
 const modules = [
   { id:"people", code:"INT.PERSONAS", name:"Directorio", description:"Personas de Gaia", route:"/intranet/personas", icon:"people", order:7 },
   { id:"home", code:"INT.INICIO", name:"Portada", description:"Inicio", route:"/intranet", icon:"home", order:6 },
-  { id:"help", code:"INT.HELPDESK", name:"Mis solicitudes", description:"Consulta tus casos", route:"/intranet/helpdesk", icon:"helpdesk", order:10 },
+  { id:"help", code:"INT.SOLICITUDES", name:"Mis solicitudes", description:"Consulta tus casos", route:"/intranet/solicitudes", icon:"solicitudes", order:10 },
   { id:"app", code:"INT.APP.ADMINCORE", name:"AdminCore", description:"Administración", route:"/admincore", icon:"admincore", order:11 },
 ];
 

@@ -71,4 +71,4 @@ Los archivos de modelo y aprovisionamiento existentes contienen varios nombres v
 - Resolver siempre entity sets, atributos y navegaciones mediante metadatos de Dataverse.
 - Proteger los endpoints en backend; ocultar opciones en frontend no sustituye autorización.
 - No editar una versión publicada: duplicarla como borrador de la siguiente versión.
-- Mantener este módulo aislado de Helpdesk y del resto de módulos, salvo contratos explícitos.
+- Mantener este módulo aislado de Solicitudes y del resto de módulos, salvo contratos explícitos.

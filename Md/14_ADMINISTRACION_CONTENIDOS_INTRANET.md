@@ -61,7 +61,7 @@ No deben persistirse favoritos hasta definir si son personales y dónde se guard
 - Navegación: proviene del modelo de Seguridad.
 - Accesos rápidos: deben dirigir a capacidades existentes; no deben duplicar aplicaciones.
 - Identidad visual y bienvenida: pertenecen a configuración del producto, no a una noticia editable.
-- Helpdesk: tendrá su propio dominio cuando se aprueben sus requerimientos.
+- Solicitudes: tendrá su propio dominio cuando se aprueben sus requerimientos.
 - Documentos: continúa fuera del alcance actual.
 
 ## Flujo editorial que debe aprobarse

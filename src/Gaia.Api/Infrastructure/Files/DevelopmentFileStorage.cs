@@ -18,7 +18,7 @@ internal sealed class DevelopmentFileStorage(IHostEnvironment environment)
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     };
-    private readonly string root = Path.Combine(environment.ContentRootPath, "App_Data", "helpdesk-files");
+    private readonly string root = Path.Combine(environment.ContentRootPath, "App_Data", "solicitudes-files");
     private string MetadataRoot => Path.Combine(root, ".metadata");
 
     public async Task<StoredFile> UploadAsync(FileUpload upload, Stream content, CancellationToken token)
@@ -47,9 +47,9 @@ internal sealed class DevelopmentFileStorage(IHostEnvironment environment)
             }
             if (length != upload.Length) throw new FileStorageException(FileStorageError.InvalidLength);
             var info = new FileInfo(path);
-            // Helpdesk's current Dataverse choice only models SharePoint. This development adapter emulates
+            // Solicitudes's current Dataverse choice only models SharePoint. This development adapter emulates
             // that contract while using an unmistakably local repository identifier.
-            var id = new ExternalFileId("SharePoint", "development-local", "helpdesk", upload.FileId.ToString("D"));
+            var id = new ExternalFileId("SharePoint", "development-local", "solicitudes", upload.FileId.ToString("D"));
             var logicalPath = upload.Scope.CorrelationId is null
                 ? $"{upload.Scope.Scope}/{storedName}"
                 : $"{upload.Scope.Scope}/{upload.Scope.CorrelationId}/{storedName}";
@@ -96,7 +96,7 @@ internal sealed class DevelopmentFileStorage(IHostEnvironment environment)
         }
         return files;
     }
-    public Task<ExternalFolder> EnsureFolderAsync(LogicalFileScope scope, CancellationToken token) { FileUploadRules.ValidateScope(scope); Directory.CreateDirectory(root); return Task.FromResult(new ExternalFolder("SharePoint", "development-local", "helpdesk", "root", scope.Scope)); }
+    public Task<ExternalFolder> EnsureFolderAsync(LogicalFileScope scope, CancellationToken token) { FileUploadRules.ValidateScope(scope); Directory.CreateDirectory(root); return Task.FromResult(new ExternalFolder("SharePoint", "development-local", "solicitudes", "root", scope.Scope)); }
     public Task<FileStorageAvailability> CheckAvailabilityAsync(CancellationToken token) => Task.FromResult(new FileStorageAvailability(StorageAccessStatus.Available, StorageAccessStatus.Available, StorageAccessStatus.Available, StorageAccessStatus.Available, StorageAccessStatus.Available, StorageAccessStatus.Available));
     public async Task DeletePhysicallyAsync(PhysicalFileDeletion deletion, CancellationToken token)
     {
@@ -116,7 +116,7 @@ internal sealed class DevelopmentFileStorage(IHostEnvironment environment)
     private static Guid LocalId(ExternalFileId file)
     {
         if (!string.Equals(file.RepositoryId, "development-local", StringComparison.Ordinal)
-            || !string.Equals(file.ContainerId, "helpdesk", StringComparison.Ordinal)
+            || !string.Equals(file.ContainerId, "solicitudes", StringComparison.Ordinal)
             || !Guid.TryParse(file.FileId, out var id))
             throw new FileStorageException(FileStorageError.FileUnauthorized);
         return id;
