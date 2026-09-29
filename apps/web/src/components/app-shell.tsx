@@ -46,6 +46,24 @@ const navigation = [
   ] },
 ];
 
+type NavigationLabelSource = {
+  label: string;
+  href?: string;
+  aliases?: readonly string[];
+  children?: readonly { href: string }[];
+};
+const normalizedRoute = (value: string) => value.length > 1 ? value.replace(/\/$/, "") : value;
+
+function configuredNavigationLabel(item: NavigationLabelSource, modules: ReturnType<typeof useSecurity>["modules"]) {
+  const candidates = item.href
+    ? [item.href, ...(item.aliases ?? [])]
+    : item.children?.length
+      ? [`/${item.children[0].href.split("/").filter(Boolean)[0]}`]
+      : [];
+  const configured = modules.find(module => candidates.some(route => normalizedRoute(module.route) === normalizedRoute(route)));
+  return configured?.name?.trim() || item.label;
+}
+
 export function AppShell({ title, user: suppliedUser }: { title: string; user?: User }) {
   const security = useSecurity();
   const pathname = usePathname(); const [user, setUser] = useState<User | null>(suppliedUser ?? null);
@@ -76,9 +94,10 @@ export function AppShell({ title, user: suppliedUser }: { title: string; user?: 
       <div className="gaia-brand"><span className="gaia-brand-mark"><Image alt="Gaia Amazonas" height={41} priority src="/brand/logo-gaia.svg" width={75} /></span>{!collapsed && <div className="min-w-0"><p className="gaia-brand-name">Fundación Gaia Amazonas</p><p className="gaia-brand-caption">Plataforma empresarial</p></div>}<IconButton className="gaia-mobile-close" label="Cerrar navegación" onClick={() => setMobileOpen(false)}><X size={19} /></IconButton></div>
       <nav className="gaia-navigation">{!collapsed && <p className="gaia-navigation-label">Espacio de trabajo</p>}{navigation.filter(item => security.loading || security.can(item.permission)).map(item => {
         const Icon = item.icon; const children = "children" in item ? item.children : undefined;
+        const itemLabel = configuredNavigationLabel(item, security.modules);
         const childActive = children?.some(child => pathname.startsWith(child.href) || child.aliases?.some(alias => pathname.startsWith(alias))); const isExpanded = expanded.includes(item.label) || childActive;
-        if (!children) return <Link aria-busy={pendingNavigation === item.href} aria-current={isActive(item.href!, item.exact) ? "page" : undefined} className={`gaia-nav-item ${isActive(item.href!, item.exact) ? "is-active" : ""}`} href={item.href!} key={item.label} onClick={event => beginNavigation(item.href!, event)} title={collapsed ? item.label : undefined}><Icon size={20} strokeWidth={1.8} />{!collapsed && <span>{item.label}</span>}{pendingNavigation === item.href && <LoaderCircle className="gaia-spin gaia-nav-loading" size={15} />}</Link>;
-        return <div className="gaia-nav-group" key={item.label}><button aria-expanded={isExpanded} className={`gaia-nav-item gaia-nav-parent ${childActive ? "has-active-child" : ""}`} onClick={() => setExpanded(current => current.includes(item.label) ? current.filter(label => label !== item.label) : [...current, item.label])} title={collapsed ? item.label : undefined} type="button"><Icon size={20} strokeWidth={1.8} />{!collapsed && <><span>{item.label}</span><ChevronDown className="gaia-nav-chevron" size={15} /></>}</button>{isExpanded && !collapsed && <div className="gaia-subnavigation">{children.filter(child => security.can(child.permission)).map(child => { const active = pathname.startsWith(child.href) || child.aliases?.some(alias => pathname.startsWith(alias)); return <Link aria-busy={pendingNavigation === child.href} aria-current={active ? "page" : undefined} className={`gaia-subnav-item ${active ? "is-active" : ""}`} href={child.href} key={child.href} onClick={event => beginNavigation(child.href, event)}>{child.label}{pendingNavigation === child.href && <LoaderCircle className="gaia-spin gaia-nav-loading" size={13} />}</Link>; })}</div>}</div>;
+        if (!children) return <Link aria-busy={pendingNavigation === item.href} aria-current={isActive(item.href!, item.exact) ? "page" : undefined} className={`gaia-nav-item ${isActive(item.href!, item.exact) ? "is-active" : ""}`} href={item.href!} key={item.label} onClick={event => beginNavigation(item.href!, event)} title={collapsed ? itemLabel : undefined}><Icon size={20} strokeWidth={1.8} />{!collapsed && <span>{itemLabel}</span>}{pendingNavigation === item.href && <LoaderCircle className="gaia-spin gaia-nav-loading" size={15} />}</Link>;
+        return <div className="gaia-nav-group" key={item.label}><button aria-expanded={isExpanded} className={`gaia-nav-item gaia-nav-parent ${childActive ? "has-active-child" : ""}`} onClick={() => setExpanded(current => current.includes(item.label) ? current.filter(label => label !== item.label) : [...current, item.label])} title={collapsed ? itemLabel : undefined} type="button"><Icon size={20} strokeWidth={1.8} />{!collapsed && <><span>{itemLabel}</span><ChevronDown className="gaia-nav-chevron" size={15} /></>}</button>{isExpanded && !collapsed && <div className="gaia-subnavigation">{children.filter(child => security.can(child.permission)).map(child => { const active = pathname.startsWith(child.href) || child.aliases?.some(alias => pathname.startsWith(alias)); const childLabel = configuredNavigationLabel(child, security.modules); return <Link aria-busy={pendingNavigation === child.href} aria-current={active ? "page" : undefined} className={`gaia-subnav-item ${active ? "is-active" : ""}`} href={child.href} key={child.href} onClick={event => beginNavigation(child.href, event)}>{childLabel}{pendingNavigation === child.href && <LoaderCircle className="gaia-spin gaia-nav-loading" size={13} />}</Link>; })}</div>}</div>;
       })}</nav>
       <div className="gaia-sidebar-footer" ref={accountRef}>{accountOpen && <div className={`gaia-account-menu ${collapsed ? "is-collapsed" : ""}`} role="menu"><div className="gaia-account-summary"><UserRound size={17} /><div><strong>{displayedUser?.displayName ?? "Usuario Gaia"}</strong><span>{displayedUser?.email}</span></div></div><div className="gaia-theme-selector"><div><Palette size={16} /><span>Color de la plataforma</span></div><div aria-label="Color de la plataforma" className="gaia-theme-options" role="radiogroup">{accentThemes.map(theme => <button aria-checked={accentTheme === theme.value} aria-label={theme.label} className={accentTheme === theme.value ? "is-selected" : ""} key={theme.value} onClick={() => selectAccent(theme.value)} role="radio" title={theme.label} type="button"><span style={{ backgroundColor: theme.color }} /><small>{theme.label}</small></button>)}</div></div><button className="gaia-account-action" disabled={loggingOut} onClick={logout} role="menuitem" type="button">{loggingOut ? <LoaderCircle className="gaia-spin" size={17} /> : <LogOut size={17} />}{loggingOut ? "Cerrando sesión..." : "Cerrar sesión"}</button></div>}
         <button aria-expanded={accountOpen} className="gaia-user-trigger" onClick={() => setAccountOpen(value => !value)} title={collapsed ? displayedUser?.displayName : undefined} type="button"><Avatar currentUser name={displayedUser?.displayName ?? "Usuario Gaia"} />{!collapsed && <><span className="min-w-0 flex-1 text-left"><strong>{displayedUser?.displayName ?? "Usuario Gaia"}</strong><small>{displayedUser?.email ?? "Cuenta institucional"}</small></span><ChevronRight size={17} /></>}</button>

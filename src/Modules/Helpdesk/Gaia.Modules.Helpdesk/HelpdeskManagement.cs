@@ -5,7 +5,7 @@ public sealed record HelpdeskQueueFilter(string? Search=null,Guid? ServiceId=nul
     string Sort="submitted-desc",string? ContinuationToken=null);
 public sealed record HelpdeskQueueItem(Guid Id,string Number,string Subject,string Service,string Status,
     string? StatusColor,string Requester,string? Responsible,string? Unit,DateTimeOffset? SubmittedAt,
-    DateOnly? DueDate,bool IsOverdue);
+    DateOnly? DueDate,bool IsOverdue,bool CanDelete=false);
 public sealed record HelpdeskQueuePage(int Total,int Page,int PageSize,IReadOnlyList<HelpdeskQueueItem> Items,
     bool HasNextPage=false,int? TotalCount=null,string? ContinuationToken=null);
 public sealed record HelpdeskManagementOption(Guid Id,string Name,string? Code=null,IReadOnlyList<Guid>? UnitIds=null);
@@ -45,6 +45,7 @@ public interface IHelpdeskManagementStore
     Task<HelpdeskQueuePage> ReadQueueAsync(HelpdeskQueueFilter filter,CancellationToken token);
     Task<HelpdeskManagementCatalog> ReadCatalogAsync(CancellationToken token);
     Task ReassignAsync(Guid requestId,Guid actorId,ReassignHelpdeskRequest request,DateTimeOffset now,CancellationToken token);
+    Task DeleteResolvedAsync(Guid requestId,Guid actorId,DateTimeOffset now,CancellationToken token);
     Task<HelpdeskAdminSnapshot> ReadAdministrationAsync(CancellationToken token);
     Task<IReadOnlyList<HelpdeskRequestExportRow>> ReadExportAsync(CancellationToken token);
     Task<Guid> SaveServiceAsync(Guid? id,SaveHelpdeskService request,CancellationToken token);
@@ -59,6 +60,7 @@ public interface IHelpdeskManagementApplication
     Task<HelpdeskQueuePage> ReadQueueAsync(HelpdeskQueueFilter filter,CancellationToken token);
     Task<HelpdeskManagementCatalog> ReadCatalogAsync(CancellationToken token);
     Task ReassignAsync(Guid requestId,Guid actorId,ReassignHelpdeskRequest request,CancellationToken token);
+    Task DeleteResolvedAsync(Guid requestId,Guid actorId,CancellationToken token);
     Task<HelpdeskAdminSnapshot> ReadAdministrationAsync(CancellationToken token);
     Task<IReadOnlyList<HelpdeskRequestExportRow>> ReadExportAsync(CancellationToken token);
     Task<Guid> SaveServiceAsync(Guid? id,SaveHelpdeskService request,CancellationToken token);
@@ -80,6 +82,12 @@ public sealed class HelpdeskManagementApplication(IHelpdeskManagementStore store
     public Task ReassignAsync(Guid requestId,Guid actorId,ReassignHelpdeskRequest request,CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(request);if(requestId==Guid.Empty||request.ResponsibleId==Guid.Empty)throw new ArgumentException("Selecciona una solicitud y un responsable válidos.");var reason=request.Reason?.Trim();if(string.IsNullOrWhiteSpace(reason)||reason.Length is <5 or >500)throw new ArgumentException("El motivo debe tener entre 5 y 500 caracteres.");return store.ReassignAsync(requestId,actorId,request with{Reason=reason},timeProvider.GetUtcNow(),token);
+    }
+    public Task DeleteResolvedAsync(Guid requestId,Guid actorId,CancellationToken token)
+    {
+        if(requestId==Guid.Empty)throw new ArgumentException("Selecciona una solicitud válida.");
+        if(actorId==Guid.Empty)throw new ArgumentException("No fue posible identificar al administrador.");
+        return store.DeleteResolvedAsync(requestId,actorId,timeProvider.GetUtcNow(),token);
     }
     public Task<HelpdeskAdminSnapshot> ReadAdministrationAsync(CancellationToken token)=>store.ReadAdministrationAsync(token);
     public Task<IReadOnlyList<HelpdeskRequestExportRow>> ReadExportAsync(CancellationToken token)=>store.ReadExportAsync(token);

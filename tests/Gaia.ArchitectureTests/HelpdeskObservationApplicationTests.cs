@@ -6,17 +6,18 @@ namespace Gaia.ArchitectureTests;
 public sealed class HelpdeskObservationApplicationTests
 {
     [Fact]
-    public async Task DocumentIsMandatoryBeforeAnyMutation()
+    public async Task ResponseWithoutDocumentChangesStateWithoutUploading()
     {
         var attachments = new Attachments();
         var conversation = new Conversation();
         var application = new HelpdeskObservationApplication(attachments, conversation);
 
-        await Assert.ThrowsAsync<ArgumentException>(() => application.AttendAsync(
-            Command() with { Length = 0 }, new MemoryStream(), default));
+        var result = await application.AttendAsync(
+            Command() with { OriginalName = null, ContentType = null, Length = 0 }, Stream.Null, default);
 
         Assert.False(attachments.UploadCalled);
-        Assert.False(conversation.TransitionCalled);
+        Assert.True(conversation.TransitionCalled);
+        Assert.Null(result.Attachment);
     }
 
     [Fact]
@@ -58,7 +59,7 @@ public sealed class HelpdeskObservationApplicationTests
         var result = await application.AttendAsync(Command(), new MemoryStream(new byte[10]), default);
 
         Assert.Equal("En gestión", result.Request.Status);
-        Assert.Equal(attachments.Uploaded.Id, result.Attachment.Id);
+        Assert.Equal(attachments.Uploaded.Id, result.Attachment!.Id);
         Assert.False(attachments.RollbackCalled);
     }
 

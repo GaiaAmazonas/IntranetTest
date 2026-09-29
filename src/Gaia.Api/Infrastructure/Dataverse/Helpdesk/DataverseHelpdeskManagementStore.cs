@@ -26,6 +26,27 @@ internal sealed partial class DataverseHelpdeskManagementStore(IDataverseDelegat
         try{await History(client,requestId,actorId,now,change.Reason,OptionalGuid(current,$"_{responsibleField}_value"),change.ResponsibleId,token);}catch{var rollback=new Dictionary<string,object?>{{responsible.NavigationProperty+"@odata.bind",Bind(third,OptionalGuid(current,$"_{responsibleField}_value"))},{organization.NavigationProperty+"@odata.bind",Bind(unit,OptionalGuid(current,$"_{unitField}_value"))}};using var undo=new HttpRequestMessage(HttpMethod.Patch,$"{request.EntitySetName}({requestId:D})"){Content=JsonContent.Create(rollback)};undo.Headers.TryAddWithoutValidation("If-Match","*");using var ignored=await client.SendAsync(undo,CancellationToken.None);throw;}
     }
 
+    public async Task DeleteResolvedAsync(Guid requestId,Guid actorId,DateTimeOffset now,CancellationToken token)
+    {
+        var client=await clients.CreateAsync();
+        var request=await DataverseMetadataResolver.TableAsync(client,"gaia_solicitud",token);
+        var state=await DataverseMetadataResolver.TableAsync(client,"gaia_estadosolicitud",token);
+        var currentState=request.Attribute("gaia_EstadoActual");
+        var row=await DataverseMetadataResolver.ReadOneAsync(client,
+            $"{request.EntitySetName}({requestId:D})?$select={request.PrimaryIdAttribute},statecode,_{currentState}_value",token)
+            ??throw new KeyNotFoundException("La solicitud no existe.");
+        if(Int(row,"statecode")!=0)throw new InvalidOperationException("La solicitud ya fue eliminada o está inactiva.");
+        var stateId=OptionalGuid(row,$"_{currentState}_value")
+            ??throw new InvalidOperationException("La solicitud no tiene un estado actual válido.");
+        var code=state.Attribute("gaia_Codigo");
+        var stateRow=await DataverseMetadataResolver.ReadOneAsync(client,
+            $"{state.EntitySetName}({stateId:D})?$select={code},statecode",token)
+            ??throw new InvalidOperationException("No fue posible validar el estado actual de la solicitud.");
+        if(Int(stateRow,"statecode")!=0||!string.Equals(Text(stateRow,code),"RESUELTA",StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Solo se pueden eliminar solicitudes que estén en estado Resuelta.");
+        await Write(client,request,requestId,new Dictionary<string,object?>{{"statecode",1}},token);
+    }
+
     public async Task<HelpdeskAdminSnapshot> ReadAdministrationAsync(CancellationToken token)
     {
         var client=await clients.CreateAsync();var service=await DataverseMetadataResolver.TableAsync(client,"gaia_servicio",token);var form=await DataverseMetadataResolver.TableAsync(client,"gaia_formularioservicio",token);var field=await DataverseMetadataResolver.TableAsync(client,"gaia_campoformulario",token);var third=await DataverseMetadataResolver.TableAsync(client,"gaia_terceros",token);var request=await DataverseMetadataResolver.TableAsync(client,"gaia_solicitud",token);var requestState=await DataverseMetadataResolver.TableAsync(client,"gaia_estadosolicitud",token);var people=await Options(client,third,null,token);

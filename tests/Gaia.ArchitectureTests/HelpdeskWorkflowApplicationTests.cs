@@ -48,6 +48,14 @@ public sealed class HelpdeskWorkflowApplicationTests
     }
 
     [Fact]
+    public async Task AdministratorCanResumeWaitingManagement()
+    {
+        var store=new Store();var app=new HelpdeskWorkflowApplication(store,TimeProvider.System);
+        await app.ResumeFromManagementAsync(Guid.NewGuid(),Guid.NewGuid(),default);
+        Assert.True(store.Resumed);
+    }
+
+    [Fact]
     public async Task WorkflowStepRequiresValidCode()
     {
         var app=new HelpdeskWorkflowApplication(new Store(),TimeProvider.System);
@@ -96,6 +104,7 @@ public sealed class HelpdeskWorkflowApplicationTests
         public Task ReassignAsync(Guid id,Guid actor,ReassignHelpdeskManagement command,DateTimeOffset now,CancellationToken token){Reassignment=command;return Task.CompletedTask;}
         public Task TakeAsync(Guid id,Guid actor,DateTimeOffset now,CancellationToken token)=>Task.CompletedTask;
         public Task ResumeFromRequesterAsync(Guid id,Guid actor,string comment,bool hasFile,DateTimeOffset now,CancellationToken token){Resumed=true;return Task.CompletedTask;}
+        public Task ResumeFromManagementAsync(Guid id,Guid actor,DateTimeOffset now,CancellationToken token){Resumed=true;return Task.CompletedTask;}
         public Task ReopenAsync(Guid requestId,Guid actor,DateTimeOffset now,CancellationToken token)=>Task.CompletedTask;
         public Task<IReadOnlyList<HelpdeskWorkflowSummary>> ListAsync(Guid serviceId,CancellationToken token)=>Task.FromResult<IReadOnlyList<HelpdeskWorkflowSummary>>([]);
         public Task<Guid> CreateDraftAsync(CreateHelpdeskWorkflowDraft command,CancellationToken token)=>Task.FromResult(Guid.NewGuid());

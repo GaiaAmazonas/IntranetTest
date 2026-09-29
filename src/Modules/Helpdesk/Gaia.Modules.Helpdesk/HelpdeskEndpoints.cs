@@ -32,6 +32,8 @@ public static class HelpdeskEndpoints
         group.MapGet("/management/catalog", ManagementCatalog).RequireAuthorization(AdminCorePermissions.HelpdeskCatalogosVer);
         group.MapPut("/management/requests/{requestId:guid}/assignment", Reassign)
             .RequireAuthorization(AdminCorePermissions.HelpdeskSolicitudesReasignar);
+        group.MapDelete("/management/requests/{requestId:guid}", DeleteResolvedRequest)
+            .RequireAuthorization(AdminCorePermissions.HelpdeskSolicitudesReasignar);
         group.MapPost("/management/workflows/{managementId:guid}/complete",CompleteWorkflowManagement)
             .RequireAuthorization(AdminCorePermissions.HelpdeskSolicitudesReasignar);
         group.MapGet("/management/workflows/{managementId:guid}/form",ReadManagementStageForm)
@@ -40,6 +42,8 @@ public static class HelpdeskEndpoints
             .RequireAuthorization(AdminCorePermissions.HelpdeskSolicitudesReasignar);
         group.MapPost("/management/workflows/{managementId:guid}/take",TakeWorkflowManagement)
             .RequireAuthorization(AdminCorePermissions.HelpdeskSolicitudesVer);
+        group.MapPost("/management/workflows/{managementId:guid}/resume",ResumeWorkflowFromManagement)
+            .RequireAuthorization(AdminCorePermissions.HelpdeskSolicitudesReasignar);
         group.MapPut("/management/workflows/{managementId:guid}/assignment",ReassignWorkflowManagement)
             .RequireAuthorization(AdminCorePermissions.HelpdeskSolicitudesReasignar);
         group.MapPost("/requests/{requestId:guid}/workflow/reopen",ReopenWorkflow)
@@ -111,6 +115,16 @@ public static class HelpdeskEndpoints
         try{var management=await authorization.HasPermissionAsync(principal,AdminCorePermissions.HelpdeskSolicitudesVer,token);var value=await application.ReadRequestStateAsync(requestId,await Actor(security,principal,token),management,token);return value is null?Results.NoContent():Results.Ok(value);}
         catch(Exception error){return Problem(error);}
     }
+    private static async Task<IResult> DeleteResolvedRequest(Guid requestId,ClaimsPrincipal principal,
+        ISecurityStore security,IHelpdeskManagementApplication application,CancellationToken token)
+    {
+        try
+        {
+            await application.DeleteResolvedAsync(requestId,await Actor(security,principal,token),token);
+            return Results.NoContent();
+        }
+        catch(Exception error){return Problem(error);}
+    }
     private static async Task<IResult> WorkflowQueue(string? queue,ClaimsPrincipal principal,ISecurityStore security,
         HelpdeskWorkflowApplication application,CancellationToken token)
     {
@@ -134,25 +148,32 @@ public static class HelpdeskEndpoints
 
     private static async Task<IResult> AttendObservation(Guid requestId, HttpRequest httpRequest,
         ClaimsPrincipal principal, ISecurityStore security, IHelpdeskObservationApplication application,
+        HelpdeskWorkflowApplication workflow,
         CancellationToken token)
     {
         try
         {
             if (!httpRequest.HasFormContentType) return Invalid("La respuesta debe usar multipart/form-data.");
             var form = await httpRequest.ReadFormAsync(token);
-            if (form.Files.Count != 1 || form.Files.GetFile("file") is not { } file)
-                return Invalid("Debes adjuntar exactamente un documento.");
+            if (form.Files.Count > 1)
+                return Invalid("Puedes adjuntar máximo un documento.");
+            var file = form.Files.GetFile("file");
             if (!Guid.TryParse(form["transitionId"], out var transitionId) || transitionId == Guid.Empty)
                 return Invalid("La transición de la respuesta no es válida.");
-            await using var stream = file.OpenReadStream();
+            await using var stream = file?.OpenReadStream() ?? Stream.Null;
+            var actor = await Actor(security, principal, token);
             var result = await application.AttendAsync(new(
                 requestId,
                 transitionId,
-                await Actor(security, principal, token),
+                actor,
                 form["comment"].ToString(),
-                file.FileName,
-                file.ContentType,
-                file.Length), stream, token);
+                file?.FileName,
+                file?.ContentType,
+                file?.Length ?? 0), stream, token);
+            var state = await workflow.ReadRequestStateAsync(requestId, actor, false, token);
+            var waiting = state?.Managements.FirstOrDefault(item => item.Status == HelpdeskWorkflowValues.ManagementWaiting);
+            if (waiting is not null)
+                await workflow.ResumeFromRequesterAsync(waiting.Id, actor, form["comment"].ToString(), file is not null, token);
             return Results.Ok(result);
         }
         catch (Exception error) { return Problem(error); }
@@ -263,6 +284,13 @@ public static class HelpdeskEndpoints
         ClaimsPrincipal principal,ISecurityStore security,HelpdeskWorkflowApplication application,CancellationToken token)
     {
         try{await application.ResumeFromRequesterAsync(managementId,await Actor(security,principal,token),request.Comment??string.Empty,request.HasFile,token);return Results.NoContent();}
+        catch(Exception error){return Problem(error);}
+    }
+
+    private static async Task<IResult> ResumeWorkflowFromManagement(Guid managementId,ClaimsPrincipal principal,
+        ISecurityStore security,HelpdeskWorkflowApplication application,CancellationToken token)
+    {
+        try{await application.ResumeFromManagementAsync(managementId,await Actor(security,principal,token),token);return Results.NoContent();}
         catch(Exception error){return Problem(error);}
     }
 

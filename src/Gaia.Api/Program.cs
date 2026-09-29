@@ -225,6 +225,11 @@ app.MapThirdPartiesEndpoints();
 app.MapInventoryEndpoints();
 app.MapSecurityEndpoints();
 app.MapHelpdeskEndpoints();
+if(app.Environment.IsDevelopment())
+{
+    app.MapDevelopmentHelpdeskDataReset();
+    app.MapDevelopmentHelpdeskScenarioSeed();
+}
 app.MapCommunicationsEndpoints();
 app.MapTrainingEndpoints();
 app.MapGet("/api/intranet/home", async (ICommunicationsStore communications, IIntranetDirectoryReader directory,

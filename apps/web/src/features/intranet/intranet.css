@@ -889,3 +889,16 @@
 @media(max-width:600px){.intranet-people-skeleton{grid-template-columns:1fr}}
 @media(max-width:1100px){.intranet-home-support:has(.intranet-home-training){grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.intranet-home-support:has(.intranet-home-training){grid-template-columns:1fr}}
+
+/* Home: a wider, fluid reading frame and enough room for every celebration name. */
+.intranet-event-copy,.intranet-home-primary,.intranet-home-support{width:min(1340px,calc(100% - 72px))}
+.intranet-home-redesign .intranet-home-primary>.intranet-home-birthdays{height:auto;min-height:350px;overflow:hidden}
+.intranet-home-primary .intranet-home-birthdays.has-celebrations{align-items:center;min-height:350px}
+.intranet-home-birthday-copy{min-height:0}
+.intranet-home-birthday-copy h2{max-width:480px;font-size:clamp(22px,1.7vw,28px);line-height:1.12}
+.intranet-home-birthday-message{max-width:560px!important;margin-top:10px!important;line-height:1.48!important}
+.intranet-home-birthday-names{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-content:start;gap:8px;margin-top:12px}
+.intranet-home-birthday-names span{width:auto;min-width:0;max-width:none;overflow-wrap:anywhere}
+@media(max-width:1100px){.intranet-event-copy,.intranet-home-primary,.intranet-home-support{width:calc(100% - 48px)}}
+@media(max-width:1100px) and (min-width:761px){.intranet-home-birthday-names{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.intranet-event-copy,.intranet-home-primary,.intranet-home-support{width:calc(100% - 28px)}.intranet-home-redesign .intranet-home-primary>.intranet-home-birthdays{min-height:330px}.intranet-home-birthday-names{display:none}}

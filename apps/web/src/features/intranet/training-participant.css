@@ -53,8 +53,9 @@ iframe.training-video { min-height: 200px; }
 @media (prefers-reduced-motion: reduce) { .training-participant * { transition: none !important; animation: none !important; } }
 .training-participant-hero{background:linear-gradient(120deg,var(--gaia-accent-pale),var(--surface-card));border:1px solid var(--gaia-line)}
 .training-assignment-list{border:1px solid var(--gaia-line);border-radius:22px;overflow:hidden;background:var(--surface-card)}
-.training-list-heading,.training-assignment-list .training-assignment-card{display:grid;grid-template-columns:minmax(230px,2.4fr) minmax(140px,1fr) minmax(120px,.9fr) minmax(130px,1fr) minmax(125px,.8fr);gap:20px;align-items:center}
+.training-list-heading,.training-assignment-list .training-assignment-card{display:grid;grid-template-columns:minmax(230px,2.4fr) minmax(140px,1fr) minmax(120px,.9fr) minmax(130px,1fr) minmax(170px,.9fr);gap:20px;align-items:center}
 .training-list-heading{padding:18px 24px;background:var(--gaia-accent-pale);font-size:11px;text-transform:uppercase;letter-spacing:.08em;font-weight:700}
+.training-list-heading>span{text-align:center;justify-self:center}
 .training-assignment-list .training-assignment-card{border:0;border-bottom:1px solid var(--gaia-line);border-radius:0;padding:24px;box-shadow:none}
 .training-list-title{display:flex;align-items:center;gap:16px;min-width:0}
 .training-course-icon{display:grid;place-items:center;width:48px;height:48px;flex-shrink:0;border-radius:16px;background:var(--gaia-accent-pale);color:var(--brand-primary)}
@@ -65,6 +66,8 @@ iframe.training-video { min-height: 200px; }
 .training-list-due{display:flex;align-items:center;gap:8px}
 .training-assignment-card:hover{background:var(--gaia-surface-subtle)}
 .training-assignment-list .training-assignment-card>.gaia-button{width:auto;margin:0}
+.training-assignment-list .training-assignment-card>.gaia-badge{justify-self:center;text-align:center}
+.training-assignment-list .training-list-due{justify-self:center;text-align:center}
 @media(max-width:1100px){.training-list-heading{display:none}.training-assignment-list .training-assignment-card{grid-template-columns:2fr 1fr}.training-list-title{grid-column:1/-1}}
 @media(max-width:600px){.training-assignment-list .training-assignment-card{grid-template-columns:1fr;padding:20px}.training-list-title{align-items:flex-start}.training-assignment-card .gaia-button{width:100%}}
 .training-participant-section{box-shadow:0 6px 22px color-mix(in srgb,var(--brand-primary) 6%,transparent)}
@@ -73,6 +76,15 @@ iframe.training-video { min-height: 200px; }
 .training-collapse-header:hover{background:var(--gaia-accent-pale)}
 .training-participant-block{border:1px solid var(--gaia-line);border-radius:16px}
 .training-participant .training-assignment-card>button:disabled{cursor:wait}
+.training-participant .training-open-button{display:inline-flex;width:100%;max-width:170px;min-height:42px;align-items:center;justify-content:center;gap:8px;justify-self:end;border:1px solid color-mix(in srgb,var(--brand-primary) 30%,transparent);border-radius:999px;background:var(--gaia-accent-pale);padding:10px 16px;color:var(--brand-primary);font-weight:750;line-height:1;white-space:nowrap;box-shadow:none;transition:background 160ms ease,border-color 160ms ease,color 160ms ease}
+.training-participant .training-open-button:hover:not(:disabled){border-color:var(--brand-primary);background:var(--brand-primary);color:#fff;transform:none}
+.training-participant .training-open-button:focus-visible{outline:3px solid var(--gaia-accent-soft);outline-offset:2px}
+.training-participant>.grid.gap-4 .training-assignment-card{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto auto auto;align-items:center;gap:10px 16px;padding:20px}
+.training-participant>.grid.gap-4 .training-list-title,.training-participant>.grid.gap-4 .training-list-progress{grid-column:1/-1}
+.training-participant>.grid.gap-4 .training-list-due{grid-column:1;grid-row:3}
+.training-participant>.grid.gap-4 .training-assignment-card>.gaia-badge{grid-column:1;grid-row:4;justify-self:start}
+.training-participant>.grid.gap-4 .training-open-button{grid-column:2;grid-row:3/5;align-self:center;justify-self:end;width:auto;min-width:170px;margin:0}
+@media(max-width:600px){.training-participant>.grid.gap-4 .training-assignment-card{grid-template-columns:1fr}.training-participant>.grid.gap-4 .training-list-title,.training-participant>.grid.gap-4 .training-list-progress,.training-participant>.grid.gap-4 .training-list-due,.training-participant>.grid.gap-4 .training-assignment-card>.gaia-badge,.training-participant>.grid.gap-4 .training-open-button{grid-column:1;grid-row:auto}.training-participant>.grid.gap-4 .training-open-button{width:100%;max-width:none}}
 @media(prefers-reduced-motion:reduce){.training-participant-section,.training-collapse-header{transition:none}}
 /* Experiencia de aprendizaje: jerarquía, navegación y superficies del toolkit. */
 .training-learning-experience{padding-top:28px}

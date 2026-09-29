@@ -63,6 +63,7 @@ internal sealed partial class DataverseHelpdeskManagementStore
             var items = root.GetProperty("value").EnumerateArray().Select(row =>
             {
                 var status = Nested(row, stateNav);
+                var statusCode = Text(status, state.Attribute("gaia_Codigo"));
                 var due = Date(row, request.Attribute("gaia_FechaLimiteActual"));
                 return new HelpdeskQueueItem(RequiredGuid(row, request.PrimaryIdAttribute), Text(row, request.PrimaryNameAttribute) ?? "",
                     Text(row, request.Attribute("gaia_Asunto")) ?? "", Text(Nested(row, serviceNav), service.PrimaryNameAttribute) ?? "Servicio",
@@ -70,7 +71,8 @@ internal sealed partial class DataverseHelpdeskManagementStore
                     Text(Nested(row, requesterNav), third.PrimaryNameAttribute) ?? "Sin solicitante",
                     Text(Nested(row, responsibleNav), third.PrimaryNameAttribute), Text(Nested(row, unitNav), unit.PrimaryNameAttribute),
                     DateTimeValue(row, request.Attribute("gaia_FechaRadicacion")), due,
-                    !Bool(status, state.Attribute("gaia_EsFinal")) && due.HasValue && due < today);
+                    !Bool(status, state.Attribute("gaia_EsFinal")) && due.HasValue && due < today,
+                    string.Equals(statusCode,"RESUELTA",StringComparison.OrdinalIgnoreCase));
             }).ToArray();
             var continuation = next is null ? null : protector.Protect(JsonSerializer.Serialize(new QueueCursor(fingerprint, filter.Page + 1, next, total)));
             return new(total ?? -1, filter.Page, filter.PageSize, items, next is not null, total, continuation);
@@ -110,7 +112,7 @@ internal sealed partial class DataverseHelpdeskManagementStore
             var term = filter.Search.Trim().Replace("'", "''");
             clauses.Add($"(contains({request.PrimaryNameAttribute},'{term}') or contains({subject},'{term}') or contains({requesterNav}/{third.PrimaryNameAttribute},'{term}') or contains({serviceNav}/{service.PrimaryNameAttribute},'{term}'))");
         }
-        var expand = $"{serviceNav}($select={service.PrimaryNameAttribute}),{stateNav}($select={state.PrimaryNameAttribute},{state.Attribute("gaia_Color")},{state.Attribute("gaia_EsFinal")}),{requesterNav}($select={third.PrimaryNameAttribute}),{responsibleNav}($select={third.PrimaryNameAttribute}),{unitNav}($select={unit.PrimaryNameAttribute})";
+        var expand = $"{serviceNav}($select={service.PrimaryNameAttribute}),{stateNav}($select={state.Attribute("gaia_Codigo")},{state.PrimaryNameAttribute},{state.Attribute("gaia_Color")},{state.Attribute("gaia_EsFinal")}),{requesterNav}($select={third.PrimaryNameAttribute}),{responsibleNav}($select={third.PrimaryNameAttribute}),{unitNav}($select={unit.PrimaryNameAttribute})";
         return $"{request.EntitySetName}?$select={request.PrimaryIdAttribute},{request.PrimaryNameAttribute},{subject},{submitted},{due}&$expand={expand}&$filter={Uri.EscapeDataString(string.Join(" and ", clauses))}&$orderby={submitted} desc,{request.PrimaryIdAttribute} desc&$count=true";
     }
 

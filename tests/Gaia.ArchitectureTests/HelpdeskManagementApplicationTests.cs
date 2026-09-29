@@ -46,13 +46,31 @@ public sealed class HelpdeskManagementApplicationTests
         Assert.Equal("Cambio por cobertura",store.Reassignment!.Reason);
     }
 
+    [Fact]
+    public async Task DeleteResolvedRequiresAValidRequestAndActor()
+    {
+        var store=new Store();var application=new HelpdeskManagementApplication(store,TimeProvider.System);
+        await Assert.ThrowsAsync<ArgumentException>(()=>application.DeleteResolvedAsync(Guid.Empty,Guid.NewGuid(),default));
+        await Assert.ThrowsAsync<ArgumentException>(()=>application.DeleteResolvedAsync(Guid.NewGuid(),Guid.Empty,default));
+        Assert.False(store.DeleteRequested);
+    }
+
+    [Fact]
+    public async Task DeleteResolvedDelegatesTheProtectedOperation()
+    {
+        var store=new Store();var application=new HelpdeskManagementApplication(store,TimeProvider.System);
+        await application.DeleteResolvedAsync(Guid.NewGuid(),Guid.NewGuid(),default);
+        Assert.True(store.DeleteRequested);
+    }
+
     private sealed class Store:IHelpdeskManagementStore
     {
-        public bool QueueRead{get;private set;}public HelpdeskQueueFilter? Filter{get;private set;}public ReassignHelpdeskRequest? Reassignment{get;private set;}
+        public bool QueueRead{get;private set;}public bool DeleteRequested{get;private set;}public HelpdeskQueueFilter? Filter{get;private set;}public ReassignHelpdeskRequest? Reassignment{get;private set;}
         public Task<HelpdeskQueuePage> ReadQueueAsync(HelpdeskQueueFilter filter,CancellationToken token){QueueRead=true;Filter=filter;return Task.FromResult(new HelpdeskQueuePage(0,1,25,[]));}
         public Task<HelpdeskManagementCatalog> ReadCatalogAsync(CancellationToken token)=>Task.FromResult(new HelpdeskManagementCatalog([],[],[],[]));
         public Task<IReadOnlyList<HelpdeskRequestExportRow>> ReadExportAsync(CancellationToken token)=>Task.FromResult<IReadOnlyList<HelpdeskRequestExportRow>>([]);
         public Task ReassignAsync(Guid requestId,Guid actorId,ReassignHelpdeskRequest request,DateTimeOffset now,CancellationToken token){Reassignment=request;return Task.CompletedTask;}
+        public Task DeleteResolvedAsync(Guid requestId,Guid actorId,DateTimeOffset now,CancellationToken token){DeleteRequested=true;return Task.CompletedTask;}
         public Task<HelpdeskAdminSnapshot> ReadAdministrationAsync(CancellationToken token)=>Task.FromResult(new HelpdeskAdminSnapshot([],[],[],[],[]));
         public Task<Guid> SaveServiceAsync(Guid? id,SaveHelpdeskService request,CancellationToken token)=>Task.FromResult(id??Guid.NewGuid());
         public Task<Guid> CreateFormDraftAsync(CreateHelpdeskFormDraft request,CancellationToken token)=>Task.FromResult(Guid.NewGuid());

@@ -40,7 +40,7 @@ public sealed record HelpdeskWorkflowManagementItem(Guid Id,Guid StepId,string S
     string? Observation,Guid? UnitId,Guid? ResponsibleId,DateTimeOffset? AvailableAt,DateTimeOffset? CompletedAt,
     bool RequiresDecision,bool RequiresObservation,bool RequiresFile,bool AllowsRequesterReturn,bool Final,
     int? TargetDays,DateOnly? TargetDueDate,string? UnitName,string? ResponsibleName,string? FormTitle,IReadOnlyList<HelpdeskWorkflowAnswerItem> Answers,
-    IReadOnlyList<HelpdeskWorkflowNextAction> NextActions);
+    IReadOnlyList<HelpdeskWorkflowNextAction> NextActions,bool CanTake=false,bool CanManage=false);
 public sealed record HelpdeskWorkflowAnswerItem(Guid FieldId,string Label,string? Value,IReadOnlyList<string> Options);
 public sealed record HelpdeskWorkflowNextAction(int Result,IReadOnlyList<HelpdeskWorkflowDestination> Destinations);
 public sealed record HelpdeskWorkflowDestination(Guid StepId,string Code,string Name,bool Final);
@@ -181,6 +181,7 @@ public interface IHelpdeskWorkflowStore
     Task ReassignAsync(Guid managementId,Guid actorId,ReassignHelpdeskManagement command,DateTimeOffset now,CancellationToken token);
     Task TakeAsync(Guid managementId,Guid actorId,DateTimeOffset now,CancellationToken token);
     Task ResumeFromRequesterAsync(Guid managementId,Guid actorId,string comment,bool hasFile,DateTimeOffset now,CancellationToken token);
+    Task ResumeFromManagementAsync(Guid managementId,Guid actorId,DateTimeOffset now,CancellationToken token);
     Task ReopenAsync(Guid requestId,Guid actorId,DateTimeOffset now,CancellationToken token);
     Task<IReadOnlyList<HelpdeskWorkflowSummary>> ListAsync(Guid serviceId,CancellationToken token);
     Task<Guid> CreateDraftAsync(CreateHelpdeskWorkflowDraft command,CancellationToken token);
@@ -226,6 +227,11 @@ public sealed class HelpdeskWorkflowApplication(IHelpdeskWorkflowStore store,Tim
         if(string.IsNullOrWhiteSpace(normalized)&&!hasFile)throw new ArgumentException("La respuesta debe incluir comentario o archivo.");
         if(normalized?.Length>4000)throw new ArgumentException("El comentario supera 4.000 caracteres.");
         return store.ResumeFromRequesterAsync(managementId,actorId,normalized??string.Empty,hasFile,timeProvider.GetUtcNow(),token);
+    }
+    public Task ResumeFromManagementAsync(Guid managementId,Guid actorId,CancellationToken token)
+    {
+        if(managementId==Guid.Empty||actorId==Guid.Empty)throw new ArgumentException("Gestión y actor son obligatorios.");
+        return store.ResumeFromManagementAsync(managementId,actorId,timeProvider.GetUtcNow(),token);
     }
     public Task ReopenAsync(Guid requestId,Guid actorId,CancellationToken token)
     {

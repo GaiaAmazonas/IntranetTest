@@ -110,6 +110,7 @@ internal sealed partial class DataverseHelpdeskWorkflowExecutionWriter(
             }
         }
         var formCache=new Dictionary<Guid,HelpdeskStageForm?>();
+        var actorUnits=managementAccess?await ActorUnits(client,actorId,token):[];
         async Task<HelpdeskStageForm?> StageForm(Guid stepId){if(formCache.TryGetValue(stepId,out var cached))return cached;var loaded=await ReadStageFormAsync(stepId,token);formCache[stepId]=loaded;return loaded;}
         var values=new List<HelpdeskWorkflowManagementItem>();
         foreach(var row in managementRows)
@@ -124,7 +125,10 @@ internal sealed partial class DataverseHelpdeskWorkflowExecutionWriter(
                 nextActions.Add(new(routes.Key,destinations));
             }
             var availableAt=DateTimeValue(row,available);var completedAt=DateTimeValue(row,completed);var targetDueDate=managementAccess?BusinessDueDate(availableAt,configured.TargetDays,holidays):null;
-            values.Add(new HelpdeskWorkflowManagementItem(managementId,stepId,configured.Code,Int(row,number),Int(row,status),NullableInt(row,result),Text(row,observation),OptionalGuid(row,$"_{unit.ReferencingAttribute}_value"),OptionalGuid(row,$"_{responsible.ReferencingAttribute}_value"),availableAt,completedAt,configured.RequiresDecision,configured.RequiresObservation,configured.RequiresFile,configured.AllowsRequesterReturn,configured.Final,configured.TargetDays,targetDueDate,managementAccess?Text(Nested(row,unit.NavigationProperty),unitTable.PrimaryNameAttribute):null,managementAccess?Text(Nested(row,responsible.NavigationProperty),thirdTable.PrimaryNameAttribute):null,form?.Title,answerItems,nextActions));
+            var unitId=OptionalGuid(row,$"_{unit.ReferencingAttribute}_value");var responsibleId=OptionalGuid(row,$"_{responsible.ReferencingAttribute}_value");var rowStatus=Int(row,status);
+            var canTake=managementAccess&&rowStatus==HelpdeskWorkflowValues.ManagementAvailable&&!responsibleId.HasValue&&unitId.HasValue&&actorUnits.Contains(unitId.Value);
+            var canManage=managementAccess&&(rowStatus is HelpdeskWorkflowValues.ManagementAvailable or HelpdeskWorkflowValues.ManagementInProgress)&&responsibleId==actorId;
+            values.Add(new HelpdeskWorkflowManagementItem(managementId,stepId,configured.Code,Int(row,number),rowStatus,NullableInt(row,result),Text(row,observation),unitId,responsibleId,availableAt,completedAt,configured.RequiresDecision,configured.RequiresObservation,configured.RequiresFile,configured.AllowsRequesterReturn,configured.Final,configured.TargetDays,targetDueDate,managementAccess?Text(Nested(row,unit.NavigationProperty),unitTable.PrimaryNameAttribute):null,managementAccess?Text(Nested(row,responsible.NavigationProperty),thirdTable.PrimaryNameAttribute):null,form?.Title,answerItems,nextActions,canTake,canManage));
         }
         return new(instanceId,flowId,definition.Version,Int(instanceRow,state),values);
     }
@@ -349,6 +353,22 @@ internal sealed partial class DataverseHelpdeskWorkflowExecutionWriter(
             string.IsNullOrWhiteSpace(comment)?"El solicitante adjuntó la información requerida.":comment,now,token);
         await AppendHistory(client,history,request,third,requestId,actorId,Guid.NewGuid().ToString("D"),299540213,string.IsNullOrWhiteSpace(comment)?"Gestión reanudada con archivo":comment,managementId,null,now,token);
         var instanceRelation=management.Relationship("gaia_InstanciaFlujo","gaia_instanciaflujo");var resumed=await DataverseMetadataResolver.ReadOneAsync(client,$"{management.EntitySetName}({managementId:D})?$select=_{instanceRelation.ReferencingAttribute}_value",token);if(resumed is not null)await SynchronizeRequestState(client,request,requestId,await ReadExecutions(client,management,RequiredGuid(resumed.Value,$"_{instanceRelation.ReferencingAttribute}_value"),token),false,now,token);
+    }
+
+    public async Task ResumeFromManagementAsync(Guid managementId,Guid actorId,DateTimeOffset now,CancellationToken token)
+    {
+        var client=await clients.CreateAsync();var management=await DataverseMetadataResolver.TableAsync(client,"gaia_gestionsolicitud",token);var request=await DataverseMetadataResolver.TableAsync(client,"gaia_solicitud",token);var third=await DataverseMetadataResolver.TableAsync(client,"gaia_terceros",token);var history=await DataverseMetadataResolver.TableAsync(client,"gaia_historialsolicitud",token);
+        var requestRelation=management.Relationship("gaia_Solicitud","gaia_solicitud");var state=management.Attribute("gaia_Estado");var instanceRelation=management.Relationship("gaia_InstanciaFlujo","gaia_instanciaflujo");
+        var row=await DataverseMetadataResolver.ReadOneAsync(client,$"{management.EntitySetName}({managementId:D})?$select={state},_{requestRelation.ReferencingAttribute}_value,_{instanceRelation.ReferencingAttribute}_value,statecode",token)??throw new KeyNotFoundException("La gestión no existe.");
+        if(Int(row,"statecode")!=0||Int(row,state)!=HelpdeskWorkflowValues.ManagementWaiting)throw new InvalidOperationException("La gestión ya no está esperando respuesta del solicitante.");
+        var requestId=RequiredGuid(row,$"_{requestRelation.ReferencingAttribute}_value");
+        await Patch(client,management.EntitySetName,managementId,new Dictionary<string,object?>
+        {
+            [state]=management.EncodedIntegerValue("gaia_Estado",HelpdeskWorkflowValues.ManagementAvailable),
+            [management.Attribute("gaia_FechaDisponibilidad")]=now
+        },token);
+        await AppendHistory(client,history,request,third,requestId,actorId,Guid.NewGuid().ToString("D"),299540213,"Gestión reactivada después de la respuesta del solicitante",managementId,null,now,token);
+        await SynchronizeRequestState(client,request,requestId,await ReadExecutions(client,management,RequiredGuid(row,$"_{instanceRelation.ReferencingAttribute}_value"),token),false,now,token);
     }
 
     public async Task ReopenAsync(Guid requestId,Guid actorId,DateTimeOffset now,CancellationToken token)

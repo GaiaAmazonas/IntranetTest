@@ -43,3 +43,7 @@
 .page :global(.helpdesk-comments article){margin:0;min-width:0;padding:10px 12px;max-width:85%;color:var(--intranet-ink)}
 .page :global(.helpdesk-comments article small){display:block;color:var(--intranet-muted);font-size:10px}
 .page :global(.helpdesk-detail form>button:disabled){cursor:wait}
+.page :global(.helpdesk-response-files){border:1px dashed #a9c4b8;border-radius:12px;background:#f8fbf9;padding:14px;cursor:pointer;transition:border-color 150ms ease,background 150ms ease,box-shadow 150ms ease}
+.page :global(.helpdesk-response-files:hover){border-color:var(--brand-primary);background:var(--gaia-accent-pale);box-shadow:0 5px 16px rgb(28 86 69/10%)}
+.page :global(.helpdesk-response-files input){cursor:pointer}
+.page :global(.helpdesk-response-files>small){color:var(--intranet-muted);font-weight:500}

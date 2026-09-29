@@ -56,6 +56,12 @@
   --gaia-accent-pale: #f5f8f3;
 }
 
+/* Helpdesk audit drawer: compact enough for long operational histories. */
+[aria-label="Actividad de la solicitud"] aside>div>article{padding-bottom:12px!important}
+[aria-label="Actividad de la solicitud"] aside>div>article>div:last-child{border-radius:12px!important;padding:12px!important}
+[aria-label="Actividad de la solicitud"] aside>div>article p{margin-top:6px!important;line-height:1.35!important}
+[aria-label="Actividad de la solicitud"] aside>div>article>div:last-child>div:last-child{margin-top:8px!important}
+
 /* Los módulos administrativos heredan siempre el tema de color seleccionado en AdminCore. */
 .gaia-app-page { background-color: var(--surface-page) !important; }
 .gaia-app-page .bg-white { background-color: var(--surface-card) !important; }
