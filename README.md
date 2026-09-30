@@ -86,12 +86,16 @@ pnpm dev
 ## Verificación
 
 ```powershell
-dotnet test Gaia.Platform.slnx
+dotnet build Gaia.Platform.slnx -c Debug --no-restore -warnaserror
+dotnet test Gaia.Platform.slnx -c Debug --no-build --no-restore
 Set-Location apps\web
+pnpm exec tsc --noEmit
 pnpm test
-pnpm lint
+pnpm exec eslint . --max-warnings 0
 pnpm build
 ```
+
+La compilación estricta debe finalizar con `0 Advertencia(s)` y `0 Errores`. Antes de compilar la API, cierre cualquier `dotnet run` o `dotnet watch` del mismo proyecto para evitar bloqueos de DLL. Solo una instancia puede escuchar en `https://localhost:7168`, y solo una instancia de Next puede usar `http://localhost:3000`; `address already in use` o `EADDRINUSE` indican que el servicio ya está ejecutándose, no un error de código.
 
 ## Edición independiente futura
 

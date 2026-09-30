@@ -42,6 +42,7 @@ Tablas técnicas usadas por esta implementación: `gaia_usuarioaplicacion`, `gai
 - `AdminCorePermissions.All` registra políticas conocidas. Cada endpoint debe usar la política adecuada; agregar un código solo al frontend no lo protege.
 - `PermissionScope.RequiresAdminCore` añade acceso AdminCore cuando corresponde. La entrada es `INT.APP.ADMINCORE.VER` además del permiso de la operación.
 - Rutas frontend en `lib/route-access.ts`; validación de permisos en `lib/security-permissions.ts`. Requisitos del array se combinan con AND; expresiones `A|B` representan alternativas según el helper existente.
+- Solicitudes separa expresamente autoservicio y administración: los endpoints de portal usan `INT.SOLICITUDES.VER`, mientras bandeja global, gestión, reasignación y catálogos usan sus permisos `HD.*`. El grupo API exige autenticación y ningún permiso del portal debe habilitar por sí mismo una operación administrativa.
 - Navegación y asignación de permisos son conceptos relacionados pero distintos. Visibilidad de módulo no equivale por sí misma a conceder acceso.
 - Aplicaciones externas deben autorizarse individualmente; `INT.APLICACIONES.VER` no debe conceder automáticamente todas las `INT.APP.*`.
 - Árbol de módulos: respetar actividad efectiva de padres, orden y prevención de ciclos.

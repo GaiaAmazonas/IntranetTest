@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element -- This authenticated API preview uses a revisioned dynamic URL that must bypass Next image optimization. */
+
 import Link from "@/components/document-link";
 import { useFeedback } from "@/components/feedback";
 import { ConfirmDialog } from "@/components/form-dialog";

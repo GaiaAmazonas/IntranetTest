@@ -1,6 +1,6 @@
 # Gaia: contexto de continuidad para un nuevo chat
 
-Fecha de revisión documental: **29 de septiembre de 2026**. Documento basado en el código local, no solamente en conversaciones anteriores. Raíz del proyecto: `Proyecto Gaia Aplicacion`.
+Fecha de revisión documental: **30 de septiembre de 2026**. Documento basado en el código local, no solamente en conversaciones anteriores. Raíz del proyecto: `Proyecto Gaia Aplicacion`.
 
 ## Cómo usar este documento
 
@@ -36,7 +36,7 @@ Son una fotografía del estado revisado. La solicitud actual del usuario delimit
 | Seguridad | Usuarios, asignaciones temporales de roles, permisos y árbol de módulos. Proteger también cada endpoint, no solo los botones. |
 | Comunicaciones | Eventos, tipos de evento y destacados/banners con estados, vigencia e imágenes. |
 | Inventario | Existe estructura, pero sus endpoints responden 503: aún no tiene implementación Dataverse operativa. No presentarlo como terminado. |
-| Solicitudes | Módulo funcional en Intranet y AdminCore: catálogos, formularios versionados, radicación, bandeja general, gestión por etapa/unidad, responsables históricos y actual, conversación, transiciones, SLA y adjuntos en SharePoint. Rutas vigentes: `/intranet/solicitudes`, `/solicitudes`, `/solicitudes/catalogos` y API `/api/solicitudes`. Consultar `Md/modulos/solicitudes.md` para estado, límites y pruebas vigentes. |
+| Solicitudes | Módulo funcional en Intranet y AdminCore: catálogos, formularios versionados, radicación, bandeja general, gestión por etapa/unidad, responsables históricos y actual, conversación, transiciones, SLA y adjuntos en SharePoint. Rutas vigentes: `/intranet/solicitudes`, `/solicitudes`, `/solicitudes/catalogos` y API `/api/solicitudes`. El portal exige `INT.SOLICITUDES.VER`; la gestión y configuración exigen permisos `HD.*` independientes. Consultar `Md/modulos/solicitudes.md` para estado, límites y pruebas vigentes. |
 | Login institucional | La configuración pública se sirve desde una instantánea publicada. Escritorio admite imagen o video MP4/WebM; móvil y tableta siguen usando imagen. Los archivos permanecen en el proveedor SharePoint/Graph configurado y no se almacenan localmente. Ver `continuidad/07_AUTENTICACION_DATAVERSE_SHAREPOINT.md`. |
 | Banners de Inicio | Textos, vigencia y acciones desde Dataverse. La administración usa una tabla responsive; las imágenes se almacenan en SharePoint mediante `IFileStorage` y la portada consume las URLs de API. Ver `modulos/destacados.md` para el contrato de referencias y la validación de columnas. |
 | Cumpleaños | Nombres y fechas desde Dataverse. Ilustraciones SVG de prueba en `public/people/temporary-avatar-*.svg`; no son fotos reales. No inventar cumpleaños ni personas. |

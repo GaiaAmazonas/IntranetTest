@@ -1,6 +1,6 @@
 # Módulo Solicitudes
 
-Revisado: 2026-09-29.
+Revisado: 2026-09-30.
 
 ## Estado implementado
 
@@ -51,7 +51,9 @@ Los detalles se presentan como diálogos superpuestos sobre la aplicación y no 
 - Bandeja: `HD.SOLICITUDES.VER`.
 - Reasignación: `HD.SOLICITUDES.REASIGNAR`.
 - Configuración: `HD.CATALOGOS.VER` y `HD.CATALOGOS.ADMINISTRAR`.
-- Toda operación se valida también en API. Los permisos deben materializarse mediante el bootstrap de Seguridad y asignarse a roles autorizados; no se conceden automáticamente a usuarios.
+- El catálogo del portal, la bandeja personal, el formulario del servicio, la radicación y la respuesta del solicitante exigen explícitamente `INT.SOLICITUDES.VER`.
+- Los endpoints de bandeja global, gestión y configuración conservan sus permisos `HD.*`; tener acceso al portal no concede acceso administrativo.
+- El grupo `/api/solicitudes` exige autenticación como base y cada operación sensible agrega su permiso funcional. Toda operación se valida también en API. Los permisos deben materializarse mediante el bootstrap de Seguridad y asignarse a roles autorizados; no se conceden automáticamente a usuarios.
 
 ## Responsabilidades principales
 
@@ -64,7 +66,7 @@ Los detalles se presentan como diálogos superpuestos sobre la aplicación y no 
 
 ## Verificación
 
-Última validación local: **356 pruebas .NET aprobadas**, TypeScript sin errores y ESLint sin hallazgos. Estas cifras deben actualizarse cuando cambie el conjunto de pruebas. En esta revisión no se volvió a ejecutar el conjunto completo de pruebas frontend ni la exportación de producción, por lo que no se declara un resultado nuevo para esos dos pasos.
+Última validación local, 30 de septiembre de 2026: compilación .NET estricta con **0 advertencias y 0 errores**, **357 pruebas .NET aprobadas**, TypeScript sin errores, ESLint con **0 advertencias y 0 errores**, **54 pruebas frontend aprobadas** y una omitida por la suite, y exportación de producción de Next.js correcta con 35 rutas estáticas.
 
 ## Activación de entorno
 

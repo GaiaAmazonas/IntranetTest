@@ -26,6 +26,21 @@ public sealed class SecurityAuthorizationTests
             Assert.Contains(permission, AdminCorePermissions.All));
     }
 
+    [Fact]
+    public void SolicitudesSeparatesPortalAndAdministrationAuthorization()
+    {
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "Gaia.Platform.slnx"))) root = root.Parent;
+        var source = File.ReadAllText(Path.Combine(root?.FullName ?? throw new DirectoryNotFoundException(),
+            "src", "Modules", "Solicitudes", "Gaia.Modules.Solicitudes", "SolicitudesEndpoints.cs"))
+            .Replace("\r\n", "\n");
+
+        Assert.Contains("MapGroup(\"/api/solicitudes\").WithTags(\"Solicitudes\")\n            .RequireAuthorization();", source);
+        Assert.Contains("MapGet(\"/portal/catalog\", PortalCatalog)\n            .RequireAuthorization(AdminCorePermissions.IntranetSolicitudesVer)", source);
+        Assert.Contains("MapGet(\"/management/queue\", ManagementQueue).RequireAuthorization(AdminCorePermissions.SolicitudesVer)", source);
+        Assert.Contains("MapGet(\"/administration\", Administration).RequireAuthorization(AdminCorePermissions.SolicitudesCatalogosVer)", source);
+    }
+
     [Theory]
     [InlineData("ORG.UNIDADES.VER", true)]
     [InlineData("TI.USUARIOS.VER", true)]

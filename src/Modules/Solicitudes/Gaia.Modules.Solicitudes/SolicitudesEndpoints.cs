@@ -12,11 +12,15 @@ public static class SolicitudesEndpoints
     public static IEndpointRouteBuilder MapSolicitudesEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/solicitudes").WithTags("Solicitudes")
+            .RequireAuthorization();
+        group.MapGet("/portal/catalog", PortalCatalog)
             .RequireAuthorization(AdminCorePermissions.IntranetSolicitudesVer);
-        group.MapGet("/portal/catalog", PortalCatalog);
-        group.MapGet("/portal", Portal);
-        group.MapGet("/services/{serviceId:guid}/form", ServiceForm);
-        group.MapPost("/requests", CreateRequest);
+        group.MapGet("/portal", Portal)
+            .RequireAuthorization(AdminCorePermissions.IntranetSolicitudesVer);
+        group.MapGet("/services/{serviceId:guid}/form", ServiceForm)
+            .RequireAuthorization(AdminCorePermissions.IntranetSolicitudesVer);
+        group.MapPost("/requests", CreateRequest)
+            .RequireAuthorization(AdminCorePermissions.IntranetSolicitudesVer);
         group.MapGet("/requests/{requestId:guid}", RequestDetail);
         group.MapGet("/requests/{requestId:guid}/workflow",RequestWorkflow);
         group.MapPost("/requests/{requestId:guid}/comments", AddComment);
@@ -48,7 +52,8 @@ public static class SolicitudesEndpoints
             .RequireAuthorization(AdminCorePermissions.SolicitudesReasignar);
         group.MapPost("/requests/{requestId:guid}/workflow/reopen",ReopenWorkflow)
             .RequireAuthorization(AdminCorePermissions.SolicitudesReasignar);
-        group.MapPost("/workflows/{managementId:guid}/requester-response",ResumeWorkflowFromRequester);
+        group.MapPost("/workflows/{managementId:guid}/requester-response",ResumeWorkflowFromRequester)
+            .RequireAuthorization(AdminCorePermissions.IntranetSolicitudesVer);
         group.MapGet("/administration", Administration).RequireAuthorization(AdminCorePermissions.SolicitudesCatalogosVer);
         group.MapGet("/administration/export", AdministrationExport).RequireAuthorization(AdminCorePermissions.SolicitudesCatalogosVer);
         group.MapPost("/administration/services", CreateService).RequireAuthorization(AdminCorePermissions.SolicitudesCatalogosAdministrar);

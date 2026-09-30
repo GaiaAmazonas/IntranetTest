@@ -66,7 +66,7 @@ function configuredNavigationLabel(item: NavigationLabelSource, modules: ReturnT
 
 export function AppShell({ title, user: suppliedUser }: { title: string; user?: User }) {
   const security = useSecurity();
-  const pathname = usePathname(); const [user, setUser] = useState<User | null>(suppliedUser ?? null);
+  const pathname = usePathname() ?? ""; const [user, setUser] = useState<User | null>(suppliedUser ?? null);
   const [collapsed, setCollapsed] = useState(false); const [mobileOpen, setMobileOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false); const [loggingOut, setLoggingOut] = useState(false);
   const [reauthRequired, setReauthRequired] = useState(false); const [expanded, setExpanded] = useState<string[]>([]);

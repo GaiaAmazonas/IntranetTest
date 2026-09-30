@@ -13,7 +13,7 @@ export default function Home() {
 function HomeContent() {
   const searchParams = useSearchParams();
   const security = useSecurity();
-  const logoutReason = searchParams.get("logout");
+  const logoutReason = searchParams?.get("logout");
   const logoutNotice = logoutReason === "inactivity"
     ? "Cerramos tu sesión después de 40 minutos sin actividad para proteger tu cuenta."
     : logoutReason === "success" ? "Sesión cerrada correctamente." : undefined;

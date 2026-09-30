@@ -10,7 +10,7 @@ const apiUrl=process.env.NEXT_PUBLIC_GAIA_API_URL??"https://localhost:7168";
 type ActiveAmbience={id:string;theme:string;effect:number;intensity:number;primaryColor?:string;secondaryColor?:string;accentColor?:string;allowAnimation:boolean;showTopDecoration:boolean;showDecorativeBackground:boolean;promotionalText?:string;destinationUrl?:string;alternativeText?:string;desktopImageUrl?:string;mobileImageUrl?:string};
 
 export function VisualAmbienceLayer(){
- const pathname=usePathname(),security=useSecurity(),[item,setItem]=useState<ActiveAmbience|null>(null),[celebrationKey,setCelebrationKey]=useState(0);
+ const pathname=usePathname()??"",security=useSecurity(),[item,setItem]=useState<ActiveAmbience|null>(null),[celebrationKey,setCelebrationKey]=useState(0);
  const surface=pathname.startsWith("/intranet")?"intranet":pathname==="/"?null:"admincore";
  useEffect(()=>{let active=true;if(!surface||!security.user){queueMicrotask(()=>{if(active)setItem(null)});return()=>{active=false}};apiRequest<ActiveAmbience|null>(`/api/communications/active-visual-ambience?surface=${surface}`).then(value=>{if(active)setItem(value)}).catch(()=>{if(active)setItem(null)});return()=>{active=false}},[surface,security.user]);
  useEffect(()=>{const root=document.documentElement;if(item?.showTopDecoration&&surface)root.dataset.gaiaAmbienceSurface=surface;else delete root.dataset.gaiaAmbienceSurface;return()=>{delete root.dataset.gaiaAmbienceSurface}},[item?.showTopDecoration,surface]);

@@ -16,7 +16,7 @@ const loginConfigurationCacheKey = "gaia:public-login-configuration";
 type PublicLoginConfiguration = { platformName?: string | null; eyebrow: string; description?: string | null; lowerLeftText?: string | null; footerTitle?: string | null; footerDescription?: string | null; imageAlt?: string | null; desktopImageUrl: string; tabletImageUrl?: string | null; mobileImageUrl?: string | null; desktopMediaType?: string | null; socialNetworks: { name: string; label: string; order: number; url: string }[] };
 
 export function RouteAccessGate({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const security = useSecurity();
   const rule = routeRuleFor(pathname);
   const [finishingLogin, setFinishingLogin] = useState(() => {
