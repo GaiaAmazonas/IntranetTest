@@ -53,6 +53,7 @@ public interface ISolicitudesManagementStore
     Task PublishFormAsync(Guid formId,Guid actorId,DateTimeOffset now,CancellationToken token);
     Task<SolicitudesAdminFormDefinition> ReadFormAsync(Guid formId,CancellationToken token);
     Task<Guid> SaveFormFieldAsync(Guid formId,Guid? fieldId,SaveSolicitudesFormField request,CancellationToken token);
+    Task DeleteFormFieldAsync(Guid formId,Guid fieldId,CancellationToken token);
 }
 
 public interface ISolicitudesManagementApplication
@@ -68,6 +69,7 @@ public interface ISolicitudesManagementApplication
     Task PublishFormAsync(Guid formId,Guid actorId,CancellationToken token);
     Task<SolicitudesAdminFormDefinition> ReadFormAsync(Guid formId,CancellationToken token);
     Task<Guid> SaveFormFieldAsync(Guid formId,Guid? fieldId,SaveSolicitudesFormField request,CancellationToken token);
+    Task DeleteFormFieldAsync(Guid formId,Guid fieldId,CancellationToken token);
 }
 
 public sealed class SolicitudesManagementApplication(ISolicitudesManagementStore store,TimeProvider timeProvider):ISolicitudesManagementApplication
@@ -105,5 +107,10 @@ public sealed class SolicitudesManagementApplication(ISolicitudesManagementStore
     {
         if(formId==Guid.Empty)throw new ArgumentException("Selecciona un formulario válido.");
         return store.SaveFormFieldAsync(formId,fieldId,SolicitudesFormFieldValidation.Normalize(request),token);
+    }
+    public Task DeleteFormFieldAsync(Guid formId,Guid fieldId,CancellationToken token)
+    {
+        if(formId==Guid.Empty||fieldId==Guid.Empty)throw new ArgumentException("Selecciona un formulario y un campo válidos.");
+        return store.DeleteFormFieldAsync(formId,fieldId,token);
     }
 }

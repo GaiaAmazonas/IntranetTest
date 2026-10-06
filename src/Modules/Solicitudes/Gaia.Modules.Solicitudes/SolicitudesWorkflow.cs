@@ -32,6 +32,7 @@ public sealed record ReassignSolicitudesManagement(Guid? ResponsibleId,string Re
 public sealed record ResumeSolicitudesWorkflowManagement(string? Comment,bool HasFile);
 public sealed record SolicitudesWorkflowSummary(Guid Id,Guid ServiceId,int Version,int Status,string Name,string? Description,DateTimeOffset? PublishedAt,int StepCount,int RouteCount);
 public sealed record CreateSolicitudesWorkflowDraft(Guid ServiceId,string Name,string? Description);
+public sealed record UpdateSolicitudesWorkflowDraft(string Name,string? Description);
 public sealed record SaveSolicitudesWorkflowStep(string Code,int Type,int Order,bool Initial,bool Final,bool ReopeningEntry,
     int AssignmentStrategy,Guid? UnitId,Guid? PersonId,int ActivationRule,bool RequiresDecision,
     bool RequiresObservation,bool RequiresFile,bool AllowsRequesterReturn,int? TargetDays,bool Active=true);
@@ -185,11 +186,16 @@ public interface ISolicitudesWorkflowStore
     Task ReopenAsync(Guid requestId,Guid actorId,DateTimeOffset now,CancellationToken token);
     Task<IReadOnlyList<SolicitudesWorkflowSummary>> ListAsync(Guid serviceId,CancellationToken token);
     Task<Guid> CreateDraftAsync(CreateSolicitudesWorkflowDraft command,CancellationToken token);
+    Task UpdateDraftAsync(Guid flowId,UpdateSolicitudesWorkflowDraft command,CancellationToken token);
+    Task DeleteDraftAsync(Guid flowId,CancellationToken token);
     Task<Guid> SaveStepAsync(Guid flowId,Guid? stepId,SaveSolicitudesWorkflowStep command,CancellationToken token);
+    Task<Guid> DuplicateStepAsync(Guid flowId,Guid stepId,CancellationToken token);
+    Task DeleteStepAsync(Guid flowId,Guid stepId,CancellationToken token);
     Task<Guid> SaveRouteAsync(Guid flowId,Guid? routeId,SaveSolicitudesWorkflowRoute command,CancellationToken token);
     Task<SolicitudesStageForm?> ReadStageFormAsync(Guid stepId,CancellationToken token);
     Task<Guid> SaveStageFormAsync(Guid stepId,SaveSolicitudesStageForm command,CancellationToken token);
     Task<Guid> SaveStageFormFieldAsync(Guid stepId,Guid? fieldId,SaveSolicitudesFormField command,CancellationToken token);
+    Task DeleteStageFormFieldAsync(Guid stepId,Guid fieldId,CancellationToken token);
     Task<SolicitudesManagementForm> ReadManagementFormAsync(Guid managementId,Guid actorId,CancellationToken token);
     Task<IReadOnlyList<SavedSolicitudesManagementAnswer>> SaveManagementAnswersAsync(Guid managementId,Guid actorId,SaveSolicitudesManagementAnswers command,CancellationToken token);
     Task<SolicitudesRequestWorkflowState?> ReadRequestStateAsync(Guid requestId,Guid actorId,bool managementAccess,CancellationToken token);
@@ -244,6 +250,10 @@ public sealed class SolicitudesWorkflowApplication(ISolicitudesWorkflowStore sto
     {if(flowId==Guid.Empty)throw new ArgumentException("Selecciona un flujo válido.");return store.ReadFlowAsync(flowId,token);}
     public Task<Guid> CreateDraftAsync(CreateSolicitudesWorkflowDraft command,CancellationToken token)
     {ArgumentNullException.ThrowIfNull(command);var name=command.Name?.Trim();if(command.ServiceId==Guid.Empty||string.IsNullOrWhiteSpace(name)||name.Length>200)throw new ArgumentException("Servicio y nombre son obligatorios.");return store.CreateDraftAsync(command with{Name=name,Description=command.Description?.Trim()},token);}
+    public Task UpdateDraftAsync(Guid flowId,UpdateSolicitudesWorkflowDraft command,CancellationToken token)
+    {ArgumentNullException.ThrowIfNull(command);var name=command.Name?.Trim();if(flowId==Guid.Empty||string.IsNullOrWhiteSpace(name)||name.Length>200)throw new ArgumentException("Flujo y nombre son obligatorios.");return store.UpdateDraftAsync(flowId,command with{Name=name,Description=command.Description?.Trim()},token);}
+    public Task DeleteDraftAsync(Guid flowId,CancellationToken token)
+    {if(flowId==Guid.Empty)throw new ArgumentException("Selecciona un flujo válido.");return store.DeleteDraftAsync(flowId,token);}
     public Task<Guid> SaveStepAsync(Guid flowId,Guid? stepId,SaveSolicitudesWorkflowStep command,CancellationToken token)
     {ArgumentNullException.ThrowIfNull(command);var code=command.Code?.Trim().ToUpperInvariant();if(flowId==Guid.Empty||string.IsNullOrWhiteSpace(code)||code.Length>80||!System.Text.RegularExpressions.Regex.IsMatch(code,"^[A-Z0-9_-]+$"))throw new ArgumentException("El código del paso no es válido.");if(command.Order<0||command.TargetDays is <1 or >3650)throw new ArgumentException("Orden o plazo no válido.");return store.SaveStepAsync(flowId,stepId,command with{Code=code},token);}
     public Task<Guid> SaveRouteAsync(Guid flowId,Guid? routeId,SaveSolicitudesWorkflowRoute command,CancellationToken token)
@@ -254,6 +264,12 @@ public sealed class SolicitudesWorkflowApplication(ISolicitudesWorkflowStore sto
     {ArgumentNullException.ThrowIfNull(command);var title=command.Title?.Trim();if(stepId==Guid.Empty||string.IsNullOrWhiteSpace(title)||title.Length>200)throw new ArgumentException("Etapa y título son obligatorios.");return store.SaveStageFormAsync(stepId,command with{Title=title,Instructions=command.Instructions?.Trim()},token);}
     public Task<Guid> SaveStageFormFieldAsync(Guid stepId,Guid? fieldId,SaveSolicitudesFormField command,CancellationToken token)
     {if(stepId==Guid.Empty)throw new ArgumentException("Selecciona una etapa válida.");return store.SaveStageFormFieldAsync(stepId,fieldId,SolicitudesFormFieldValidation.Normalize(command),token);}
+    public Task DeleteStageFormFieldAsync(Guid stepId,Guid fieldId,CancellationToken token)
+    {if(stepId==Guid.Empty||fieldId==Guid.Empty)throw new ArgumentException("Selecciona una etapa y un campo válidos.");return store.DeleteStageFormFieldAsync(stepId,fieldId,token);}
+    public Task<Guid> DuplicateStepAsync(Guid flowId,Guid stepId,CancellationToken token)
+    {if(flowId==Guid.Empty||stepId==Guid.Empty)throw new ArgumentException("Selecciona un flujo y una etapa válidos.");return store.DuplicateStepAsync(flowId,stepId,token);}
+    public Task DeleteStepAsync(Guid flowId,Guid stepId,CancellationToken token)
+    {if(flowId==Guid.Empty||stepId==Guid.Empty)throw new ArgumentException("Selecciona un flujo y una etapa válidos.");return store.DeleteStepAsync(flowId,stepId,token);}
     public Task<SolicitudesManagementForm> ReadManagementFormAsync(Guid managementId,Guid actorId,CancellationToken token)
     {if(managementId==Guid.Empty||actorId==Guid.Empty)throw new ArgumentException("Gestión y actor son obligatorios.");return store.ReadManagementFormAsync(managementId,actorId,token);}
     public Task<IReadOnlyList<SavedSolicitudesManagementAnswer>> SaveManagementAnswersAsync(Guid managementId,Guid actorId,SaveSolicitudesManagementAnswers command,CancellationToken token)

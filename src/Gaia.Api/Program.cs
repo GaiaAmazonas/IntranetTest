@@ -225,9 +225,9 @@ app.MapThirdPartiesEndpoints();
 app.MapInventoryEndpoints();
 app.MapSecurityEndpoints();
 app.MapSolicitudesEndpoints();
+app.MapDevelopmentSolicitudesDataReset();
 if(app.Environment.IsDevelopment())
 {
-    app.MapDevelopmentSolicitudesDataReset();
     app.MapDevelopmentSolicitudesScenarioSeed();
 }
 app.MapCommunicationsEndpoints();

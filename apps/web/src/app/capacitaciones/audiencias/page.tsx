@@ -1,2 +1,2 @@
-import {TrainingAdministration} from "@/features/training/training-administration";
-export default function Page(){return <TrainingAdministration section="audiencias"/>}
+import {redirect} from "next/navigation";
+export default function Page(){redirect("/capacitaciones/catalogo")}

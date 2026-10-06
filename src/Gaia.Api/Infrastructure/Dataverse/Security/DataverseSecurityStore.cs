@@ -90,6 +90,20 @@ internal sealed class DataverseSecurityStore(
         var rolePermissionMeta = await DataverseMetadataResolver.TableAsync(client, RolePermissionTable, token);
         var moduleType = await DataverseMetadataResolver.ChoicesAsync(client, ModuleTable, moduleMeta.Attribute("gaia_Tipodemodulo"), token);
         var actions = await DataverseMetadataResolver.ChoicesAsync(client, PermissionTable, permissionMeta.Attribute("gaia_Accion"), token);
+        var permissionCodeField = permissionMeta.Attribute("gaia_Codigo");
+        var existingPermissionCodes = (await DataverseJson.ReadAllAsync(client,
+                $"{permissionMeta.EntitySetName}?$select={permissionCodeField}", token))
+            .Select(row => StringValue(row, permissionCodeField))
+            .Where(code => !string.IsNullOrWhiteSpace(code))
+            .Cast<string>()
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var roleCodeField = roleMeta.Attribute("gaia_Codigo");
+        var existingRoleCodes = (await DataverseJson.ReadAllAsync(client,
+                $"{roleMeta.EntitySetName}?$select={roleCodeField}", token))
+            .Select(row => StringValue(row, roleCodeField))
+            .Where(code => !string.IsNullOrWhiteSpace(code))
+            .Cast<string>()
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var modules = ModuleSeeds();
         var moduleIds = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
@@ -119,6 +133,7 @@ internal sealed class DataverseSecurityStore(
         }
 
         var permissionIds = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+        var newPermissionIds = new HashSet<Guid>();
         foreach (var code in AdminCorePermissions.All)
         {
             var split = code.LastIndexOf('.');
@@ -135,14 +150,20 @@ internal sealed class DataverseSecurityStore(
                 [$"{relation.NavigationProperty}@odata.bind"] = $"/{moduleMeta.EntitySetName}({moduleId:D})",
                 ["statecode"] = 0
             };
-            permissionIds[code] = await UpsertByCode(client, permissionMeta, code, payload, token);
+            var permissionId = await UpsertByCode(client, permissionMeta, code, payload, token);
+            permissionIds[code] = permissionId;
+            if (!existingPermissionCodes.Contains(code)) newPermissionIds.Add(permissionId);
         }
 
         var adminId = await UpsertRole(client, roleMeta, "ADMIN", "Administrador", "Acceso administrativo completo al AdminCore Gaia.", true, token);
         var consultId = await UpsertRole(client, roleMeta, "CONSULTA", "Consulta", "Acceso de consulta a los módulos operativos autorizados.", true, token);
         var readCodes = DefaultRolePermissions.Consulta.Where(permissionIds.ContainsKey).ToArray();
-        await EnsureRolePermissions(client, rolePermissionMeta, roleMeta, permissionMeta, adminId, permissionIds.Values, token);
-        await EnsureRolePermissions(client, rolePermissionMeta, roleMeta, permissionMeta, consultId, readCodes.Select(x => permissionIds[x]), token);
+        IEnumerable<Guid> administratorPermissions = existingRoleCodes.Contains("ADMIN") ? newPermissionIds : permissionIds.Values;
+        IEnumerable<Guid> consultationPermissions = existingRoleCodes.Contains("CONSULTA")
+            ? readCodes.Select(code => permissionIds[code]).Where(newPermissionIds.Contains)
+            : readCodes.Select(code => permissionIds[code]);
+        await EnsureRolePermissions(client, rolePermissionMeta, roleMeta, permissionMeta, adminId, administratorPermissions, token);
+        await EnsureRolePermissions(client, rolePermissionMeta, roleMeta, permissionMeta, consultId, consultationPermissions, token);
 
         var current = await GetOrProvisionCoreAsync(principal, adminId, token);
         await EnsureUserRole(client, current.User.Id, adminId, "Bootstrap ADMIN", token);
@@ -271,7 +292,6 @@ internal sealed class DataverseSecurityStore(
         {
             var administratorRole = await FindRoleId(client, "ADMIN", token)
                 ?? throw new InvalidOperationException("El rol interno ADMIN no está disponible en el catálogo de Seguridad.");
-            await EnsureAdministratorPermissions(client, administratorRole, token);
             await EnsureUserRole(client, userId, administratorRole, "Recuperación automática de administrador autorizado", token);
         }
         var context = await LoadContext(client, userMeta, userId, identity.Oid, identity.Name, identity.Email, thirdPartyId, document, token);
@@ -337,12 +357,16 @@ internal sealed class DataverseSecurityStore(
                 .Where(id => id.HasValue && effectiveActiveModuleIds.Contains(id.Value))
                 .Select(id => id!.Value)
                 .ToHashSet();
-            var authorizedRootIds = new HashSet<Guid>();
+            var authorizedHierarchyIds = new HashSet<Guid>();
             foreach (var assignedModuleId in assignedModuleIds)
             {
                 var current = assignedModuleId;
-                while (moduleParents.TryGetValue(current, out var parent) && parent.HasValue) current = parent.Value;
-                authorizedRootIds.Add(current);
+                authorizedHierarchyIds.Add(current);
+                while (moduleParents.TryGetValue(current, out var parent) && parent.HasValue)
+                {
+                    current = parent.Value;
+                    authorizedHierarchyIds.Add(current);
+                }
             }
             var applicationsContainerId = moduleRows
                 .Where(row => string.Equals(StringValue(row,moduleMeta.Attribute("gaia_Codigo")),"INT.APLICACIONES",StringComparison.OrdinalIgnoreCase))
@@ -361,7 +385,7 @@ internal sealed class DataverseSecurityStore(
                     || (applicationsContainerId.HasValue && OptionalGuid(row,$"_{moduleParent}_value")==applicationsContainerId.Value))
                 .Select(row => GuidValue(row, moduleMeta.PrimaryIdAttribute))
                 .ToHashSet();
-            if (intranetContainerId.HasValue && authorizedRootIds.Contains(intranetContainerId.Value))
+            if (intranetContainerId.HasValue && authorizedHierarchyIds.Contains(intranetContainerId.Value))
             {
                 foreach (var homeId in moduleRows
                     .Where(row => string.Equals(StringValue(row,moduleMeta.Attribute("gaia_Codigo")),"INT.INICIO",StringComparison.OrdinalIgnoreCase))
@@ -372,7 +396,7 @@ internal sealed class DataverseSecurityStore(
                 .Where(assignedModuleIds.Contains)
                 .ToHashSet();
             navigationModules = moduleRows
-                .Where(row => authorizedRootIds.Contains(GuidValue(row, moduleMeta.PrimaryIdAttribute))
+                .Where(row => authorizedHierarchyIds.Contains(GuidValue(row, moduleMeta.PrimaryIdAttribute))
                     || authorizedApplicationIds.Contains(GuidValue(row, moduleMeta.PrimaryIdAttribute))
                     || authorizedIntranetNavigationIds.Contains(GuidValue(row, moduleMeta.PrimaryIdAttribute)))
                 .Where(row => effectiveActiveModuleIds.Contains(GuidValue(row, moduleMeta.PrimaryIdAttribute)))
@@ -384,12 +408,12 @@ internal sealed class DataverseSecurityStore(
                         : StringValue(row, moduleMeta.Attribute("gaia_Codigo")) ?? "",
                     StringValue(row, moduleMeta.Attribute("gaia_Nombre")) ?? "",
                     StringValue(row, moduleMeta.Attribute("gaia_Descripcion")),
+                    OptionalGuid(row, $"_{moduleParent}_value"),
                     StringValue(row, moduleMeta.Attribute("gaia_Ruta")) ?? "",
                     StringValue(row, moduleMeta.Attribute("gaia_Icono")),
                     DataverseJson.OptionalInt32(row, moduleMeta.Attribute("gaia_Orden")) ?? 0))
                 .Where(module => !string.IsNullOrWhiteSpace(module.Route) &&
-                    (module.Code.StartsWith("INT.APP.", StringComparison.OrdinalIgnoreCase) ||
-                     (!string.Equals(module.Code, "INTRANET", StringComparison.OrdinalIgnoreCase) && module.Route != "/admincore")))
+                    !string.Equals(module.Code, "INTRANET", StringComparison.OrdinalIgnoreCase))
                 .OrderBy(module => module.Order)
                 .ToArray();
         }
@@ -717,7 +741,20 @@ internal sealed class DataverseSecurityStore(
         },token);
     }
     public async Task SetRolePermissionsAsync(Guid roleId, RolePermissionsRequest request, CancellationToken token)
-    { var client=await clientFactory.CreateAsync(); var rp=await DataverseMetadataResolver.TableAsync(client,RolePermissionTable,token); var role=await DataverseMetadataResolver.TableAsync(client,RoleTable,token); var permission=await DataverseMetadataResolver.TableAsync(client,PermissionTable,token); var roleField=rp.Attribute("gaia_Rol"); var current=await DataverseJson.ReadAllAsync(client,$"{rp.EntitySetName}?$select={rp.PrimaryIdAttribute},_{rp.Attribute("gaia_Permiso")}_value&$filter=_{roleField}_value eq {roleId:D} and statecode eq 0",token); var wanted=request.PermissionIds.ToHashSet(); await IncludeApplicationCatalogPermissionAsync(client,permission,wanted,token); foreach(var row in current.Where(x=>!wanted.Contains(OptionalGuid(x,$"_{rp.Attribute("gaia_Permiso")}_value")??Guid.Empty))) await Patch(client,$"{rp.EntitySetName}({GuidValue(row,rp.PrimaryIdAttribute):D})",new(){{"statecode",1}},token); await EnsureRolePermissions(client,rp,role,permission,roleId,wanted,token); InvalidateAll(); }
+    {
+        var client=await clientFactory.CreateAsync();
+        var rp=await DataverseMetadataResolver.TableAsync(client,RolePermissionTable,token);
+        var role=await DataverseMetadataResolver.TableAsync(client,RoleTable,token);
+        var permission=await DataverseMetadataResolver.TableAsync(client,PermissionTable,token);
+        var roleField=rp.Attribute("gaia_Rol");var permissionField=rp.Attribute("gaia_Permiso");
+        var current=await DataverseJson.ReadAllAsync(client,$"{rp.EntitySetName}?$select={rp.PrimaryIdAttribute},_{permissionField}_value&$filter=_{roleField}_value eq {roleId:D} and statecode eq 0",token);
+        var wanted=request.PermissionIds.ToHashSet();
+        await IncludeApplicationCatalogPermissionAsync(client,permission,wanted,token);
+        foreach(var row in current.Where(x=>!wanted.Contains(OptionalGuid(x,$"_{permissionField}_value")??Guid.Empty)))
+            await Delete(client,$"{rp.EntitySetName}({GuidValue(row,rp.PrimaryIdAttribute):D})",token);
+        await EnsureRolePermissions(client,rp,role,permission,roleId,wanted,token);
+        InvalidateAll();
+    }
 
     private static async Task IncludeApplicationCatalogPermissionAsync(HttpClient client,DataverseTableMetadata permission,HashSet<Guid> wanted,CancellationToken token)
     {
@@ -839,6 +876,62 @@ internal sealed class DataverseSecurityStore(
         var result=id.HasValue?await PatchReturn(client,m.EntitySetName,id.Value,payload,token):await Post(client,m.EntitySetName,payload,token); InvalidateAll(); return result;
     }
 
+    public async Task DeleteModuleAsync(Guid id,CancellationToken token)
+    {
+        var client=await clientFactory.CreateAsync();
+        var module=await DataverseMetadataResolver.TableAsync(client,ModuleTable,token);
+        var parent=module.Attribute("gaia_Modulopadre");
+        var modules=await DataverseJson.ReadAllAsync(client,$"{module.EntitySetName}?$select={module.PrimaryIdAttribute},_{parent}_value,statecode",token);
+        if(!modules.Any(item=>GuidValue(item,module.PrimaryIdAttribute)==id))throw new KeyNotFoundException("El elemento solicitado no existe.");
+        var descendants=new HashSet<Guid>{id};
+        var pending=new Queue<Guid>(); pending.Enqueue(id);
+        while(pending.Count>0)
+        {
+            var current=pending.Dequeue();
+            foreach(var child in modules.Where(item=>OptionalGuid(item,$"_{parent}_value")==current))
+            {
+                var childId=GuidValue(child,module.PrimaryIdAttribute);
+                if(descendants.Add(childId))pending.Enqueue(childId);
+            }
+        }
+        if(modules.Any(item=>descendants.Contains(GuidValue(item,module.PrimaryIdAttribute))&&(DataverseJson.OptionalInt32(item,"statecode")??0)==0))
+            throw new SecurityModuleValidationException("Inactiva primero el módulo y todos sus elementos hijos.");
+        var permission=await DataverseMetadataResolver.TableAsync(client,PermissionTable,token);
+        var permissionModule=permission.Attribute("gaia_ModuloPermiso");
+        var moduleFilter=string.Join(" or ",descendants.Select(moduleId=>$"_{permissionModule}_value eq {moduleId:D}"));
+        var permissions=await DataverseJson.ReadAllAsync(client,$"{permission.EntitySetName}?$select={permission.PrimaryIdAttribute},statecode&$filter={moduleFilter}",token);
+        var rolePermission=await DataverseMetadataResolver.TableAsync(client,RolePermissionTable,token);
+        var permissionLookup=rolePermission.Attribute("gaia_Permiso");
+        var assignmentsByPermission=new Dictionary<Guid,IReadOnlyList<JsonElement>>();
+        foreach(var permissionRow in permissions)
+        {
+            var permissionId=GuidValue(permissionRow,permission.PrimaryIdAttribute);
+            var assignments=await DataverseJson.ReadAllAsync(client,$"{rolePermission.EntitySetName}?$select={rolePermission.PrimaryIdAttribute},statecode&$filter=_{permissionLookup}_value eq {permissionId:D}",token);
+            if(assignments.Any(item=>(DataverseJson.OptionalInt32(item,"statecode")??0)==0))throw new SecurityModuleValidationException("Finaliza primero las asignaciones activas de sus permisos a roles.");
+            assignmentsByPermission[permissionId]=assignments;
+        }
+        foreach(var permissionRow in permissions)
+        {
+            var permissionId=GuidValue(permissionRow,permission.PrimaryIdAttribute);
+            foreach(var assignment in assignmentsByPermission[permissionId])await Delete(client,$"{rolePermission.EntitySetName}({GuidValue(assignment,rolePermission.PrimaryIdAttribute):D})",token);
+            await Delete(client,$"{permission.EntitySetName}({permissionId:D})",token);
+        }
+        var depthById=new Dictionary<Guid,int>{{id,0}};
+        foreach(var moduleId in descendants.Where(moduleId=>moduleId!=id))
+        {
+            var depth=0; var current=moduleId;
+            while(current!=id&&depth<=descendants.Count)
+            {
+                current=modules.Where(item=>GuidValue(item,module.PrimaryIdAttribute)==current).Select(item=>OptionalGuid(item,$"_{parent}_value")??id).First();
+                depth++;
+            }
+            depthById[moduleId]=depth;
+        }
+        foreach(var moduleId in descendants.OrderByDescending(moduleId=>depthById[moduleId]))
+            await Delete(client,$"{module.EntitySetName}({moduleId:D})",token);
+        InvalidateAll();
+    }
+
     private static bool IsValidModuleRoute(string route)
     {
         if(route.StartsWith('/')&&!route.StartsWith("//",StringComparison.Ordinal))return true;
@@ -859,11 +952,11 @@ internal sealed class DataverseSecurityStore(
         new("HD.SOLICITUDES","Bandeja Solicitudes","SUBMÓDULO","HD","/solicitudes","solicitudes",61,true,"Bandeja global de solicitudes."),
         new("HD.CATALOGOS","Servicios y flujos","SUBMÓDULO","HD","/solicitudes/servicios-y-flujos","catalog",62,true,"Servicios, formularios y flujos de Solicitudes."),
         new("CAP","Capacitaciones","MÓDULO",null,"/capacitaciones/catalogo","training",70,true,"Diseño, publicación y seguimiento de capacitaciones."),
-        new("CAP.CATALOGO","Catálogo","SUBMÓDULO","CAP","/capacitaciones/catalogo","catalog",71,true,"Categorías y capacitaciones."),
-        new("CAP.CONTENIDO","Contenido y versiones","SUBMÓDULO","CAP","/capacitaciones/contenido","content",72,true,"Versiones, secciones, bloques, recursos y evaluaciones."),
-        new("CAP.AUDIENCIAS","Audiencias","SUBMÓDULO","CAP","/capacitaciones/audiencias","people",73,true,"Destinatarios y vista previa de alcance."),
-        new("CAP.SEGUIMIENTO","Seguimiento","SUBMÓDULO","CAP","/capacitaciones/seguimiento","tracking",74,true,"Asignaciones, progreso e intentos."),
-        new("CAP.RESULTADOS","Resultados","SUBMÓDULO","CAP","/capacitaciones/resultados","results",75,true,"Resultados, métricas y exportación."),
+        new("CAP.CATALOGO","Catálogo","FUNCIONALIDAD","CAP","/capacitaciones/catalogo","catalog",71,false,"Categorías y capacitaciones."),
+        new("CAP.CONTENIDO","Contenido y versiones","FUNCIONALIDAD","CAP","/capacitaciones/catalogo","content",72,false,"Versiones, secciones, bloques, recursos y evaluaciones."),
+        new("CAP.AUDIENCIAS","Audiencias","FUNCIONALIDAD","CAP","/capacitaciones/catalogo","people",73,false,"Destinatarios y vista previa de alcance."),
+        new("CAP.SEGUIMIENTO","Seguimiento","FUNCIONALIDAD","CAP","/capacitaciones/catalogo","tracking",74,false,"Asignaciones, progreso e intentos."),
+        new("CAP.RESULTADOS","Resultados","FUNCIONALIDAD","CAP","/capacitaciones/catalogo","results",75,false,"Resultados, métricas y exportación."),
         new("CAP.REVISAR","Revisar capacitaciones","FUNCIONALIDAD","CAP.CONTENIDO",null,"review",76,false,"Devolver versiones que están en revisión."),
         new("CAP.PUBLICAR","Publicar capacitaciones","FUNCIONALIDAD","CAP.CONTENIDO",null,"publish",77,false,"Aprobar y publicar versiones revisadas."),
         new("CAP.ARCHIVAR","Cerrar y archivar","FUNCIONALIDAD","CAP.CONTENIDO",null,"archive",78,false,"Cerrar o archivar versiones publicadas."),
@@ -888,6 +981,9 @@ internal sealed class DataverseSecurityStore(
         new("COM.EVENTOS","Eventos","SUBMÓDULO","COM","/comunicaciones/eventos","calendar",51,true,"Agenda y eventos institucionales."),
         new("COM.TIPOS_EVENTO","Tipos de evento","SUBMÓDULO","COM","/comunicaciones/tipos-evento","tags",52,true,"Clasificación y presentación visual de eventos."),
         new("COM.DESTACADOS","Destacados","SUBMÓDULO","COM","/comunicaciones/destacados","image",53,true,"Piezas destacadas y promociones visibles en la portada de la Intranet."),
+        new("CONFIG","Configuración","MÓDULO",null,"/configuracion/login","settings",55,true,"Configuración transversal de la experiencia institucional."),
+        new("CONFIG.LOGIN","Login institucional","SUBMÓDULO","CONFIG","/configuracion/login","login",56,true,"Contenido visual y enlaces de la pantalla de acceso."),
+        new("CONFIG.AMBIENTACION","Ambientación visual","SUBMÓDULO","CONFIG","/configuracion/ambientacion","palette",57,true,"Ambientación visual y campañas temporales de la plataforma."),
         new("TI","Seguridad","MÓDULO",null,"/seguridad","security",90,true,"Administración de identidad, roles, permisos y recursos protegidos."),
         new("TI.USUARIOS","Usuarios","SUBMÓDULO","TI","/seguridad/usuarios","users",91,true,"Usuarios y roles."),
         new("TI.ROLES","Roles y permisos","SUBMÓDULO","TI","/seguridad/roles","roles",92,true,"Roles y permisos."),
@@ -943,16 +1039,6 @@ internal sealed class DataverseSecurityStore(
     private static async Task<string?> ReadDocumentAsync(HttpClient client,Guid id,CancellationToken token){var t=await DataverseMetadataResolver.TableAsync(client,ThirdPartyTable,token);var field=t.Attribute("gaia_NumeroDocumento");var row=await DataverseMetadataResolver.ReadOneAsync(client,$"{t.EntitySetName}({id:D})?$select={field}",token);return row is null?null:StringValue(row.Value,field);}
     private static async Task<Guid?> FindThirdPartyByDocumentAsync(HttpClient client,string document,CancellationToken token){var t=await DataverseMetadataResolver.TableAsync(client,ThirdPartyTable,token);var f=t.Attribute("gaia_NumeroDocumento");var rows=await DataverseJson.ReadAllAsync(client,$"{t.EntitySetName}?$select={t.PrimaryIdAttribute}&$filter={f} eq '{Escape(document)}' and statecode eq 0&$top=2",token);return rows.Count==1?GuidValue(rows[0],t.PrimaryIdAttribute):null;}
     private static async Task<Guid?> FindRoleId(HttpClient client,string code,CancellationToken token){var r=await DataverseMetadataResolver.TableAsync(client,RoleTable,token);var rows=await DataverseJson.ReadAllAsync(client,$"{r.EntitySetName}?$select={r.PrimaryIdAttribute}&$filter={r.Attribute("gaia_Codigo")} eq '{Escape(code)}' and statecode eq 0&$top=1",token);return rows.Count==1?GuidValue(rows[0],r.PrimaryIdAttribute):null;}
-    private static async Task EnsureAdministratorPermissions(HttpClient client, Guid administratorRoleId, CancellationToken token)
-    {
-        var role = await DataverseMetadataResolver.TableAsync(client, RoleTable, token);
-        var permission = await DataverseMetadataResolver.TableAsync(client, PermissionTable, token);
-        var rolePermission = await DataverseMetadataResolver.TableAsync(client, RolePermissionTable, token);
-        var rows = await DataverseJson.ReadAllAsync(client,
-            $"{permission.EntitySetName}?$select={permission.PrimaryIdAttribute}&$filter=statecode eq 0", token);
-        var permissionIds = rows.Select(row => GuidValue(row, permission.PrimaryIdAttribute)).ToArray();
-        await EnsureRolePermissions(client, rolePermission, role, permission, administratorRoleId, permissionIds, token);
-    }
     private static async Task<IReadOnlyList<SecurityUserRoleItem>> ReadUserRoles(HttpClient client,Guid userId,CancellationToken token){var ur=await DataverseMetadataResolver.TableAsync(client,UserRoleTable,token);var r=await DataverseMetadataResolver.TableAsync(client,RoleTable,token);var roleField=ur.RelationshipTo(RoleTable).ReferencingAttribute;var userField=ur.RelationshipTo(UserTable).ReferencingAttribute;var rows=await DataverseJson.ReadAllAsync(client,$"{ur.EntitySetName}?$select={ur.PrimaryIdAttribute},_{roleField}_value,{ur.Attribute("gaia_FechaInicio")},{ur.Attribute("gaia_FechaFin")},statecode&$filter=_{userField}_value eq {userId:D}",token);var result=new List<SecurityUserRoleItem>();foreach(var x in rows){var roleId=OptionalGuid(x,$"_{roleField}_value")??Guid.Empty;var rr=await DataverseMetadataResolver.ReadOneAsync(client,$"{r.EntitySetName}({roleId:D})?$select={r.Attribute("gaia_Codigo")},{r.Attribute("gaia_Nombre")}",token);result.Add(new(GuidValue(x,ur.PrimaryIdAttribute),roleId,rr is null?"":StringValue(rr.Value,r.Attribute("gaia_Codigo"))??"",rr is null?"":StringValue(rr.Value,r.Attribute("gaia_Nombre"))??"",OptionalDateOnly(x,ur.Attribute("gaia_FechaInicio"))??DateOnly.MinValue,OptionalDateOnly(x,ur.Attribute("gaia_FechaFin")),(DataverseJson.OptionalInt32(x,"statecode")??0)==0));}return result;}
     private static async Task<IReadOnlyList<string>> ReadRolePermissionCodes(HttpClient client,Guid roleId,CancellationToken token){var rp=await DataverseMetadataResolver.TableAsync(client,RolePermissionTable,token);var p=await DataverseMetadataResolver.TableAsync(client,PermissionTable,token);var lookup=rp.Attribute("gaia_Permiso");var rows=await DataverseJson.ReadAllAsync(client,$"{rp.EntitySetName}?$select=_{lookup}_value&$filter=_{rp.Attribute("gaia_Rol")}_value eq {roleId:D} and statecode eq 0",token);var ids=rows.Select(x=>OptionalGuid(x,$"_{lookup}_value")).Where(x=>x.HasValue).Select(x=>x!.Value).ToArray();if(ids.Length==0)return[];var filter=string.Join(" or ",ids.Select(x=>$"{p.PrimaryIdAttribute} eq {x:D}"));return(await DataverseJson.ReadAllAsync(client,$"{p.EntitySetName}?$select={p.Attribute("gaia_Codigo")}&$filter={filter}",token)).Select(x=>StringValue(x,p.Attribute("gaia_Codigo"))).Where(x=>!string.IsNullOrWhiteSpace(x)).Cast<string>().ToArray();}
     private static async Task<Guid> UpsertRole(HttpClient client,DataverseTableMetadata meta,string code,string name,string description,bool system,CancellationToken token)=>await UpsertByCode(client,meta,code,new(){{meta.Attribute("gaia_Codigo"),code},{meta.Attribute("gaia_Nombre"),name},{meta.Attribute("gaia_Descripcion"),description},{meta.Attribute("gaia_EsSistema"),system},{"statecode",0}},token);
@@ -1005,6 +1091,7 @@ internal sealed class DataverseSecurityStore(
     private static async Task<Guid> Post(HttpClient client,string set,Dictionary<string,object?> payload,CancellationToken token){using var response=await client.PostAsJsonAsync(set,payload,token);await Ensure(response,token);var header=response.Headers.TryGetValues("OData-EntityId",out var values)?values.SingleOrDefault():null;var match=header is null?null:System.Text.RegularExpressions.Regex.Match(header,@"\(([0-9a-f-]{36})\)$");if(match?.Success!=true)throw new InvalidOperationException("Dataverse creó el registro sin devolver su identificador.");return Guid.Parse(match.Groups[1].Value);}
     private static async Task<Guid> PatchReturn(HttpClient client,string set,Guid id,Dictionary<string,object?> payload,CancellationToken token){await Patch(client,$"{set}({id:D})",payload,token);return id;}
     private static async Task Patch(HttpClient client,string path,Dictionary<string,object?> payload,CancellationToken token){using var request=new HttpRequestMessage(HttpMethod.Patch,path){Content=JsonContent.Create(payload)};request.Headers.TryAddWithoutValidation("If-Match","*");using var response=await client.SendAsync(request,token);await Ensure(response,token);}
+    private static async Task Delete(HttpClient client,string path,CancellationToken token){using var request=new HttpRequestMessage(HttpMethod.Delete,path);request.Headers.TryAddWithoutValidation("If-Match","*");using var response=await client.SendAsync(request,token);await Ensure(response,token);}
     private static async Task Ensure(HttpResponseMessage response,CancellationToken token){if(response.IsSuccessStatusCode)return;var body=await response.Content.ReadAsStringAsync(token);throw new InvalidOperationException($"Dataverse rechazó Seguridad ({(int)response.StatusCode}): {body}");}
     private static (string Oid,string Email,string Name) IdentityFrom(ClaimsPrincipal p){var oid=p.FindFirstValue("oid")??p.FindFirstValue("http://schemas.microsoft.com/identity/claims/objectidentifier");var email=(p.FindFirstValue("preferred_username")??p.FindFirstValue(ClaimTypes.Email))?.Trim().ToLowerInvariant();var name=p.FindFirstValue("name")??p.Identity?.Name;if(string.IsNullOrWhiteSpace(oid)||!Guid.TryParse(oid,out _))throw new InvalidOperationException("Microsoft Entra no entregó un Object ID válido.");if(string.IsNullOrWhiteSpace(email)||!email.EndsWith("@gaiaamazonas.org",StringComparison.OrdinalIgnoreCase))throw new InvalidOperationException("Solo se permiten cuentas corporativas @gaiaamazonas.org.");return(oid,email,string.IsNullOrWhiteSpace(name)?email:name);}
     private static string PermissionActionChoice(string action)=>action.ToUpperInvariant() switch

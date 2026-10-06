@@ -27,6 +27,55 @@ public sealed class SecurityAuthorizationTests
     }
 
     [Fact]
+    public void AdministratorLoginDoesNotRestorePermissionsRemovedFromTheRole()
+    {
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "Gaia.Platform.slnx"))) root = root.Parent;
+        var source = File.ReadAllText(Path.Combine(root?.FullName ?? throw new DirectoryNotFoundException(),
+            "src", "Gaia.Api", "Infrastructure", "Dataverse", "Security", "DataverseSecurityStore.cs"));
+        var provisioningStart = source.IndexOf("private async Task<SecurityContextResponse> GetOrProvisionUnsafeAsync", StringComparison.Ordinal);
+        var contextStart = source.IndexOf("private static async Task<SecurityContextResponse> LoadContext", provisioningStart, StringComparison.Ordinal);
+        var provisioning = source[provisioningStart..contextStart];
+
+        Assert.DoesNotContain("EnsureRolePermissions", provisioning, StringComparison.Ordinal);
+        Assert.DoesNotContain("EnsureAdministratorPermissions", provisioning, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SecuritySynchronizationPreservesCustomizedExistingRoles()
+    {
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "Gaia.Platform.slnx"))) root = root.Parent;
+        var source = File.ReadAllText(Path.Combine(root?.FullName ?? throw new DirectoryNotFoundException(),
+            "src", "Gaia.Api", "Infrastructure", "Dataverse", "Security", "DataverseSecurityStore.cs"));
+        var bootstrapStart = source.IndexOf("public async Task<SecurityBootstrapResult> BootstrapAsync", StringComparison.Ordinal);
+        var bootstrapEnd = source.IndexOf("public Task<SecurityContextResponse> GetOrProvisionAsync", bootstrapStart, StringComparison.Ordinal);
+        var bootstrap = source[bootstrapStart..bootstrapEnd];
+
+        Assert.Contains("existingPermissionCodes", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("existingRoleCodes.Contains(\"ADMIN\") ? newPermissionIds : permissionIds.Values", bootstrap, StringComparison.Ordinal);
+        Assert.DoesNotContain("adminId, permissionIds.Values", bootstrap, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void InactiveModuleDeletionOwnsItsPermissionRecordsButProtectsActiveRoleAssignments()
+    {
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "Gaia.Platform.slnx"))) root = root.Parent;
+        var source = File.ReadAllText(Path.Combine(root?.FullName ?? throw new DirectoryNotFoundException(),
+            "src", "Gaia.Api", "Infrastructure", "Dataverse", "Security", "DataverseSecurityStore.cs"));
+        var deletionStart = source.IndexOf("public async Task DeleteModuleAsync", StringComparison.Ordinal);
+        var deletionEnd = source.IndexOf("private static bool IsValidModuleRoute", deletionStart, StringComparison.Ordinal);
+        var deletion = source[deletionStart..deletionEnd];
+
+        Assert.DoesNotContain("Inactiva primero todos los permisos del módulo", deletion, StringComparison.Ordinal);
+        Assert.Contains("Finaliza primero las asignaciones activas de sus permisos a roles", deletion, StringComparison.Ordinal);
+        Assert.True(
+            deletion.IndexOf("assignmentsByPermission[permissionId]=assignments", StringComparison.Ordinal)
+            < deletion.IndexOf("foreach(var assignment in assignmentsByPermission[permissionId])", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void SolicitudesSeparatesPortalAndAdministrationAuthorization()
     {
         var root = new DirectoryInfo(AppContext.BaseDirectory);

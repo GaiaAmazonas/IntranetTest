@@ -77,5 +77,6 @@ public sealed class SolicitudesManagementApplicationTests
         public Task PublishFormAsync(Guid formId,Guid actorId,DateTimeOffset now,CancellationToken token)=>Task.CompletedTask;
         public Task<SolicitudesAdminFormDefinition> ReadFormAsync(Guid formId,CancellationToken token)=>throw new NotImplementedException();
         public Task<Guid> SaveFormFieldAsync(Guid formId,Guid? fieldId,SaveSolicitudesFormField request,CancellationToken token)=>Task.FromResult(fieldId??Guid.NewGuid());
+        public Task DeleteFormFieldAsync(Guid formId,Guid fieldId,CancellationToken token)=>Task.CompletedTask;
     }
 }

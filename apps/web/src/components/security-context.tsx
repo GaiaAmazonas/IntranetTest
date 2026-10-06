@@ -33,6 +33,7 @@ export type SecurityNavigationModule = {
   code: string;
   name: string;
   description?: string | null;
+  parentId?: string | null;
   route: string;
   icon?: string | null;
   order: number;

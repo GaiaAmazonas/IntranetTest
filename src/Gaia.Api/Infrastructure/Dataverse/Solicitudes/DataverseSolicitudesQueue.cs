@@ -66,7 +66,7 @@ internal sealed partial class DataverseSolicitudesManagementStore
                 var statusCode = Text(status, state.Attribute("gaia_Codigo"));
                 var due = Date(row, request.Attribute("gaia_FechaLimiteActual"));
                 return new SolicitudesQueueItem(RequiredGuid(row, request.PrimaryIdAttribute), Text(row, request.PrimaryNameAttribute) ?? "",
-                    Text(row, request.Attribute("gaia_Asunto")) ?? "", Text(Nested(row, serviceNav), service.PrimaryNameAttribute) ?? "Servicio",
+                    DisplaySubject(Text(row, request.Attribute("gaia_Asunto"))), Text(Nested(row, serviceNav), service.PrimaryNameAttribute) ?? "Servicio",
                     Text(status, state.PrimaryNameAttribute) ?? "Sin estado", Text(status, state.Attribute("gaia_Color")),
                     Text(Nested(row, requesterNav), third.PrimaryNameAttribute) ?? "Sin solicitante",
                     Text(Nested(row, responsibleNav), third.PrimaryNameAttribute), Text(Nested(row, unitNav), unit.PrimaryNameAttribute),
@@ -116,6 +116,9 @@ internal sealed partial class DataverseSolicitudesManagementStore
         var result = values.Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         return result.Length == 0 ? null : string.Join(" · ", result);
     }
+
+    private static string DisplaySubject(string? value) =>
+        string.IsNullOrWhiteSpace(value) || Guid.TryParse(value, out _) ? string.Empty : value.Trim();
 
     internal static int? ReliableQueueTotal(JsonElement root)
     {

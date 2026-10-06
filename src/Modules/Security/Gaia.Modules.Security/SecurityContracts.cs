@@ -36,6 +36,8 @@ public static class AdminCorePermissions
     public const string ComEventsRead="COM.EVENTOS.VER"; public const string ComEventsCreate="COM.EVENTOS.CREAR"; public const string ComEventsEdit="COM.EVENTOS.ACTUALIZAR"; public const string ComEventsState="COM.EVENTOS.ADMINISTRAR";
     public const string ComEventTypesRead="COM.TIPOS_EVENTO.VER"; public const string ComEventTypesManage="COM.TIPOS_EVENTO.ADMINISTRAR";
     public const string ComBannersRead="COM.DESTACADOS.VER"; public const string ComBannersCreate="COM.DESTACADOS.CREAR"; public const string ComBannersEdit="COM.DESTACADOS.ACTUALIZAR"; public const string ComBannersState="COM.DESTACADOS.ADMINISTRAR"; public const string ComBannersDelete="COM.DESTACADOS.ELIMINAR";
+    public const string ConfigLoginVer="CONFIG.LOGIN.VER";
+    public const string ConfigAmbientacionVer="CONFIG.AMBIENTACION.VER";
     public const string TiUsuariosVer="TI.USUARIOS.VER"; public const string TiUsuariosCrear="TI.USUARIOS.CREAR"; public const string TiUsuariosActualizar="TI.USUARIOS.ACTUALIZAR"; public const string TiUsuariosActivar="TI.USUARIOS.ACTIVAR"; public const string TiUsuariosInactivar="TI.USUARIOS.INACTIVAR"; public const string TiUsuariosAdministrar="TI.USUARIOS.ADMINISTRAR";
     public const string TiRolesVer="TI.ROLES.VER"; public const string TiRolesCrear="TI.ROLES.CREAR"; public const string TiRolesActualizar="TI.ROLES.ACTUALIZAR"; public const string TiRolesAdministrar="TI.ROLES.ADMINISTRAR";
     public const string TiModulosVer="TI.MODULOS.VER"; public const string TiModulosCrear="TI.MODULOS.CREAR"; public const string TiModulosActualizar="TI.MODULOS.ACTUALIZAR"; public const string TiModulosActivar="TI.MODULOS.ACTIVAR"; public const string TiModulosInactivar="TI.MODULOS.INACTIVAR"; public const string TiModulosAdministrar="TI.MODULOS.ADMINISTRAR";
@@ -65,7 +67,7 @@ public static class PermissionScope
 public sealed record SecurityUser(Guid Id,string Name,string Email,string EntraObjectId,Guid? ThirdPartyId,string? DocumentNumber,DateTimeOffset? LastAccess,bool IsActive);
 public sealed record SecurityUserListItem(Guid? Id,string Name,string Email,string? EntraObjectId,Guid? ThirdPartyId,string? DocumentNumber,DateTimeOffset? LastAccess,bool IsActive,string ProvisioningStatus);
 public sealed record SecurityContextResponse(SecurityUser User,IReadOnlyList<string> Roles,IReadOnlyList<string> Permissions,IReadOnlyList<SecurityNavigationModule> Modules);
-public sealed record SecurityNavigationModule(Guid Id,string Code,string Name,string? Description,string Route,string? Icon,int Order);
+public sealed record SecurityNavigationModule(Guid Id,string Code,string Name,string? Description,Guid? ParentId,string Route,string? Icon,int Order);
 public sealed record SecurityModuleItem(Guid Id,string Code,string Name,string? Description,string Type,Guid? ParentId,string? Route,string? Icon,int Order,bool Visible,bool SupportsVisibility,bool IsActive);
 public sealed record SecurityPermissionItem(Guid Id,string Code,string Name,string Action,Guid ModuleId,bool IsActive);
 public sealed record SecurityRoleItem(Guid Id,string Code,string Name,string? Description,bool IsSystem,bool IsActive,int AssignedUsers,IReadOnlyList<string> Permissions);
@@ -98,6 +100,7 @@ public interface ISecurityStore
     Task<Guid> AssignUserRoleAsync(Guid userId,UserRoleWriteRequest request,CancellationToken token);
     Task EndUserRoleAsync(Guid userId,Guid assignmentId,DateOnly endDate,CancellationToken token);
     Task<Guid> UpsertModuleAsync(Guid? id,ModuleWriteRequest request,CancellationToken token);
+    Task DeleteModuleAsync(Guid id,CancellationToken token);
 }
 
 public interface IAdminCoreAuthorization

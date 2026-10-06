@@ -25,6 +25,7 @@ internal static class SecurityEndpoints
   group.MapGet("/modules",(ISecurityStore store,CancellationToken ct)=>store.ListModulesAsync(ct)).RequireAuthorization(AdminCorePermissions.TiModulosVer);
   group.MapPost("/modules",(ModuleWriteRequest request,ISecurityStore store,CancellationToken ct)=>WriteModuleAsync(null,request,store,ct)).RequireAuthorization(AdminCorePermissions.TiModulosCrear);
   group.MapPut("/modules/{id:guid}",(Guid id,ModuleWriteRequest request,ISecurityStore store,CancellationToken ct)=>WriteModuleAsync(id,request,store,ct)).RequireAuthorization(AdminCorePermissions.TiModulosActualizar);
+  group.MapDelete("/modules/{id:guid}",DeleteModuleAsync).RequireAuthorization(AdminCorePermissions.TiModulosAdministrar);
  }
 
  private static async Task<IResult> PreprovisionAsync(ISecurityStore store,CancellationToken ct)
@@ -83,6 +84,14 @@ internal static class SecurityEndpoints
   try { return Results.Ok(await store.UpsertModuleAsync(id,request,ct)); }
   catch(SecurityModuleConflictException exception)
   { return Results.Conflict(new { title="El elemento ya existe",detail=exception.Message }); }
+  catch(SecurityModuleValidationException exception)
+  { return Results.ValidationProblem(new Dictionary<string,string[]>{{"module",[exception.Message]}}); }
+  catch(KeyNotFoundException exception)
+  { return Results.NotFound(new { title="Elemento no encontrado",detail=exception.Message }); }
+ }
+ private static async Task<IResult> DeleteModuleAsync(Guid id,ISecurityStore store,CancellationToken ct)
+ {
+  try { await store.DeleteModuleAsync(id,ct); return Results.NoContent(); }
   catch(SecurityModuleValidationException exception)
   { return Results.ValidationProblem(new Dictionary<string,string[]>{{"module",[exception.Message]}}); }
   catch(KeyNotFoundException exception)

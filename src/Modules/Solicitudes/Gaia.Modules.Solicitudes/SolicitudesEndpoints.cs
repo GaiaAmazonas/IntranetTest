@@ -64,17 +64,23 @@ public static class SolicitudesEndpoints
         group.MapGet("/administration/services/{serviceId:guid}/workflows",ListWorkflows).RequireAuthorization(AdminCorePermissions.SolicitudesCatalogosVer);
         group.MapPost("/administration/workflows",CreateWorkflow).RequireAuthorization(AdminCorePermissions.SolicitudesCatalogosAdministrar);
         group.MapGet("/administration/workflows/{flowId:guid}",ReadWorkflow).RequireAuthorization(AdminCorePermissions.SolicitudesCatalogosVer);
+        group.MapPut("/administration/workflows/{flowId:guid}",UpdateWorkflow).RequireAuthorization(AdminCorePermissions.SolicitudesCatalogosAdministrar);
+        group.MapDelete("/administration/workflows/{flowId:guid}",DeleteWorkflow).RequireAuthorization(AdminCorePermissions.SolicitudesCatalogosAdministrar);
         group.MapPost("/administration/workflows/{flowId:guid}/steps",CreateWorkflowStep).RequireAuthorization(AdminCorePermissions.SolicitudesCatalogosAdministrar);
         group.MapPut("/administration/workflows/{flowId:guid}/steps/{stepId:guid}",UpdateWorkflowStep).RequireAuthorization(AdminCorePermissions.SolicitudesCatalogosAdministrar);
+        group.MapPost("/administration/workflows/{flowId:guid}/steps/{stepId:guid}/duplicate",DuplicateWorkflowStep).RequireAuthorization(AdminCorePermissions.SolicitudesCatalogosAdministrar);
+        group.MapDelete("/administration/workflows/{flowId:guid}/steps/{stepId:guid}",DeleteWorkflowStep).RequireAuthorization(AdminCorePermissions.SolicitudesCatalogosAdministrar);
         group.MapGet("/administration/workflow-steps/{stepId:guid}/form",ReadStageForm).RequireAuthorization(AdminCorePermissions.SolicitudesCatalogosVer);
         group.MapPut("/administration/workflow-steps/{stepId:guid}/form",SaveStageForm).RequireAuthorization(AdminCorePermissions.SolicitudesCatalogosAdministrar);
         group.MapPost("/administration/workflow-steps/{stepId:guid}/form/fields",CreateStageFormField).RequireAuthorization(AdminCorePermissions.SolicitudesCatalogosAdministrar);
         group.MapPut("/administration/workflow-steps/{stepId:guid}/form/fields/{fieldId:guid}",UpdateStageFormField).RequireAuthorization(AdminCorePermissions.SolicitudesCatalogosAdministrar);
+        group.MapDelete("/administration/workflow-steps/{stepId:guid}/form/fields/{fieldId:guid}",DeleteStageFormField).RequireAuthorization(AdminCorePermissions.SolicitudesCatalogosAdministrar);
         group.MapPost("/administration/workflows/{flowId:guid}/routes",CreateWorkflowRoute).RequireAuthorization(AdminCorePermissions.SolicitudesCatalogosAdministrar);
         group.MapPut("/administration/workflows/{flowId:guid}/routes/{routeId:guid}",UpdateWorkflowRoute).RequireAuthorization(AdminCorePermissions.SolicitudesCatalogosAdministrar);
         group.MapGet("/administration/forms/{id:guid}", ReadAdminForm).RequireAuthorization(AdminCorePermissions.SolicitudesCatalogosVer);
         group.MapPost("/administration/forms/{formId:guid}/fields", CreateField).RequireAuthorization(AdminCorePermissions.SolicitudesCatalogosAdministrar);
         group.MapPut("/administration/forms/{formId:guid}/fields/{fieldId:guid}", UpdateField).RequireAuthorization(AdminCorePermissions.SolicitudesCatalogosAdministrar);
+        group.MapDelete("/administration/forms/{formId:guid}/fields/{fieldId:guid}", DeleteField).RequireAuthorization(AdminCorePermissions.SolicitudesCatalogosAdministrar);
         return endpoints;
     }
 
@@ -318,10 +324,18 @@ public static class SolicitudesEndpoints
     {try{var value=await application.ReadAsync(flowId,token);return value is null?Results.NotFound():Results.Ok(value);}catch(Exception error){return Problem(error);}}
     private static async Task<IResult> CreateWorkflow(CreateSolicitudesWorkflowDraft request,SolicitudesWorkflowApplication application,CancellationToken token)
     {try{var id=await application.CreateDraftAsync(request,token);return Results.Created($"/api/solicitudes/administration/workflows/{id:D}",new{id});}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> UpdateWorkflow(Guid flowId,UpdateSolicitudesWorkflowDraft request,SolicitudesWorkflowApplication application,CancellationToken token)
+    {try{await application.UpdateDraftAsync(flowId,request,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> DeleteWorkflow(Guid flowId,SolicitudesWorkflowApplication application,CancellationToken token)
+    {try{await application.DeleteDraftAsync(flowId,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
     private static async Task<IResult> CreateWorkflowStep(Guid flowId,SaveSolicitudesWorkflowStep request,SolicitudesWorkflowApplication application,CancellationToken token)
     {try{var id=await application.SaveStepAsync(flowId,null,request,token);return Results.Created($"/api/solicitudes/administration/workflows/{flowId:D}/steps/{id:D}",new{id});}catch(Exception error){return Problem(error);}}
     private static async Task<IResult> UpdateWorkflowStep(Guid flowId,Guid stepId,SaveSolicitudesWorkflowStep request,SolicitudesWorkflowApplication application,CancellationToken token)
     {try{await application.SaveStepAsync(flowId,stepId,request,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> DuplicateWorkflowStep(Guid flowId,Guid stepId,SolicitudesWorkflowApplication application,CancellationToken token)
+    {try{var id=await application.DuplicateStepAsync(flowId,stepId,token);return Results.Created($"/api/solicitudes/administration/workflows/{flowId:D}/steps/{id:D}",new{id});}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> DeleteWorkflowStep(Guid flowId,Guid stepId,SolicitudesWorkflowApplication application,CancellationToken token)
+    {try{await application.DeleteStepAsync(flowId,stepId,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
     private static async Task<IResult> ReadStageForm(Guid stepId,SolicitudesWorkflowApplication application,CancellationToken token)
     {try{var value=await application.ReadStageFormAsync(stepId,token);return value is null?Results.NoContent():Results.Ok(value);}catch(Exception error){return Problem(error);}}
     private static async Task<IResult> SaveStageForm(Guid stepId,SaveSolicitudesStageForm request,SolicitudesWorkflowApplication application,CancellationToken token)
@@ -330,6 +344,8 @@ public static class SolicitudesEndpoints
     {try{var id=await application.SaveStageFormFieldAsync(stepId,null,request,token);return Results.Created($"/api/solicitudes/administration/workflow-steps/{stepId:D}/form/fields/{id:D}",new{id});}catch(Exception error){return Problem(error);}}
     private static async Task<IResult> UpdateStageFormField(Guid stepId,Guid fieldId,SaveSolicitudesFormField request,SolicitudesWorkflowApplication application,CancellationToken token)
     {try{await application.SaveStageFormFieldAsync(stepId,fieldId,request,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> DeleteStageFormField(Guid stepId,Guid fieldId,SolicitudesWorkflowApplication application,CancellationToken token)
+    {try{await application.DeleteStageFormFieldAsync(stepId,fieldId,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
     private static async Task<IResult> CreateWorkflowRoute(Guid flowId,SaveSolicitudesWorkflowRoute request,SolicitudesWorkflowApplication application,CancellationToken token)
     {try{var id=await application.SaveRouteAsync(flowId,null,request,token);return Results.Created($"/api/solicitudes/administration/workflows/{flowId:D}/routes/{id:D}",new{id});}catch(Exception error){return Problem(error);}}
     private static async Task<IResult> UpdateWorkflowRoute(Guid flowId,Guid routeId,SaveSolicitudesWorkflowRoute request,SolicitudesWorkflowApplication application,CancellationToken token)
@@ -353,6 +369,8 @@ public static class SolicitudesEndpoints
     {try{var id=await application.SaveFormFieldAsync(formId,null,request,token);return Results.Created($"/api/solicitudes/administration/forms/{formId:D}/fields/{id:D}",new{id});}catch(Exception error){return Problem(error);}}
     private static async Task<IResult> UpdateField(Guid formId,Guid fieldId,SaveSolicitudesFormField request,ISolicitudesManagementApplication application,CancellationToken token)
     {try{await application.SaveFormFieldAsync(formId,fieldId,request,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> DeleteField(Guid formId,Guid fieldId,ISolicitudesManagementApplication application,CancellationToken token)
+    {try{await application.DeleteFormFieldAsync(formId,fieldId,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
 
     private static async Task<Guid> Actor(ISecurityStore security, ClaimsPrincipal principal, CancellationToken token) =>
         (await security.GetOrProvisionAsync(principal, token)).User.ThirdPartyId
@@ -382,6 +400,7 @@ public static class SolicitudesEndpoints
         ArgumentException => Invalid(error.Message),
         InvalidOperationException => Results.Problem(statusCode: StatusCodes.Status422UnprocessableEntity,
             title: "No fue posible completar la operación", detail: error.Message),
-        _ => Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: "Servicio temporalmente no disponible")
+        _ => Results.Problem(statusCode: StatusCodes.Status422UnprocessableEntity,
+            title: "No fue posible completar la operación", detail: error.Message)
     };
 }

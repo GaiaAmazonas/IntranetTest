@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type React from "react";
-import { Boxes, ChevronDown, ChevronRight, Edit3, Eye, EyeOff, FolderTree, FunctionSquare, LayoutGrid, Plus, Route, Search, Settings2 } from "lucide-react";
+import { Boxes, ChevronDown, ChevronRight, Edit3, Eye, EyeOff, FolderTree, FunctionSquare, GripVertical, LayoutGrid, Plus, Route, Search, Settings2, Trash2 } from "lucide-react";
 import { apiRequest } from "@/lib/api-client";
 import { useFeedback } from "./feedback";
 import { ConfirmDialog, FormDialog } from "./form-dialog";
@@ -15,12 +15,15 @@ export function SecurityModulesView({ modules, onAccessChanged, onReload }: { mo
   const feedback = useFeedback();
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(modules[0]?.id ?? null);
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(modules.filter(item => !item.parentId).map(item => item.id)));
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ id: string; position: "before" | "after" } | null>(null);
   const [technical, setTechnical] = useState(false);
   const [form, setForm] = useState<ModuleForm | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [stateItem, setStateItem] = useState<SecurityModule | null>(null);
+  const [deleteItem, setDeleteItem] = useState<SecurityModule | null>(null);
   const byId = useMemo(() => new Map(modules.map(item => [item.id, item])), [modules]);
   const children = useMemo(() => {
     const result = new Map<string | null, SecurityModule[]>();
@@ -74,18 +77,71 @@ export function SecurityModulesView({ modules, onAccessChanged, onReload }: { mo
     finally { setSaving(false); }
   }
 
+  async function reorder(target: SecurityModule, position: "before" | "after") {
+    const dragged = draggedId ? byId.get(draggedId) : undefined;
+    setDraggedId(null); setDropTarget(null);
+    if (!dragged || dragged.id === target.id || dragged.parentId !== target.parentId) return;
+    const siblings = [...(children.get(target.parentId ?? null) ?? [])];
+    const from = siblings.findIndex(item => item.id === dragged.id);
+    if (from < 0) return;
+    const [moved] = siblings.splice(from, 1);
+    const targetIndex = siblings.findIndex(item => item.id === target.id);
+    if (targetIndex < 0) return;
+    siblings.splice(targetIndex + (position === "after" ? 1 : 0), 0, moved);
+    const changed = siblings.filter((item, index) => item.order !== (index + 1) * 10);
+    if (!changed.length) return;
+    setSaving(true);
+    try {
+      for (const item of changed) {
+        const index = siblings.findIndex(sibling => sibling.id === item.id);
+        await apiRequest(`/api/security/modules/${item.id}`, { method: "PUT", body: JSON.stringify({ code: item.code, name: item.name, description: item.description, type: item.type, parentId: item.parentId, route: item.route, icon: item.icon, order: (index + 1) * 10, visible: item.visible, isActive: item.isActive }) });
+      }
+      feedback.notify({ tone: "success", title: "Orden actualizado", description: `${dragged.name} cambió de posición.` }); await onReload(); await onAccessChanged();
+    } catch (reason) { feedback.notify({ tone: "error", title: "No fue posible actualizar el orden", description: reason instanceof Error ? reason.message : undefined }); await onReload(); }
+    finally { setSaving(false); }
+  }
+
+  function startDragging(event: React.DragEvent<HTMLDivElement>, item: SecurityModule) {
+    if (saving || normalizedQuery) { event.preventDefault(); return; }
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", item.id);
+    setDraggedId(item.id); setDropTarget(null);
+  }
+
+  function moveOver(event: React.DragEvent<HTMLDivElement>, item: SecurityModule) {
+    const dragged = draggedId ? byId.get(draggedId) : undefined;
+    if (!dragged || dragged.id === item.id || dragged.parentId !== item.parentId) return;
+    event.preventDefault(); event.dataTransfer.dropEffect = "move";
+    const bounds = event.currentTarget.getBoundingClientRect();
+    setDropTarget({ id: item.id, position: event.clientY < bounds.top + bounds.height / 2 ? "before" : "after" });
+  }
+
+  function deleteModule(item: SecurityModule) {
+    if (!item.isActive) setDeleteItem(item);
+  }
+
+  async function confirmDeleteModule() {
+    if (!deleteItem) return;
+    setSaving(true);
+    try { await apiRequest(`/api/security/modules/${deleteItem.id}`, { method: "DELETE" }); setSelectedId(null); feedback.notify({ tone: "success", title: "Elemento eliminado", description: `${deleteItem.name} se eliminó definitivamente del catálogo.` }); setDeleteItem(null); await onReload(); await onAccessChanged(); }
+    catch (reason) { feedback.notify({ tone: "error", title: "No fue posible eliminar el elemento", description: reason instanceof Error ? reason.message : undefined }); }
+    finally { setSaving(false); }
+  }
+
   function renderBranch(item: SecurityModule, depth: number): React.ReactNode {
     if (visibleIds && !visibleIds.has(item.id)) return null;
     const itemChildren = children.get(item.id) ?? []; const open = expanded.has(item.id) || Boolean(normalizedQuery); const active = selected?.id === item.id;
-    return <div className="gaia-module-branch" key={item.id}><div className={`gaia-module-tree-row ${active ? "is-selected" : ""} ${!item.isActive ? "is-inactive" : ""}`} style={{ "--tree-depth": depth } as React.CSSProperties}>{itemChildren.length ? <button aria-label={`${open ? "Contraer" : "Expandir"} ${item.name}`} aria-expanded={open} onClick={() => setExpanded(current => { const next = new Set(current); if (next.has(item.id)) next.delete(item.id); else next.add(item.id); return next; })} type="button">{open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}</button> : <span className="gaia-module-tree-spacer" />}<button className="gaia-module-tree-select" onClick={() => { setSelectedId(item.id); setTechnical(false); }} type="button"><ModuleIcon type={item.type} /><span><strong>{item.name}</strong><small>{friendlyType(item.type)}</small></span><Badge tone={item.isActive ? "success" : "danger"}>{item.isActive ? "Activo" : "Inactivo"}</Badge></button></div>{open && itemChildren.map(child => renderBranch(child, depth + 1))}</div>;
+    const targetPosition = dropTarget?.id === item.id ? dropTarget.position : null;
+    return <div className="gaia-module-branch" key={item.id}><div aria-level={depth + 1} aria-selected={active} className={`gaia-module-tree-row ${active ? "is-selected" : ""} ${!item.isActive ? "is-inactive" : ""} ${draggedId === item.id ? "is-dragging" : ""} ${targetPosition ? `is-drop-${targetPosition}` : ""}`} draggable={!saving && !normalizedQuery} onDragEnd={()=>{setDraggedId(null);setDropTarget(null);}} onDragLeave={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node))setDropTarget(current=>current?.id===item.id?null:current);}} onDragOver={event=>moveOver(event,item)} onDragStart={event=>startDragging(event,item)} onDrop={event=>{event.preventDefault();if(targetPosition)void reorder(item,targetPosition);}} role="treeitem" style={{ "--tree-depth": depth } as React.CSSProperties}>{itemChildren.length ? <button aria-label={`${open ? "Contraer" : "Expandir"} ${item.name}`} aria-expanded={open} onClick={() => setExpanded(current => { const next = new Set(current); if (next.has(item.id)) next.delete(item.id); else next.add(item.id); return next; })} type="button">{open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}</button> : <span className="gaia-module-tree-spacer" />}<span aria-label={`Arrastrar ${item.name} para cambiar su orden`} className="gaia-module-drag-handle" role="img" title="Arrastra para cambiar el orden"><GripVertical size={15}/></span><button className="gaia-module-tree-select" onClick={() => { setSelectedId(item.id); setTechnical(false); }} type="button"><ModuleIcon type={item.type} /><span><strong>{item.name}</strong><small>{friendlyType(item.type)}</small></span><Badge tone={item.isActive ? "success" : "danger"}>{item.isActive ? "Activo" : "Inactivo"}</Badge></button></div>{open && itemChildren.map(child => renderBranch(child, depth + 1))}</div>;
   }
 
   return <div className="gaia-modules-workspace">
-    <aside className="gaia-module-tree-panel"><div className="gaia-module-tree-head"><label><Search size={16} /><span className="sr-only">Buscar elementos</span><input onChange={event => setQuery(event.target.value)} placeholder="Buscar en el catálogo…" type="search" value={query} /></label><Button onClick={() => openNew()}><Plus size={16} />Nuevo módulo principal</Button></div><div className="gaia-module-tree" role="tree">{(children.get(null) ?? []).map(item => renderBranch(item, 0))}</div>{visibleIds?.size === 0 && <EmptyState title="Sin resultados" description="No encontramos elementos con ese criterio." />}</aside>
-    <section className="gaia-module-detail">{!selected ? <EmptyState title="Catálogo vacío" description="Crea el primer módulo para comenzar." /> : <><header><div className="gaia-module-detail-title"><ModuleIcon type={selected.type} /><div><p>Seguridad · Catálogo de módulos</p><h2>{selected.name}</h2><span>{friendlyType(selected.type)}{selected.parentId && byId.get(selected.parentId) ? ` · Dentro de ${byId.get(selected.parentId)!.name}` : " · Nivel principal"}</span></div></div><Badge tone={selected.isActive ? "success" : "danger"}>{selected.isActive ? "Activo" : "Inactivo"}</Badge></header><div className="gaia-module-detail-body"><section><h3>Información funcional</h3><p>{selected.description || "Este elemento todavía no tiene una descripción funcional."}</p><dl className="gaia-module-facts"><div><dt><FolderTree size={14} />Ubicación</dt><dd>{breadcrumb(selected, byId)}</dd></div><div><dt><Route size={14} />Destino</dt><dd>{selected.route || "Sin ruta; recurso interno de autorización"}</dd></div><div><dt><Eye size={14} />Navegación</dt><dd>{selected.visible ? "Visible cuando el usuario tiene acceso" : "Oculto en navegación"}</dd></div><div><dt><Settings2 size={14} />Orden</dt><dd>{selected.order}</dd></div></dl></section><section><div className="gaia-module-action-heading"><div><h3>Administración</h3><p>Los cambios de código no están permitidos porque afectarían las reglas de autorización.</p></div></div><div className="gaia-module-detail-actions"><Button onClick={() => openEdit(selected)} variant="secondary"><Edit3 size={15} />Editar información</Button><Button onClick={() => openNew(selected)} variant="secondary"><Plus size={15} />Agregar elemento hijo</Button><Button onClick={() => setStateItem(selected)} variant="secondary">{selected.isActive ? <EyeOff size={15} /> : <Eye size={15} />}{selected.isActive ? "Inactivar" : "Activar"}</Button></div></section><section><button aria-expanded={technical} className="gaia-module-technical-toggle" onClick={() => setTechnical(value => !value)} type="button"><Settings2 size={15} />{technical ? "Ocultar" : "Mostrar"} información técnica<ChevronRight className={technical ? "is-open" : ""} size={15} /></button>{technical && <dl className="gaia-module-technical"><div><dt>Código estable</dt><dd>{selected.code}</dd></div><div><dt>GUID</dt><dd>{selected.id}</dd></div><div><dt>Tipo Dataverse</dt><dd>{selected.type}</dd></div><div><dt>Icono configurado</dt><dd>{selected.icon || "Sin icono"}</dd></div></dl>}</section></div></>}
+    <aside className="gaia-module-tree-panel"><div className="gaia-module-tree-head"><label><Search size={16} /><span className="sr-only">Buscar elementos</span><input onChange={event => setQuery(event.target.value)} placeholder="Buscar en el catálogo…" type="search" value={query} /></label><div className="gaia-module-tree-actions"><Button onClick={() => openNew()}><Plus size={16} />Nuevo módulo principal</Button><div className="gaia-module-tree-tools"><button onClick={()=>setExpanded(new Set(modules.filter(item=>(children.get(item.id)?.length??0)>0).map(item=>item.id)))} type="button"><ChevronDown size={13}/>Expandir</button><button onClick={()=>setExpanded(new Set())} type="button"><ChevronRight size={13}/>Contraer</button></div></div></div><p className="gaia-module-tree-help">{normalizedQuery ? "Limpia la búsqueda para cambiar el orden." : "Toma el control de puntos y arrastra un elemento antes o después de otro del mismo nivel."}</p><div className="gaia-module-tree" role="tree">{(children.get(null) ?? []).map(item => renderBranch(item, 0))}</div>{visibleIds?.size === 0 && <EmptyState title="Sin resultados" description="No encontramos elementos con ese criterio." />}</aside>
+    <section className="gaia-module-detail">{!selected ? <EmptyState title="Catálogo vacío" description="Crea el primer módulo para comenzar." /> : <><header><div className="gaia-module-detail-title"><ModuleIcon type={selected.type} /><div><p>Seguridad · Catálogo de módulos</p><h2>{selected.name}</h2><span>{friendlyType(selected.type)}{selected.parentId && byId.get(selected.parentId) ? ` · Dentro de ${byId.get(selected.parentId)!.name}` : " · Nivel principal"}</span></div></div><Badge tone={selected.isActive ? "success" : "danger"}>{selected.isActive ? "Activo" : "Inactivo"}</Badge></header><div className="gaia-module-detail-body"><section><h3>Información funcional</h3><p>{selected.description || "Este elemento todavía no tiene una descripción funcional."}</p><dl className="gaia-module-facts"><div><dt><FolderTree size={14} />Ubicación</dt><dd>{breadcrumb(selected, byId)}</dd></div><div><dt><Route size={14} />Destino</dt><dd>{selected.route || "Sin ruta; recurso interno de autorización"}</dd></div><div><dt><Eye size={14} />Navegación</dt><dd>{selected.visible ? "Visible cuando el usuario tiene acceso" : "Oculto en navegación"}</dd></div><div><dt><Settings2 size={14} />Orden</dt><dd>{selected.order}</dd></div></dl></section><section><div className="gaia-module-action-heading"><div><h3>Administración</h3><p>Los cambios de código no están permitidos porque afectarían las reglas de autorización.</p></div></div><div className="gaia-module-detail-actions"><Button onClick={() => openEdit(selected)} variant="secondary"><Edit3 size={15} />Editar información</Button><Button onClick={() => openNew(selected)} variant="secondary"><Plus size={15} />Agregar elemento hijo</Button><Button onClick={() => setStateItem(selected)} variant="secondary">{selected.isActive ? <EyeOff size={15} /> : <Eye size={15} />}{selected.isActive ? "Inactivar" : "Activar"}</Button>{!selected.isActive&&<Button onClick={()=>void deleteModule(selected)} variant="secondary"><Trash2 size={15}/>Eliminar definitivamente</Button>}</div></section><section><button aria-expanded={technical} className="gaia-module-technical-toggle" onClick={() => setTechnical(value => !value)} type="button"><Settings2 size={15} />{technical ? "Ocultar" : "Mostrar"} información técnica<ChevronRight className={technical ? "is-open" : ""} size={15} /></button>{technical && <dl className="gaia-module-technical"><div><dt>Código estable</dt><dd>{selected.code}</dd></div><div><dt>GUID</dt><dd>{selected.id}</dd></div><div><dt>Tipo Dataverse</dt><dd>{selected.type}</dd></div><div><dt>Icono configurado</dt><dd>{selected.icon || "Sin icono"}</dd></div></dl>}</section></div></>}
     </section>
 
     <FormDialog error={formError} formId="security-module-form" loading={saving} onClose={() => setForm(null)} open={Boolean(form)} submitLabel={form?.id ? "Guardar cambios" : "Crear elemento"} subtitle="Nombre, jerarquía y descripción funcional." title={form?.id ? "Editar elemento" : "Nuevo elemento del catálogo"}>{form && <form className="gaia-module-form" id="security-module-form" onSubmit={event => { event.preventDefault(); void saveModule(); }}><label><span>Nombre funcional</span><input maxLength={120} onChange={event => updateForm({ name: event.target.value, code: form.id ? form.code : generateModuleCode(event.target.value, form.parentId ? byId.get(form.parentId)?.code : undefined) })} required value={form.name} /></label><label><span>Descripción</span><textarea maxLength={500} onChange={event => updateForm({ description: event.target.value })} rows={3} value={form.description} /></label><div className="gaia-module-form-grid"><label><span>Tipo</span><select onChange={event => { const type = event.target.value; updateForm({ type, parentId: isRootType(type) ? "" : form.parentId }); }} required value={form.type}>{types.map(type => <option key={type} value={type}>{friendlyType(type)}</option>)}</select></label><label><span>Elemento padre</span><select disabled={isRootType(form.type)} onChange={event => { const parentId = event.target.value; updateForm({ parentId, code: form.id ? form.code : generateModuleCode(form.name, parentId ? byId.get(parentId)?.code : undefined), order: nextOrder(parentId || null, children) }); }} required={!isRootType(form.type)} value={form.parentId}><option value="">Nivel principal</option>{availableParents.map(item => <option key={item.id} value={item.id}>{breadcrumb(item, byId)}</option>)}</select></label></div><label><span>Ruta o enlace</span><input maxLength={3000} onChange={event => updateForm({ route: event.target.value })} placeholder="/ruta-interna o https://sitio-externo.com" value={form.route} /><small>Las aplicaciones configuradas aquí aparecerán en la Intranet para los usuarios autorizados.</small></label>{modules.some(item => item.supportsVisibility) && <label className="gaia-module-visible"><input checked={form.visible} onChange={event => updateForm({ visible: event.target.checked })} type="checkbox" /><span><strong>Mostrar en menú</strong><small>Puede aparecer en la navegación cuando el usuario tenga permisos. Ocultarlo no modifica autorizaciones.</small></span></label>}</form>}</FormDialog>
+    <ConfirmDialog confirmLabel="Sí, eliminar definitivamente" description={deleteItem ? `${deleteItem.name} y sus datos dependientes inactivos se eliminarán del catálogo. Esta acción no se puede deshacer.` : ""} destructive loading={saving} onCancel={() => setDeleteItem(null)} onConfirm={() => void confirmDeleteModule()} open={Boolean(deleteItem)} title="¿Eliminar este elemento?" />
     <ConfirmDialog confirmLabel={stateItem?.isActive ? "Sí, inactivar" : "Sí, activar"} description={stateItem ? `${stateItem.name} ${stateItem.isActive ? "dejará de estar disponible en el catálogo activo" : "volverá a estar disponible"}. Sus relaciones y código se conservarán.` : ""} destructive={Boolean(stateItem?.isActive)} loading={saving} onCancel={() => setStateItem(null)} onConfirm={() => void toggleState()} open={Boolean(stateItem)} title={stateItem?.isActive ? "¿Inactivar este elemento?" : "¿Activar este elemento?"} />
   </div>;
 }

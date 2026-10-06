@@ -67,12 +67,42 @@ internal sealed partial class DataverseSolicitudesWorkflowExecutionWriter(
 
     public async Task<Guid> CreateDraftAsync(CreateSolicitudesWorkflowDraft command,CancellationToken token)
     {
-        var client=await clients.CreateAsync();var flow=await DataverseMetadataResolver.TableAsync(client,"gaia_flujogestion",token);var service=await DataverseMetadataResolver.TableAsync(client,"gaia_servicio",token);var existingService=await DataverseMetadataResolver.ReadOneAsync(client,$"{service.EntitySetName}({command.ServiceId:D})?$select={service.PrimaryIdAttribute},statecode",token);if(existingService is null||Int(existingService.Value,"statecode")!=0)throw new ArgumentException("El servicio no existe o está inactivo.");
-        var relation=flow.Relationship("gaia_Servicio","gaia_servicio");var version=flow.Attribute("gaia_Version");var status=flow.Attribute("gaia_EstadoFlujo");var rows=await DataverseJson.ReadAllAsync(client,$"{flow.EntitySetName}?$select={flow.PrimaryIdAttribute},{version},{status}&$filter=statecode eq 0 and _{relation.ReferencingAttribute}_value eq {command.ServiceId:D}",token);if(rows.Any(x=>Int(x,status)==SolicitudesWorkflowValues.Draft))throw new InvalidOperationException("Ya existe un flujo borrador para el servicio.");var next=rows.Select(x=>Int(x,version)).DefaultIfEmpty(0).Max()+1;
+        var client=await clients.CreateAsync();var flow=await DataverseMetadataResolver.TableAsync(client,"gaia_flujogestion",token);var service=await DataverseMetadataResolver.TableAsync(client,"gaia_servicio",token);var serviceUnit=service.Relationship("gaia_UnidadResponsable","gaia_organizacion");var existingService=await DataverseMetadataResolver.ReadOneAsync(client,$"{service.EntitySetName}({command.ServiceId:D})?$select={service.PrimaryIdAttribute},_{serviceUnit.ReferencingAttribute}_value,statecode",token);if(existingService is null||Int(existingService.Value,"statecode")!=0)throw new ArgumentException("El servicio no existe o está inactivo.");
+        var relation=flow.Relationship("gaia_Servicio","gaia_servicio");var version=flow.Attribute("gaia_Version");var status=flow.Attribute("gaia_EstadoFlujo");var rows=await DataverseJson.ReadAllAsync(client,$"{flow.EntitySetName}?$select={flow.PrimaryIdAttribute},{version},{status},statecode&$filter=_{relation.ReferencingAttribute}_value eq {command.ServiceId:D}",token);if(rows.Any(x=>Int(x,"statecode")==0&&Int(x,status)==SolicitudesWorkflowValues.Draft))throw new InvalidOperationException("Ya existe un flujo borrador para el servicio.");var next=rows.Select(x=>Int(x,version)).DefaultIfEmpty(0).Max()+1;
         var created=await Create(client,flow.EntitySetName,new Dictionary<string,object?>{{flow.PrimaryNameAttribute,command.Name},{version,next},{status,flow.EncodedIntegerValue("gaia_EstadoFlujo",SolicitudesWorkflowValues.Draft)},{flow.Attribute("gaia_Descripcion"),command.Description},{relation.NavigationProperty+"@odata.bind",$"/{service.EntitySetName}({command.ServiceId:D})"},{"statecode",0}},token);
-        var source=rows.Where(x=>RequiredGuid(x,flow.PrimaryIdAttribute)!=created&&Int(x,status)!=SolicitudesWorkflowValues.Draft).OrderByDescending(x=>Int(x,version)).FirstOrDefault();
+        var source=rows.Where(x=>Int(x,"statecode")==0&&RequiredGuid(x,flow.PrimaryIdAttribute)!=created&&Int(x,status)!=SolicitudesWorkflowValues.Draft).OrderByDescending(x=>Int(x,version)).FirstOrDefault();
         if(source.ValueKind!=JsonValueKind.Undefined)await CloneWorkflowAsync(RequiredGuid(source,flow.PrimaryIdAttribute),created,token);
+        else
+        {
+            var unitId=OptionalGuid(existingService.Value,$"_{serviceUnit.ReferencingAttribute}_value");
+            var strategy=unitId.HasValue?SolicitudesWorkflowValues.UnitQueue:SolicitudesWorkflowValues.RequestOwner;
+            var initial=await SaveStepAsync(created,null,new("REVISION_INICIAL",299540141,10,true,false,false,
+                strategy,unitId,null,SolicitudesWorkflowValues.AnyIncoming,false,false,false,false,null,true),token);
+            var final=await SaveStepAsync(created,null,new("CIERRE_FINAL",299540144,20,false,true,false,
+                strategy,unitId,null,SolicitudesWorkflowValues.AllIncoming,false,true,false,false,null,true),token);
+            await SaveRouteAsync(created,null,new("REVISION_INICIAL_A_CIERRE",initial,final,
+                SolicitudesWorkflowValues.Completed,10,true),token);
+        }
         return created;
+    }
+
+    public async Task UpdateDraftAsync(Guid flowId,UpdateSolicitudesWorkflowDraft command,CancellationToken token)
+    {
+        var client=await clients.CreateAsync();await RequireUnpublishedDraft(flowId,client,token);var flow=await DataverseMetadataResolver.TableAsync(client,"gaia_flujogestion",token);
+        await Patch(client,flow.EntitySetName,flowId,new Dictionary<string,object?>{{flow.PrimaryNameAttribute,command.Name},{flow.Attribute("gaia_Descripcion"),command.Description}},token);
+    }
+
+    public async Task DeleteDraftAsync(Guid flowId,CancellationToken token)
+    {
+        var client=await clients.CreateAsync();await RequireUnpublishedDraft(flowId,client,token);
+        var flow=await DataverseMetadataResolver.TableAsync(client,"gaia_flujogestion",token);
+        var route=await DataverseMetadataResolver.TableAsync(client,"gaia_rutaflujo",token);var routeFlow=route.Relationship("gaia_FlujoGestion","gaia_flujogestion");
+        var step=await DataverseMetadataResolver.TableAsync(client,"gaia_pasoflujo",token);var stepFlow=step.Relationship("gaia_FlujoGestion","gaia_flujogestion");
+        var routes=await RelatedIds(client,route,routeFlow.ReferencingAttribute,[flowId],token);var steps=await RelatedIds(client,step,stepFlow.ReferencingAttribute,[flowId],token);
+        var form=await DataverseMetadataResolver.TableAsync(client,"gaia_formulariopaso",token);var formStep=form.Relationship("gaia_PasoFlujo","gaia_pasoflujo");var forms=await RelatedIds(client,form,formStep.ReferencingAttribute,steps,token);
+        var field=await DataverseMetadataResolver.TableAsync(client,"gaia_campoformulariopaso",token);var fieldForm=field.Relationship("gaia_FormularioPaso","gaia_formulariopaso");var fields=await RelatedIds(client,field,fieldForm.ReferencingAttribute,forms,token);
+        var option=await DataverseMetadataResolver.TableAsync(client,"gaia_opcioncampoformulariopaso",token);var optionField=option.Relationship("gaia_CampoFormularioPaso","gaia_campoformulariopaso");var options=await RelatedIds(client,option,optionField.ReferencingAttribute,fields,token);
+        foreach(var id in options)await Delete(client,option.EntitySetName,id,token);foreach(var id in fields)await Delete(client,field.EntitySetName,id,token);foreach(var id in forms)await Delete(client,form.EntitySetName,id,token);foreach(var id in routes)await Delete(client,route.EntitySetName,id,token);foreach(var id in steps)await Delete(client,step.EntitySetName,id,token);await Delete(client,flow.EntitySetName,flowId,token);
     }
 
     public async Task<Guid> SaveStepAsync(Guid flowId,Guid? stepId,SaveSolicitudesWorkflowStep command,CancellationToken token)
@@ -435,13 +465,15 @@ internal sealed partial class DataverseSolicitudesWorkflowExecutionWriter(
         return await Create(client,management.EntitySetName,payload,token);
     }
 
-    private static async Task<IReadOnlyCollection<Guid>> ActorUnits(HttpClient client,Guid actorId,CancellationToken token)
+    private async Task<IReadOnlyCollection<Guid>> ActorUnits(HttpClient client,Guid actorId,CancellationToken token)
     {
-        var assignment=await DataverseMetadataResolver.TableAsync(client,"gaia_asignacionorganizacional",token);
-        var person=assignment.RelationshipTo("gaia_terceros");var unit=assignment.RelationshipTo("gaia_organizacion");
-        var rows=await DataverseJson.ReadAllAsync(client,
-            $"{assignment.EntitySetName}?$select=_{unit.ReferencingAttribute}_value&$filter=statecode eq 0 and _{person.ReferencingAttribute}_value eq {actorId:D}",token);
-        return rows.Select(x=>OptionalGuid(x,$"_{unit.ReferencingAttribute}_value")).Where(x=>x.HasValue).Select(x=>x!.Value).Distinct().ToArray();
+        _=client;
+        var today=DateOnly.FromDateTime(DateTime.UtcNow);
+        return (await assignmentStore.ListAsync(token))
+            .Where(item=>item.IsActive&&item.ThirdPartyId==actorId
+                &&(!item.StartDate.HasValue||item.StartDate<=today)
+                &&(!item.EndDate.HasValue||item.EndDate>=today))
+            .Select(item=>item.OrganizationalUnitId).Distinct().ToArray();
     }
 
     private static async Task<IReadOnlyList<SolicitudesManagementExecution>> ReadExecutions(HttpClient client,
@@ -621,6 +653,12 @@ internal sealed partial class DataverseSolicitudesWorkflowExecutionWriter(
     {using var response=await client.PostAsJsonAsync(set,payload,token);await Ensure(response,token);var uri=response.Headers.TryGetValues("OData-EntityId",out var values)?values.SingleOrDefault():null;var match=Regex.Match(uri??"",@"\(([0-9a-f-]{36})\)$");return match.Success?Guid.Parse(match.Groups[1].Value):throw new InvalidOperationException("Dataverse no devolvió el identificador creado.");}
     private static async Task Patch(HttpClient client,string set,Guid id,object payload,CancellationToken token)
     {using var request=new HttpRequestMessage(HttpMethod.Patch,$"{set}({id:D})"){Content=JsonContent.Create(payload)};request.Headers.TryAddWithoutValidation("If-Match","*");using var response=await client.SendAsync(request,token);await Ensure(response,token);}
+    private static async Task Delete(HttpClient client,string set,Guid id,CancellationToken token)
+    {using var request=new HttpRequestMessage(HttpMethod.Delete,$"{set}({id:D})");request.Headers.TryAddWithoutValidation("If-Match","*");using var response=await client.SendAsync(request,token);if(response.StatusCode==System.Net.HttpStatusCode.NotFound)return;await Ensure(response,token);}
+    private static async Task<IReadOnlyList<Guid>> RelatedIds(HttpClient client,DataverseTableMetadata table,string lookup,IReadOnlyCollection<Guid> parents,CancellationToken token)
+    {if(parents.Count==0)return [];var filter=string.Join(" or ",parents.Select(id=>$"_{lookup}_value eq {id:D}"));var rows=await DataverseJson.ReadAllAsync(client,$"{table.EntitySetName}?$select={table.PrimaryIdAttribute}&$filter={filter}",token);return rows.Select(row=>RequiredGuid(row,table.PrimaryIdAttribute)).ToArray();}
+    private static async Task RequireUnpublishedDraft(Guid flowId,HttpClient client,CancellationToken token)
+    {var flow=await DataverseMetadataResolver.TableAsync(client,"gaia_flujogestion",token);var status=flow.Attribute("gaia_EstadoFlujo");var row=await DataverseMetadataResolver.ReadOneAsync(client,$"{flow.EntitySetName}({flowId:D})?$select={status},statecode",token);if(row is null||Int(row.Value,"statecode")!=0)throw new KeyNotFoundException("El flujo no existe.");if(Int(row.Value,status)!=SolicitudesWorkflowValues.Draft)throw new InvalidOperationException("Solo se puede editar o eliminar físicamente un flujo en borrador.");}
     private static async Task RequireDraft(Guid flowId,HttpClient client,CancellationToken token)
     {
         var flow=await DataverseMetadataResolver.TableAsync(client,"gaia_flujogestion",token);

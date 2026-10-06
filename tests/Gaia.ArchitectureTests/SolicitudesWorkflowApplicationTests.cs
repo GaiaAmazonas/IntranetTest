@@ -108,11 +108,16 @@ public sealed class SolicitudesWorkflowApplicationTests
         public Task ReopenAsync(Guid requestId,Guid actor,DateTimeOffset now,CancellationToken token)=>Task.CompletedTask;
         public Task<IReadOnlyList<SolicitudesWorkflowSummary>> ListAsync(Guid serviceId,CancellationToken token)=>Task.FromResult<IReadOnlyList<SolicitudesWorkflowSummary>>([]);
         public Task<Guid> CreateDraftAsync(CreateSolicitudesWorkflowDraft command,CancellationToken token)=>Task.FromResult(Guid.NewGuid());
+        public Task UpdateDraftAsync(Guid flowId,UpdateSolicitudesWorkflowDraft command,CancellationToken token)=>Task.CompletedTask;
+        public Task DeleteDraftAsync(Guid flowId,CancellationToken token)=>Task.CompletedTask;
         public Task<Guid> SaveStepAsync(Guid flowId,Guid? stepId,SaveSolicitudesWorkflowStep command,CancellationToken token)=>Task.FromResult(stepId??Guid.NewGuid());
+        public Task<Guid> DuplicateStepAsync(Guid flowId,Guid stepId,CancellationToken token)=>Task.FromResult(Guid.NewGuid());
+        public Task DeleteStepAsync(Guid flowId,Guid stepId,CancellationToken token)=>Task.CompletedTask;
         public Task<Guid> SaveRouteAsync(Guid flowId,Guid? routeId,SaveSolicitudesWorkflowRoute command,CancellationToken token)=>Task.FromResult(routeId??Guid.NewGuid());
         public Task<SolicitudesStageForm?> ReadStageFormAsync(Guid stepId,CancellationToken token)=>Task.FromResult<SolicitudesStageForm?>(null);
         public Task<Guid> SaveStageFormAsync(Guid stepId,SaveSolicitudesStageForm command,CancellationToken token)=>Task.FromResult(Guid.NewGuid());
         public Task<Guid> SaveStageFormFieldAsync(Guid stepId,Guid? fieldId,SaveSolicitudesFormField command,CancellationToken token)=>Task.FromResult(fieldId??Guid.NewGuid());
+        public Task DeleteStageFormFieldAsync(Guid stepId,Guid fieldId,CancellationToken token)=>Task.CompletedTask;
         public Task<SolicitudesManagementForm> ReadManagementFormAsync(Guid managementId,Guid actorId,CancellationToken token)=>Task.FromResult(new SolicitudesManagementForm(managementId,Guid.NewGuid(),null,[]));
         public Task<IReadOnlyList<SavedSolicitudesManagementAnswer>> SaveManagementAnswersAsync(Guid managementId,Guid actorId,SaveSolicitudesManagementAnswers command,CancellationToken token)=>Task.FromResult<IReadOnlyList<SavedSolicitudesManagementAnswer>>([]);
         public Task<SolicitudesRequestWorkflowState?> ReadRequestStateAsync(Guid requestId,Guid actorId,bool managementAccess,CancellationToken token)=>Task.FromResult<SolicitudesRequestWorkflowState?>(null);

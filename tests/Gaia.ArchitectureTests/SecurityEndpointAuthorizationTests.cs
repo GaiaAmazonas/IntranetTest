@@ -21,6 +21,7 @@ public sealed class SecurityEndpointAuthorizationTests
     [InlineData("/api/security/modules", "GET", "TI.MODULOS.VER")]
     [InlineData("/api/security/modules", "POST", "TI.MODULOS.CREAR")]
     [InlineData("/api/security/modules/{id:guid}", "PUT", "TI.MODULOS.ACTUALIZAR")]
+    [InlineData("/api/security/modules/{id:guid}", "DELETE", "TI.MODULOS.ADMINISTRAR")]
     public void SensitiveEndpointRequiresItsSpecificPolicy(string route, string method, string policy)
     {
         var builder = WebApplication.CreateBuilder();
@@ -35,21 +36,6 @@ public sealed class SecurityEndpointAuthorizationTests
 
         Assert.NotEmpty(authorization);
         Assert.Contains(authorization, item => string.Equals(item.Policy, policy, StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public void SecurityDoesNotPublishDeleteBeforeARealSafeOperationExists()
-    {
-        var builder = WebApplication.CreateBuilder();
-        builder.Services.AddSingleton<ISecurityStore, UnusedSecurityStore>();
-        builder.Services.AddSingleton<IAdminCoreAuthorization, DenyAllAuthorization>();
-        builder.Services.AddSecurityModule();
-        var application = builder.Build(); application.MapSecurityEndpoints();
-
-        var deleteEndpoints = ((IEndpointRouteBuilder)application).DataSources.SelectMany(source => source.Endpoints)
-            .OfType<RouteEndpoint>().Where(endpoint => endpoint.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods.Contains("DELETE") == true);
-
-        Assert.Empty(deleteEndpoints);
     }
 
     private sealed class DenyAllAuthorization : IAdminCoreAuthorization
@@ -75,5 +61,6 @@ public sealed class SecurityEndpointAuthorizationTests
         public Task<Guid> AssignUserRoleAsync(Guid userId, UserRoleWriteRequest request, CancellationToken token) => Unused<Guid>();
         public Task EndUserRoleAsync(Guid userId, Guid assignmentId, DateOnly endDate, CancellationToken token) => UnusedAction();
         public Task<Guid> UpsertModuleAsync(Guid? id, ModuleWriteRequest request, CancellationToken token) => Unused<Guid>();
+        public Task DeleteModuleAsync(Guid id, CancellationToken token) => UnusedAction();
     }
 }

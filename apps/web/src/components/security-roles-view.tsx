@@ -45,7 +45,6 @@ export function SecurityRolesView({ roles, permissions, modules, onReload, onPer
     for (const permission of permissions) {
       if (!permission.isActive || (assignedOnly && !selectedCodes.has(permission.code))) continue;
       const direct = moduleMap.get(permission.moduleId); if (!direct) continue;
-      if (direct.code.toUpperCase() === "INT.APLICACIONES") continue;
       const root = findRoot(direct, moduleMap);
       if (moduleFilter && root.id !== moduleFilter) continue;
       if (normalized && !`${permission.name} ${permission.action} ${permission.code} ${direct.name} ${root.name}`.toLocaleLowerCase("es").includes(normalized)) continue;

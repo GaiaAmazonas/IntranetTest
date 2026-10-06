@@ -23,9 +23,13 @@ internal sealed class DataverseTrainingAdministrationReader(IDataverseDelegatedC
         var directoryUnits=await directory.ListOrganizationUnitsAsync(token);var people=await directory.ListPeopleAsync(null,null,false,1,500,token);
         var units=directoryUnits.OrderBy(x=>x.Code,StringComparer.OrdinalIgnoreCase).Select(x=>new TrainingReferenceItem(x.Id,x.Code,x.Name,x.ParentId,null,x.Level)).ToArray();var responsibles=people.Items.OrderBy(x=>x.FullName,StringComparer.OrdinalIgnoreCase).Select(x=>new TrainingReferenceItem(x.Id,"",x.FullName,null,x.OrganizationUnitId,0)).ToArray();
         var unitNames=units.ToDictionary(row=>row.Id,row=>row.Name);var responsibleNames=responsibles.ToDictionary(row=>row.Id,row=>row.Name);
-        var items=rows.Select(row=>MapTraining(row,tf,categoryNames,unitNames,responsibleNames)).ToArray();
+        var actorUnitId=actorId.HasValue?responsibles.FirstOrDefault(x=>x.Id==actorId.Value)?.UnitId:null;
+        var items=rows.Select(row=>MapTraining(row,tf,categoryNames,unitNames,responsibleNames))
+            .Where(item=>actorId.HasValue&&(item.ResponsibleId==actorId.Value||(actorUnitId.HasValue&&item.UnitId==actorUnitId.Value)))
+            .ToArray();
         var trainingNames=items.ToDictionary(row=>row.Id,row=>row.Name);var versions=versionRows.Select(row=>MapVersion(row,vf,trainingNames)).ToArray();
-        return new(categories.Count(x=>x.IsActive),items.Length,versions.Count(x=>x.IsActive),categories,items,versions,units,responsibles,actorId.HasValue?responsibles.FirstOrDefault(x=>x.Id==actorId.Value)?.UnitId:null);
+        versions=versions.Where(item=>trainingNames.ContainsKey(item.TrainingId)).ToArray();
+        return new(categories.Count(x=>x.IsActive),items.Length,versions.Count(x=>x.IsActive),categories,items,versions,units,responsibles,actorUnitId);
     }
 
     public async Task<Guid> SaveCategoryAsync(Guid? id,SaveTrainingCategory value,CancellationToken token)

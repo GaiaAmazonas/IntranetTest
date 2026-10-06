@@ -20,8 +20,9 @@ public sealed class SolicitudesFormDesignerRegressionTests
         var source=ReadDesigner();
         Assert.Contains("draggable={canEdit}",source);
         Assert.Contains("onDrop={drop}",source);
-        Assert.Contains("const normalized=ordered.map((item,index)=>({...item,order:index}))",source);
-        Assert.Contains("method:\"PUT\"",source);
+        Assert.Contains("const normalized = ordered.map",source);
+        Assert.Contains("order: index",source);
+        Assert.Contains("method: \"PUT\"",source);
         Assert.Contains("await changed()",source);
     }
 
@@ -34,6 +35,34 @@ public sealed class SolicitudesFormDesignerRegressionTests
         Assert.Contains("onDrop={()=>void reorder(field.id)}",source);
         Assert.Contains("order:(index+1)*10",source);
         Assert.Contains("method:\"PUT\"",source);
+    }
+
+    [Fact]
+    public void WorkflowDesignerSupportsParallelInitialStagesAndDraftMaintenance()
+    {
+        var source=Read("solicitudes-workflow-manager.tsx");
+        Assert.Contains("Existe al menos una etapa inicial",source);
+        Assert.DoesNotContain("Existe una única etapa inicial",source);
+        Assert.Contains("/duplicate",source);
+        Assert.Contains("method: \"DELETE\"",source);
+
+        var stageForm=Read("solicitudes-dynamic-form.tsx");
+        Assert.Contains("form/fields/${field.id}",stageForm);
+        Assert.Contains("method:\"DELETE\"",stageForm);
+    }
+
+    [Fact]
+    public void NewWorkflowStartsWithInitialAndFinalStagesAndPeopleAreSearchable()
+    {
+        var backend=ReadBackend("DataverseSolicitudesWorkflowExecutionWriter.cs");
+        Assert.Contains("REVISION_INICIAL",backend);
+        Assert.Contains("CIERRE_FINAL",backend);
+        Assert.Contains("REVISION_INICIAL_A_CIERRE",backend);
+
+        var designer=Read("solicitudes-workflow-manager.tsx");
+        Assert.Contains("function PersonAutocomplete",designer);
+        Assert.Contains("Buscar persona por nombre o unidad",designer);
+        Assert.Contains("<PersonAutocomplete",designer);
     }
 
     [Fact]

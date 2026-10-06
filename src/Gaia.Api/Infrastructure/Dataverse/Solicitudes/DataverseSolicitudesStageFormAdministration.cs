@@ -50,6 +50,46 @@ internal sealed partial class DataverseSolicitudesWorkflowExecutionWriter
         return id;
     }
 
+    public async Task DeleteStageFormFieldAsync(Guid stepId,Guid fieldId,CancellationToken token)
+    {
+        var client=await clients.CreateAsync();await RequireDraftForStep(stepId,client,token);
+        var current=await ReadStageFormAsync(stepId,token)??throw new KeyNotFoundException("La etapa no tiene un formulario activo.");
+        if(current.Fields.All(x=>x.Id!=fieldId))throw new KeyNotFoundException("El campo no pertenece al formulario de esta etapa o ya fue eliminado.");
+        var field=await DataverseMetadataResolver.TableAsync(client,"gaia_campoformulariopaso",token);
+        await Patch(client,field.EntitySetName,fieldId,new Dictionary<string,object?>{{"statecode",1}},token);
+    }
+
+    public async Task<Guid> DuplicateStepAsync(Guid flowId,Guid stepId,CancellationToken token)
+    {
+        var client=await clients.CreateAsync();await RequireDraft(flowId,client,token);
+        var definition=await definitions.ReadAsync(flowId,token)??throw new KeyNotFoundException("El flujo no existe.");
+        var source=definition.Steps.SingleOrDefault(x=>x.Id==stepId&&x.Active)??throw new KeyNotFoundException("La etapa no pertenece al flujo o está inactiva.");
+        var baseCode=$"{source.Code}_COPIA";var code=baseCode;var suffix=2;
+        while(definition.Steps.Any(x=>string.Equals(x.Code,code,StringComparison.OrdinalIgnoreCase)))code=$"{baseCode}_{suffix++}";
+        var created=await SaveStepAsync(flowId,null,new(code,source.Type,definition.Steps.Select(x=>x.Order).DefaultIfEmpty(0).Max()+10,
+            false,false,false,source.AssignmentStrategy,source.UnitId,source.PersonId,source.ActivationRule,
+            source.RequiresDecision,source.RequiresObservation,source.RequiresFile,source.AllowsRequesterReturn,source.TargetDays,true),token);
+        var form=await ReadStageFormAsync(stepId,token);
+        if(form is not null)
+        {
+            await SaveStageFormAsync(created,new($"{form.Title} (copia)",form.Instructions),token);
+            foreach(var field in form.Fields)await SaveStageFormFieldAsync(created,null,ToSave(field),token);
+        }
+        return created;
+    }
+
+    public async Task DeleteStepAsync(Guid flowId,Guid stepId,CancellationToken token)
+    {
+        var client=await clients.CreateAsync();await RequireDraft(flowId,client,token);
+        var definition=await definitions.ReadAsync(flowId,token)??throw new KeyNotFoundException("El flujo no existe.");
+        if(!definition.Steps.Any(x=>x.Id==stepId&&x.Active))throw new KeyNotFoundException("La etapa no pertenece al flujo o ya fue eliminada.");
+        var route=await DataverseMetadataResolver.TableAsync(client,"gaia_rutaflujo",token);
+        foreach(var item in definition.Routes.Where(x=>x.Active&&(x.SourceStepId==stepId||x.TargetStepId==stepId)))
+            await Patch(client,route.EntitySetName,item.Id,new Dictionary<string,object?>{{route.Attribute("gaia_Activa"),false},{"statecode",1}},token);
+        var step=await DataverseMetadataResolver.TableAsync(client,"gaia_pasoflujo",token);
+        await Patch(client,step.EntitySetName,stepId,new Dictionary<string,object?>{{step.Attribute("gaia_Activo"),false},{"statecode",1}},token);
+    }
+
     private async Task<IReadOnlyList<string>> ValidateStageFormsAsync(Guid flowId,CancellationToken token)
     {
         var definition=await definitions.ReadAsync(flowId,token)??throw new KeyNotFoundException("El flujo no existe.");var errors=new List<string>();

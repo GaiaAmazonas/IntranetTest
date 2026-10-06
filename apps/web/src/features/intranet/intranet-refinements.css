@@ -85,6 +85,37 @@
 .intranet-service-copy small{font-size:10px;line-height:1.35}
 @media(max-width:768px){.intranet-service-links{width:100%}}
 .intranet-frame :is(.intranet-page-heading,.intranet-section-hero)>div>p,.intranet-home-support header small,.intranet-home-training-icon,.intranet-home-training-empty>svg{color:var(--brand-primary)}
+.intranet-home-support>article>header{min-height:48px;align-items:flex-start}
+.intranet-home-support>article>header>span{display:block;min-width:0}
+.intranet-home-support>article>header small{display:block;margin:0;color:var(--brand-primary);font-size:9px;font-weight:800;line-height:1.2;letter-spacing:.09em;text-transform:uppercase}
+.intranet-home-support .intranet-home-apps>header small{display:block}
+.intranet-home-support>article>header h2{margin-top:6px;font-size:20px;line-height:1.2;font-weight:500}
+.intranet-home-primary>.intranet-agenda{padding:20px!important}
+.intranet-home-primary>.intranet-agenda>.intranet-section-title{min-height:48px;align-items:flex-start}
+.intranet-home-primary>.intranet-agenda>.intranet-section-title>span{display:block;min-width:0}
+.intranet-home-primary>.intranet-agenda>.intranet-section-title p{display:block;margin:0;color:var(--brand-primary);font-size:9px;font-weight:800;line-height:1.2;letter-spacing:.09em;text-transform:uppercase}
+.intranet-home-primary>.intranet-agenda>.intranet-section-title h2{margin-top:6px;font-size:20px;line-height:1.2;font-weight:500;letter-spacing:normal}
+.intranet-home-primary>.intranet-agenda>.intranet-section-title>a{font-size:10px;line-height:1.2}
 .intranet-home-training-icon>svg,.intranet-home-training-action{background:var(--gaia-accent-soft);color:var(--brand-primary)!important}
 .intranet-home-training-action:hover{background:var(--gaia-accent-pale)}
 .intranet-home-training{background:linear-gradient(135deg,var(--gaia-accent-pale),var(--surface-card))!important}
+
+/* Mantiene identificables y ordenadas las celebraciones, incluso con cinco personas. */
+.intranet-home-birthday-portraits{display:flex!important;align-items:flex-end;justify-content:center;min-width:0;padding:18px 8px}
+.intranet-home-birthday-portraits .intranet-home-birthday-photo{width:112px!important;max-width:112px;flex:0 1 112px;margin-left:0!important;transform:translateY(7px) rotate(-4deg)!important}
+.intranet-home-birthday-portraits .intranet-home-birthday-photo+.intranet-home-birthday-photo{margin-left:clamp(-64px,-3.8vw,-46px)!important}
+.intranet-home-birthday-portraits .intranet-home-birthday-photo:nth-child(2){transform:translateY(22px) rotate(4deg)!important}
+.intranet-home-birthday-portraits .intranet-home-birthday-photo:nth-child(3){transform:translateY(-8px) rotate(2deg)!important}
+.intranet-home-birthday-portraits .intranet-home-birthday-photo:nth-child(4){transform:translateY(18px) rotate(-5deg)!important}
+.intranet-home-birthday-portraits .intranet-home-birthday-photo:nth-child(5){transform:translateY(1px) rotate(5deg)!important}
+.intranet-home-birthday-portraits .intranet-home-birthday-photo:hover{z-index:10!important;transform:translateY(-14px) rotate(0deg) scale(1.08)!important;box-shadow:0 18px 30px rgb(54 35 56 / 24%)!important;filter:brightness(1.02)}
+.intranet-directory-layout .intranet-people-grid{align-items:start}
+.intranet-directory-layout .intranet-person-card{align-self:start}
+@media(max-width:760px){
+ .intranet-home-redesign .intranet-home-primary>.intranet-home-birthdays,.intranet-home-primary .intranet-home-birthdays.has-celebrations{height:auto!important;min-height:0!important;padding:24px 20px 28px!important}
+ .intranet-home-birthday-names{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));max-height:none!important;overflow:visible!important;gap:6px}
+ .intranet-home-birthday-names>span{min-width:0;overflow-wrap:anywhere}
+ .intranet-home-birthday-portraits{width:100%;height:150px!important;margin-top:8px;padding:12px 4px 18px}
+ .intranet-home-birthday-portraits .intranet-home-birthday-photo{width:80px!important;max-width:80px;flex:0 1 80px}
+ .intranet-home-birthday-portraits .intranet-home-birthday-photo+.intranet-home-birthday-photo{margin-left:clamp(-40px,-9vw,-28px)!important}
+}

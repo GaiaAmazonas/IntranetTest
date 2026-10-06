@@ -36,7 +36,7 @@ internal sealed partial class DataverseSolicitudesWorkflowExecutionWriter
         }
     }
 
-    private static async Task<(Guid StepId,Guid RequestId)> ManagementFormContext(HttpClient client,Guid managementId,Guid actorId,CancellationToken token)
+    private async Task<(Guid StepId,Guid RequestId)> ManagementFormContext(HttpClient client,Guid managementId,Guid actorId,CancellationToken token)
     {
         var management=await DataverseMetadataResolver.TableAsync(client,"gaia_gestionsolicitud",token);var step=management.Relationship("gaia_PasoFlujo","gaia_pasoflujo");var request=management.Relationship("gaia_Solicitud","gaia_solicitud");var responsible=management.Relationship("gaia_Responsable","gaia_terceros");var unit=management.Relationship("gaia_UnidadResponsable","gaia_organizacion");var status=management.Attribute("gaia_Estado");var row=await DataverseMetadataResolver.ReadOneAsync(client,$"{management.EntitySetName}({managementId:D})?$select={status},_{step.ReferencingAttribute}_value,_{request.ReferencingAttribute}_value,_{responsible.ReferencingAttribute}_value,_{unit.ReferencingAttribute}_value,statecode",token)??throw new KeyNotFoundException("La gestión no existe.");if(Int(row,"statecode")!=0||Int(row,status) is SolicitudesWorkflowValues.ManagementCompleted or SolicitudesWorkflowValues.ManagementCancelled)throw new InvalidOperationException("La gestión ya no admite captura de información.");SolicitudesWorkflowAuthorization.Demand(actorId,OptionalGuid(row,$"_{responsible.ReferencingAttribute}_value"),OptionalGuid(row,$"_{unit.ReferencingAttribute}_value"),await ActorUnits(client,actorId,token),false);return(RequiredGuid(row,$"_{step.ReferencingAttribute}_value"),RequiredGuid(row,$"_{request.ReferencingAttribute}_value"));
     }
