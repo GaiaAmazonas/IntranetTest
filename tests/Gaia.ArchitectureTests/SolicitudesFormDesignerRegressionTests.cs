@@ -60,9 +60,11 @@ public sealed class SolicitudesFormDesignerRegressionTests
         Assert.Contains("REVISION_INICIAL_A_CIERRE",backend);
 
         var designer=Read("solicitudes-workflow-manager.tsx");
-        Assert.Contains("function PersonAutocomplete",designer);
-        Assert.Contains("Buscar persona por nombre o unidad",designer);
-        Assert.Contains("<PersonAutocomplete",designer);
+        Assert.Contains("<PersonPicker",designer);
+        Assert.Contains("<OrganizationalUnitPicker",designer);
+        var picker=ReadComponent("person-picker.tsx");
+        Assert.Contains("Buscar persona por nombre o unidad",picker);
+        Assert.Contains("role=\"listbox\"",picker);
     }
 
     [Fact]
@@ -99,6 +101,12 @@ public sealed class SolicitudesFormDesignerRegressionTests
     {
         var root=RepositoryRoot();
         return File.ReadAllText(Path.Combine(root,"apps","web","src","features","solicitudes",file));
+    }
+
+    private static string ReadComponent(string file)
+    {
+        var root=RepositoryRoot();
+        return File.ReadAllText(Path.Combine(root,"apps","web","src","components",file));
     }
 
     private static string ReadBackend(string file)

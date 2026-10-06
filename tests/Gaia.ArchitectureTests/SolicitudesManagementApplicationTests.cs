@@ -8,7 +8,7 @@ public sealed class SolicitudesManagementApplicationTests
     public async Task QueueRejectsUnboundedPageSize()
     {
         var store=new Store();var application=new SolicitudesManagementApplication(store,TimeProvider.System);
-        await Assert.ThrowsAsync<ArgumentException>(()=>application.ReadQueueAsync(new(PageSize:101),default));
+        await Assert.ThrowsAsync<ArgumentException>(()=>application.ReadQueueAsync(Guid.NewGuid(),new(PageSize:101),default));
         Assert.False(store.QueueRead);
     }
 
@@ -16,7 +16,7 @@ public sealed class SolicitudesManagementApplicationTests
     public async Task QueueRejectsUnknownSort()
     {
         var store=new Store();var application=new SolicitudesManagementApplication(store,TimeProvider.System);
-        await Assert.ThrowsAsync<ArgumentException>(()=>application.ReadQueueAsync(new(Sort:"subject-asc"),default));
+        await Assert.ThrowsAsync<ArgumentException>(()=>application.ReadQueueAsync(Guid.NewGuid(),new(Sort:"subject-asc"),default));
         Assert.False(store.QueueRead);
     }
 
@@ -24,7 +24,7 @@ public sealed class SolicitudesManagementApplicationTests
     public async Task QueuePreservesPageCursorAndStableSort()
     {
         var store=new Store();var application=new SolicitudesManagementApplication(store,TimeProvider.System);
-        await application.ReadQueueAsync(new(Search:"  acceso  ",Page:3,PageSize:10,Sort:"submitted-desc",ContinuationToken:"protected"),default);
+        await application.ReadQueueAsync(Guid.NewGuid(),new(Search:"  acceso  ",Page:3,PageSize:10,Sort:"submitted-desc",ContinuationToken:"protected"),default);
         Assert.Equal(new SolicitudesQueueFilter("acceso",null,null,null,null,3,10,"submitted-desc","protected"),store.Filter);
     }
 
@@ -66,7 +66,7 @@ public sealed class SolicitudesManagementApplicationTests
     private sealed class Store:ISolicitudesManagementStore
     {
         public bool QueueRead{get;private set;}public bool DeleteRequested{get;private set;}public SolicitudesQueueFilter? Filter{get;private set;}public ReassignSolicitudesRequest? Reassignment{get;private set;}
-        public Task<SolicitudesQueuePage> ReadQueueAsync(SolicitudesQueueFilter filter,CancellationToken token){QueueRead=true;Filter=filter;return Task.FromResult(new SolicitudesQueuePage(0,1,25,[]));}
+        public Task<SolicitudesQueuePage> ReadQueueAsync(Guid actorId,SolicitudesQueueFilter filter,CancellationToken token){QueueRead=true;Filter=filter;return Task.FromResult(new SolicitudesQueuePage(0,1,25,[]));}
         public Task<SolicitudesManagementCatalog> ReadCatalogAsync(CancellationToken token)=>Task.FromResult(new SolicitudesManagementCatalog([],[],[],[]));
         public Task<IReadOnlyList<SolicitudesRequestExportRow>> ReadExportAsync(CancellationToken token)=>Task.FromResult<IReadOnlyList<SolicitudesRequestExportRow>>([]);
         public Task ReassignAsync(Guid requestId,Guid actorId,ReassignSolicitudesRequest request,DateTimeOffset now,CancellationToken token){Reassignment=request;return Task.CompletedTask;}

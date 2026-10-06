@@ -1,5 +1,5 @@
 "use client";
-import { type FormEvent, useEffect, useId, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import {
   ArrowRight,
   CheckCircle2,
@@ -20,6 +20,8 @@ import { apiRequest } from "@/lib/api-client";
 import { SolicitudesStageFormDesigner } from "./solicitudes-dynamic-form";
 import { useFeedback } from "@/components/feedback";
 import { ConfirmDialog } from "@/components/form-dialog";
+import { OrganizationalUnitPicker } from "@/components/organizational-unit-picker";
+import { PersonPicker } from "@/components/person-picker";
 
 type Unit = {
   id: string;
@@ -288,15 +290,6 @@ export function SolicitudesWorkflowManager({
         `/api/solicitudes/administration/workflows/${definition.id}/publish`,
         { method: "POST", body: "{}" },
       );
-      if (!service.visible) {
-        await apiRequest(
-          `/api/solicitudes/administration/services/${service.id}`,
-          {
-            method: "PUT",
-            body: JSON.stringify({ ...service, visible: true }),
-          },
-        );
-      }
       setConfirmPublish(false);
       await onPublished();
       await load(definition.id);
@@ -772,8 +765,9 @@ export function SolicitudesWorkflowManager({
                 help="Busca la unidad por código o nombre."
                 label="Unidad responsable"
               >
-                <UnitAutocomplete
+                <OrganizationalUnitPicker
                   onChange={(unitId) => setStep({ ...step, unitId })}
+                  required
                   units={units}
                   value={step.unitId ?? ""}
                 />
@@ -784,9 +778,10 @@ export function SolicitudesWorkflowManager({
                 help="Busca la persona por nombre o unidad."
                 label="Persona responsable"
               >
-                <PersonAutocomplete
+                <PersonPicker
                   onChange={(personId) => setStep({ ...step, personId })}
                   people={people}
+                  required
                   units={units}
                   value={step.personId ?? ""}
                 />
@@ -1235,110 +1230,6 @@ function ContextHelp({ content }: { content: HelpContent }) {
         </div>
       )}
     </>
-  );
-}
-function UnitAutocomplete({
-  units,
-  value,
-  onChange,
-}: {
-  units: Unit[];
-  value: string;
-  onChange: (id: string) => void;
-}) {
-  const listId = useId(),
-    ordered = [...units].sort((a, b) =>
-      a.code.localeCompare(b.code, "es", { numeric: true }),
-    ),
-    label = (unit: Unit) => `${unit.code} · ${unit.name}`,
-    current = ordered.find((x) => x.id === value),
-    currentLabel = current ? label(current) : "",
-    [draft, setDraft] = useState<string | null>(null),
-    text = draft ?? currentLabel;
-  return (
-    <div className="relative">
-      <input
-        className="mt-2 h-11 w-full rounded-xl border border-[var(--gaia-line-strong)] bg-white px-3 text-sm font-normal outline-none focus:border-[var(--brand-primary)]"
-        list={listId}
-        onBlur={() => {
-          if (!ordered.some((x) => label(x) === text)) {
-            setDraft(null);
-            onChange("");
-          }
-        }}
-        onChange={(event) => {
-          const match = ordered.find(
-            (x) => label(x) === event.target.value,
-          );
-          setDraft(match ? null : event.target.value);
-          onChange(match?.id ?? "");
-        }}
-        placeholder="Buscar por código o nombre"
-        required
-        value={text}
-      />
-      <datalist id={listId}>
-        {ordered.map((unit) => (
-          <option key={unit.id} value={label(unit)} />
-        ))}
-      </datalist>
-    </div>
-  );
-}
-function PersonAutocomplete({
-  people,
-  units,
-  value,
-  onChange,
-}: {
-  people: Person[];
-  units: Unit[];
-  value: string;
-  onChange: (id: string) => void;
-}) {
-  const listId = useId(),
-    unitNames = new Map(units.map((unit) => [unit.id, unit.name])),
-    ordered = [...people].sort((a, b) => a.name.localeCompare(b.name, "es")),
-    label = (person: Person) => {
-      const areas = person.unitIds
-        .map((unitId) => unitNames.get(unitId))
-        .filter((name): name is string => Boolean(name));
-      return areas.length
-        ? `${person.name} · ${areas.join(", ")}`
-        : person.name;
-    },
-    current = ordered.find((person) => person.id === value),
-    currentLabel = current ? label(current) : "",
-    [draft, setDraft] = useState<string | null>(null),
-    text = draft ?? currentLabel;
-  return (
-    <div className="relative">
-      <input
-        className="mt-2 h-11 w-full rounded-xl border border-[var(--gaia-line-strong)] bg-white px-3 text-sm font-normal outline-none focus:border-[var(--brand-primary)]"
-        list={listId}
-        onBlur={() => {
-          if (!ordered.some((person) => label(person) === text)) {
-            setDraft(null);
-            onChange("");
-          }
-        }}
-        onChange={(event) => {
-          const match = ordered.find(
-            (person) => label(person) === event.target.value,
-          );
-          setDraft(match ? null : event.target.value);
-          onChange(match?.id ?? "");
-        }}
-        placeholder="Buscar persona por nombre o unidad"
-        required
-        value={text}
-      />
-      <datalist id={listId}>
-        {ordered.map((person) => (
-          <option key={person.id} value={label(person)} />
-        ))}
-      </datalist>
-    </div>
   );
 }
 function Action({

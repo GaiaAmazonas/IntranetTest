@@ -1,6 +1,6 @@
 "use client";
 /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps -- Dataverse loaders synchronize local editor state after remote changes. */
-import { type FormEvent, useEffect, useId, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import {
   Activity,
   ArrowLeft,
@@ -24,6 +24,7 @@ import {
   X,
 } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
+import { PersonPicker } from "@/components/person-picker";
 import { useSecurity } from "@/components/security-context";
 import { apiRequest } from "@/lib/api-client";
 import { SolicitudesWorkflowManager } from "./solicitudes-workflow-manager";
@@ -351,10 +352,12 @@ export function SolicitudesAdministration() {
                 />
               </Input>
               <Input compact label="Responsable predeterminado" required>
-                <ResponsibleAutocomplete
+                <PersonPicker
                   disabled={!serviceForm.unitId}
                   key={serviceForm.unitId}
                   people={responsibles}
+                  units={data?.units ?? []}
+                  required
                   value={serviceForm.responsibleId}
                   onChange={(responsibleId) =>
                     setServiceForm({
@@ -763,6 +766,7 @@ function ServiceCatalog({
             <tbody>
               {filtered.map((service, index) => {
                 const stats = metric(service.id);
+                const published = service.isActive && service.visible && Boolean(service.currentFormId);
                 return (
                   <tr
                     className={`border-t border-[var(--gaia-line)] transition hover:bg-[var(--gaia-accent-pale)] ${index % 2 ? "bg-[#fbfcfb]" : "bg-white"}`}
@@ -789,9 +793,9 @@ function ServiceCatalog({
                     </td>
                     <td className="px-2 text-center">
                       <span
-                        className={`inline-block rounded-full px-2.5 py-1 text-[10px] font-bold ${service.isActive ? "bg-[#e2f3ec] text-[#17695b]" : "bg-[#eef0ef] text-[#69736f]"}`}
+                        className={`inline-block rounded-full px-2.5 py-1 text-[10px] font-bold ${published ? "bg-[#e2f3ec] text-[#17695b]" : service.isActive ? "bg-[#fff0cf] text-[#8a5b00]" : "bg-[#eef0ef] text-[#69736f]"}`}
                       >
-                        {service.isActive ? "ACTIVO" : "INACTIVO"}
+                        {published ? "PUBLICADO" : service.isActive ? "BORRADOR" : "INACTIVO"}
                       </span>
                       <small className="mt-1 flex items-center justify-center gap-1 text-[var(--gaia-ink-500)]">
                         {service.visible ? (
@@ -1801,57 +1805,6 @@ function Input({
       )}
       {children}
     </label>
-  );
-}
-function ResponsibleAutocomplete({
-  people,
-  value,
-  disabled,
-  onChange,
-}: {
-  people: Responsible[];
-  value: string;
-  disabled: boolean;
-  onChange: (id: string) => void;
-}) {
-  const listId = useId(),
-    ordered = [...people].sort((left, right) =>
-      left.name.localeCompare(right.name, "es"),
-    ),
-    current = ordered.find((person) => person.id === value),
-    [draft, setDraft] = useState<string | null>(null),
-    text = draft ?? current?.name ?? "";
-  return (
-    <div>
-      <input
-        className="mt-2 min-h-11 w-full rounded-xl border border-[var(--gaia-line-strong)] bg-white px-3 text-sm font-normal outline-none focus:border-[var(--brand-primary)] disabled:bg-[var(--surface-muted)]"
-        disabled={disabled}
-        list={listId}
-        onBlur={() => {
-          if (!ordered.some((person) => person.name === text)) {
-            setDraft(null);
-            onChange("");
-          }
-        }}
-        onChange={(event) => {
-          const match = ordered.find(
-            (person) => person.name === event.target.value,
-          );
-          setDraft(match ? null : event.target.value);
-          onChange(match?.id ?? "");
-        }}
-        placeholder={
-          disabled ? "Selecciona primero una unidad" : "Buscar persona"
-        }
-        required
-        value={text}
-      />
-      <datalist id={listId}>
-        {ordered.map((person) => (
-          <option key={person.id} value={person.name} />
-        ))}
-      </datalist>
-    </div>
   );
 }
 function Toggle({

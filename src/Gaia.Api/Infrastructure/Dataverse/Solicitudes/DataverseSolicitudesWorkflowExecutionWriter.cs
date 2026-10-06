@@ -50,7 +50,8 @@ internal sealed partial class DataverseSolicitudesWorkflowExecutionWriter(
         var current=service.Relationship("gaia_FlujoVigente","gaia_flujogestion");
         await Patch(client,service.EntitySetName,definition.ServiceId,new Dictionary<string,object?>
         {
-            [current.NavigationProperty+"@odata.bind"]=$"/{flow.EntitySetName}({flowId:D})"
+              [current.NavigationProperty+"@odata.bind"]=$"/{flow.EntitySetName}({flowId:D})",
+              [service.Attribute("gaia_VisibleAlSolicitante")]=true
         },token);
     }
 

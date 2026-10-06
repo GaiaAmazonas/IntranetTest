@@ -42,7 +42,7 @@ public sealed record SolicitudesAdminFormDefinition(SolicitudesAdminForm Form,IR
 
 public interface ISolicitudesManagementStore
 {
-    Task<SolicitudesQueuePage> ReadQueueAsync(SolicitudesQueueFilter filter,CancellationToken token);
+    Task<SolicitudesQueuePage> ReadQueueAsync(Guid actorId,SolicitudesQueueFilter filter,CancellationToken token);
     Task<SolicitudesManagementCatalog> ReadCatalogAsync(CancellationToken token);
     Task ReassignAsync(Guid requestId,Guid actorId,ReassignSolicitudesRequest request,DateTimeOffset now,CancellationToken token);
     Task DeleteResolvedAsync(Guid requestId,Guid actorId,DateTimeOffset now,CancellationToken token);
@@ -58,7 +58,7 @@ public interface ISolicitudesManagementStore
 
 public interface ISolicitudesManagementApplication
 {
-    Task<SolicitudesQueuePage> ReadQueueAsync(SolicitudesQueueFilter filter,CancellationToken token);
+    Task<SolicitudesQueuePage> ReadQueueAsync(Guid actorId,SolicitudesQueueFilter filter,CancellationToken token);
     Task<SolicitudesManagementCatalog> ReadCatalogAsync(CancellationToken token);
     Task ReassignAsync(Guid requestId,Guid actorId,ReassignSolicitudesRequest request,CancellationToken token);
     Task DeleteResolvedAsync(Guid requestId,Guid actorId,CancellationToken token);
@@ -74,11 +74,12 @@ public interface ISolicitudesManagementApplication
 
 public sealed class SolicitudesManagementApplication(ISolicitudesManagementStore store,TimeProvider timeProvider):ISolicitudesManagementApplication
 {
-    public Task<SolicitudesQueuePage> ReadQueueAsync(SolicitudesQueueFilter filter,CancellationToken token)
+    public Task<SolicitudesQueuePage> ReadQueueAsync(Guid actorId,SolicitudesQueueFilter filter,CancellationToken token)
     {
+        if(actorId==Guid.Empty)throw new ArgumentException("No fue posible identificar al usuario.");
         if (filter.Sort != "submitted-desc") throw new ArgumentException("Ordenamiento no válido.");
         if (filter.ContinuationToken?.Length > 16000) throw new ArgumentException("Continuación no válida.");
-        ArgumentNullException.ThrowIfNull(filter);if(filter.Page<1)throw new ArgumentException("La página debe ser mayor que cero.");if(filter.PageSize is <1 or >100)throw new ArgumentException("El tamaño de página debe estar entre 1 y 100.");if(filter.Search?.Length>100)throw new ArgumentException("La búsqueda no puede superar 100 caracteres.");return store.ReadQueueAsync(filter with{Search=filter.Search?.Trim()},token);
+        ArgumentNullException.ThrowIfNull(filter);if(filter.Page<1)throw new ArgumentException("La página debe ser mayor que cero.");if(filter.PageSize is <1 or >100)throw new ArgumentException("El tamaño de página debe estar entre 1 y 100.");if(filter.Search?.Length>100)throw new ArgumentException("La búsqueda no puede superar 100 caracteres.");return store.ReadQueueAsync(actorId,filter with{Search=filter.Search?.Trim()},token);
     }
     public Task<SolicitudesManagementCatalog> ReadCatalogAsync(CancellationToken token)=>store.ReadCatalogAsync(token);
     public Task ReassignAsync(Guid requestId,Guid actorId,ReassignSolicitudesRequest request,CancellationToken token)

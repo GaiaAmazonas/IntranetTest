@@ -8,7 +8,7 @@ namespace Gaia.Api.Infrastructure.Dataverse.Solicitudes;
 
 internal sealed partial class DataverseSolicitudesManagementStore
 {
-    public async Task<SolicitudesQueuePage> ReadQueueAsync(SolicitudesQueueFilter filter, CancellationToken token)
+    public async Task<SolicitudesQueuePage> ReadQueueAsync(Guid actorId, SolicitudesQueueFilter filter, CancellationToken token)
     {
         var client = await clients.CreateAsync();
         var request = await DataverseMetadataResolver.TableAsync(client, "gaia_solicitud", token);
@@ -16,7 +16,9 @@ internal sealed partial class DataverseSolicitudesManagementStore
         var state = await DataverseMetadataResolver.TableAsync(client, "gaia_estadosolicitud", token);
         var third = await DataverseMetadataResolver.TableAsync(client, "gaia_terceros", token);
         var unit = await DataverseMetadataResolver.TableAsync(client, "gaia_organizacion", token);
-        var path = BuildQueueQuery(filter, request, service, state, third, unit, DateOnly.FromDateTime(DateTime.UtcNow));
+        var accessibleRequests = await ReadAccessibleRequestIds(client, actorId, token);
+        if (accessibleRequests.Count == 0) return new(0, filter.Page, filter.PageSize, [], false, 0);
+        var path = BuildQueueQuery(filter, request, service, state, third, unit, DateOnly.FromDateTime(DateTime.UtcNow), accessibleRequests);
         var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{client.BaseAddress}|{filter.PageSize}|{path}")));
         var protector = protection.CreateProtector("Gaia.Solicitudes.Queue.v1");
         var currentPage = 1;
@@ -131,7 +133,7 @@ internal sealed partial class DataverseSolicitudesManagementStore
 
     internal static string BuildQueueQuery(SolicitudesQueueFilter filter, DataverseTableMetadata request,
         DataverseTableMetadata service, DataverseTableMetadata state, DataverseTableMetadata third,
-        DataverseTableMetadata unit, DateOnly today)
+        DataverseTableMetadata unit, DateOnly today, IReadOnlyCollection<Guid>? accessibleRequests=null)
     {
         var serviceNav = request.Relationship("gaia_Servicio", service.LogicalName).NavigationProperty;
         var stateNav = request.Relationship("gaia_EstadoActual", state.LogicalName).NavigationProperty;
@@ -143,6 +145,8 @@ internal sealed partial class DataverseSolicitudesManagementStore
         var due = request.Attribute("gaia_FechaLimiteActual");
         var final = $"{stateNav}/{state.Attribute("gaia_EsFinal")}";
         var clauses = new List<string> { "statecode eq 0" };
+        if (accessibleRequests is { Count: > 0 })
+            clauses.Add($"({string.Join(" or ", accessibleRequests.Select(id => $"{request.PrimaryIdAttribute} eq {id:D}"))})");
         foreach (var (schema, id) in new[] { ("gaia_Servicio", filter.ServiceId), ("gaia_EstadoActual", filter.StateId), ("gaia_ResponsableInterno", filter.ResponsibleId) })
             if (id.HasValue) clauses.Add($"_{request.Attribute(schema)}_value eq {id.Value:D}");
         var date = today.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
@@ -162,4 +166,26 @@ internal sealed partial class DataverseSolicitudesManagementStore
     private static readonly JsonElement EmptyObject = JsonSerializer.SerializeToElement(new { });
     private sealed record ActiveAssignment(string? Responsible, string? Unit);
     private sealed record QueueCursor(string Query, int Page, string Path, int? TotalCount);
+
+    private async Task<IReadOnlyCollection<Guid>> ReadAccessibleRequestIds(HttpClient client, Guid actorId, CancellationToken token)
+    {
+        var management = await DataverseMetadataResolver.TableAsync(client, "gaia_gestionsolicitud", token);
+        var request = management.Relationship("gaia_Solicitud", "gaia_solicitud");
+        var responsible = management.Relationship("gaia_Responsable", "gaia_terceros");
+        var unit = management.Relationship("gaia_UnidadResponsable", "gaia_organizacion");
+        var currentDate = DateOnly.FromDateTime(DateTime.UtcNow);
+        var actorUnits = (await assignmentStore.ListAsync(token))
+            .Where(item => item.IsActive && item.ThirdPartyId == actorId
+                && (!item.StartDate.HasValue || item.StartDate <= currentDate)
+                && (!item.EndDate.HasValue || item.EndDate >= currentDate))
+            .Select(item => item.OrganizationalUnitId).Distinct().ToArray();
+        var units = string.Join(" or ", actorUnits.Select(id => $"_{unit.ReferencingAttribute}_value eq {id:D}"));
+        var access = actorUnits.Length == 0
+            ? $"_{responsible.ReferencingAttribute}_value eq {actorId:D}"
+            : $"(_{responsible.ReferencingAttribute}_value eq {actorId:D} or (_{responsible.ReferencingAttribute}_value eq null and ({units})))";
+        var rows = await DataverseJson.ReadAllAsync(client,
+            $"{management.EntitySetName}?$select=_{request.ReferencingAttribute}_value&$filter={Uri.EscapeDataString($"statecode eq 0 and ({access})")}", token);
+        return rows.Select(row => OptionalGuid(row, $"_{request.ReferencingAttribute}_value"))
+            .Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToArray();
+    }
 }
