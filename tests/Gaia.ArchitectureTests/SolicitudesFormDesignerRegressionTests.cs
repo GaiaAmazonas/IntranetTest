@@ -80,6 +80,17 @@ public sealed class SolicitudesFormDesignerRegressionTests
     }
 
     [Fact]
+    public void SolicitudesLetsTheApiHandleInteractiveReauthentication()
+    {
+        var endpoints=File.ReadAllText(Path.Combine(RepositoryRoot(),"src","Modules","Solicitudes",
+            "Gaia.Modules.Solicitudes","SolicitudesEndpoints.cs"));
+        Assert.Contains("RequiresInteractiveAuthentication(error)",endpoints);
+        Assert.Contains("ExceptionDispatchInfo.Capture(error).Throw()",endpoints);
+        Assert.Contains("MicrosoftIdentityWebChallengeUserException",endpoints);
+        Assert.Contains("MsalUiRequiredException",endpoints);
+    }
+
+    [Fact]
     public void BackendKeepsResponsesScopedToManagementExecutionAndDerivesFilesServerSide()
     {
         var execution=ReadBackend("DataverseSolicitudesStageFormExecution.cs");

@@ -29,12 +29,23 @@ public sealed class IntranetProfileObservationRegressionTests
         Assert.Contains("ReadTransitions(client,state,stateId,299540010,token)",source);
     }
     [Fact]
-    public void IntranetRendersRequesterStateActions()
+    public void IntranetUsesOnlyTheActiveWorkflowObservation()
     {
         var source=Read("apps","web","src","features","intranet","intranet-solicitudes.tsx");
-        Assert.Contains("function RequesterStateActions",source);
-        Assert.Contains("Cerrar solicitud",source);
-        Assert.Contains("selected?.requestsRating",source);
+        Assert.Contains("workflow?.managements.some(item=>item.status===299540193)&&<form",source);
+        Assert.Contains("item.id===waiting.id?{...item,status:299540191}:item",source);
+        Assert.DoesNotContain("function RequesterStateActions",source);
+        Assert.DoesNotContain("Selecciona la siguiente acción",source);
+        Assert.DoesNotContain("function RequesterWorkflow",source);
+    }
+    [Fact]
+    public void ConversationLabelsTeamCommentsWithTheirOrganizationalArea()
+    {
+        var source=Read("src","Gaia.Api","Infrastructure","Dataverse","Solicitudes","DataverseSolicitudesConversationStore.cs");
+        Assert.Contains("IOrganizationalAssignmentStore assignments",source);
+        Assert.Contains("item.IsPrimary",source);
+        Assert.Contains("item.OrganizationalUnitName",source);
+        Assert.Contains("teamAreas.GetValueOrDefault(authorId,\"Equipo Gaia\")",source);
     }
     [Fact]
     public void ProfileUsesOnlyTheAuthenticatedLinkedPerson()

@@ -27,10 +27,8 @@
 .page :global(.solicitudes-detail form>button:hover:not(:disabled)){filter:brightness(.95)}
 .page :global(.solicitudes-detail form>button:disabled){opacity:.55;cursor:wait}
 .page :global(.solicitudes-detail form>button:focus-visible){outline:3px solid var(--brand-primary);outline-offset:3px}
-.page :global(.solicitudes-requester-actions){width:100%;margin-top:20px;border:1px solid var(--intranet-line);border-radius:16px;background:var(--intranet-soft);padding:16px;box-shadow:none}
-.page :global(.solicitudes-requester-actions form){display:grid;gap:12px}.page :global(.solicitudes-requester-actions small){color:var(--brand-primary);font-size:9px;font-weight:800;text-transform:uppercase}.page :global(.solicitudes-requester-actions h3){margin-top:3px;font-size:17px}.page :global(.solicitudes-requester-actions p){margin-top:5px;color:var(--intranet-muted);font-size:11px;line-height:1.5}.page :global(.solicitudes-requester-actions label){display:grid;gap:5px;color:var(--intranet-ink);font-size:10px;font-weight:700}.page :global(.solicitudes-requester-actions label span){font-weight:400}.page :global(.solicitudes-requester-actions :is(select,textarea)){width:100%;border:1px solid #d4ddd7;border-radius:9px;background:#fff;padding:10px;color:var(--intranet-ink);font:inherit}.page :global(.solicitudes-requester-actions button){border:0;border-radius:10px;background:var(--brand-primary);padding:12px;color:#fff;font-size:11px;font-weight:800}.page :global(.solicitudes-requester-actions button:disabled){opacity:.55}
 .page :global(.solicitudes-response-files){min-width:0}
-@media(max-width:760px){.page :global(.solicitudes-detail form>button){width:100%}.page :global(.solicitudes-requester-actions){padding:14px}}
+@media(max-width:760px){.page :global(.solicitudes-detail form>button){width:100%}}
 /* Estados de navegación discretos, sin relieve ni saltos. */
 .tabs button{transition:background 150ms ease,color 150ms ease;border-color:transparent;background:transparent;color:var(--intranet-muted);box-shadow:none}
 .tabs button:hover:not(.activeTab){background:var(--gaia-accent-pale);border-color:transparent;color:var(--brand-primary)}

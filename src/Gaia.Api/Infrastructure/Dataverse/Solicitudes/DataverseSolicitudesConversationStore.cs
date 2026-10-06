@@ -3,11 +3,12 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Gaia.Modules.Solicitudes;
+using Gaia.Modules.ThirdParties;
 
 namespace Gaia.Api.Infrastructure.Dataverse.Solicitudes;
 
 internal sealed class DataverseSolicitudesConversationStore(IDataverseDelegatedClientFactory clients,
-    ISolicitudesHistoryStore history) : ISolicitudesConversationStore
+    ISolicitudesHistoryStore history,IOrganizationalAssignmentStore assignments) : ISolicitudesConversationStore
 {
     public async Task<SolicitudesRequestDetail?> ReadAsync(Guid requestId, Guid actorId, bool managementAccess, CancellationToken token)
     {
@@ -30,7 +31,8 @@ internal sealed class DataverseSolicitudesConversationStore(IDataverseDelegatedC
         var content=comment.Attribute("gaia_Contenido");var published=comment.Attribute("gaia_FechaPublicacion");
         var filter=$"_{requestLookup}_value eq {requestId:D} and statecode eq 0"+(isManager?"":$" and {visibility} eq {comment.EncodedIntegerLiteral("gaia_Visibilidad",299540080)}");
         var rows=await DataverseJson.ReadAllAsync(client,$"{comment.EntitySetName}?$select={comment.PrimaryIdAttribute},{content},{published},{visibility},_{author}_value&$filter={filter}&$orderby={published} asc",token);
-        var comments=rows.Select(item=>new SolicitudesComment(GuidValue(item,comment.PrimaryIdAttribute),Text(item,content)??"",Date(item,published)??DateTimeOffset.MinValue,Int(item,visibility)==299540081,GuidValue(item,author)==actorId,GuidValue(item,author)==requester?"Solicitante":"Equipo Gaia")).ToArray();
+        var teamAreas=await TeamAreas(token);
+        var comments=rows.Select(item=>{var authorId=GuidValue(item,author);return new SolicitudesComment(GuidValue(item,comment.PrimaryIdAttribute),Text(item,content)??"",Date(item,published)??DateTimeOffset.MinValue,Int(item,visibility)==299540081,authorId==actorId,authorId==requester?"Solicitante":teamAreas.GetValueOrDefault(authorId,"Equipo Gaia"));}).ToArray();
         var stateName=Text(stateRow.Value,state.PrimaryNameAttribute)??"Sin estado";
         var requesterCanReply=isRequester&&(stateName.Contains("devuelt",StringComparison.OrdinalIgnoreCase)||stateName.Contains("espera del solicitante",StringComparison.OrdinalIgnoreCase));
         var availableTransitions=new List<SolicitudesTransition>();
@@ -69,7 +71,21 @@ internal sealed class DataverseSolicitudesConversationStore(IDataverseDelegatedC
             using var ignored=await client.SendAsync(deactivate,CancellationToken.None);
             throw;
         }
-        return new(id,content,now,internalOnly,true,isRequester?"Solicitante":"Equipo Gaia");
+        var teamAreas=await TeamAreas(token);
+        return new(id,content,now,internalOnly,true,isRequester?"Solicitante":teamAreas.GetValueOrDefault(actorId,"Equipo Gaia"));
+    }
+
+    private async Task<IReadOnlyDictionary<Guid,string>> TeamAreas(CancellationToken token)
+    {
+        var today=DateOnly.FromDateTime(DateTime.UtcNow);
+        return (await assignments.ListAsync(token))
+            .Where(item=>item.IsActive&&(!item.StartDate.HasValue||item.StartDate<=today)&&(!item.EndDate.HasValue||item.EndDate>=today))
+            .GroupBy(item=>item.ThirdPartyId)
+            .ToDictionary(group=>group.Key,group=>
+            {
+                var primary=group.Where(item=>item.IsPrimary).Select(item=>item.OrganizationalUnitName).FirstOrDefault(name=>!string.IsNullOrWhiteSpace(name));
+                return primary??string.Join(" · ",group.Select(item=>item.OrganizationalUnitName).Where(name=>!string.IsNullOrWhiteSpace(name)).Distinct(StringComparer.OrdinalIgnoreCase));
+            });
     }
 
     public async Task<SolicitudesRequestDetail> TransitionAsync(Guid requestId,Guid actorId,ApplySolicitudesTransition command,bool managementAccess,DateTimeOffset now,CancellationToken token)

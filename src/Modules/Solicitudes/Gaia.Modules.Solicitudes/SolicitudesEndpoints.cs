@@ -385,8 +385,16 @@ public static class SolicitudesEndpoints
     }
 
     private static IResult Invalid(string detail) => Results.ValidationProblem(new Dictionary<string, string[]> { ["attachment"] = [detail] });
-    private static IResult Problem(Exception error) => error switch
+    private static IResult Problem(Exception error)
     {
+        // El middleware de la API transforma este caso en 401/reauth_required para que
+        // la interfaz reinicie el flujo interactivo. No debe convertirse en un 422 con
+        // el texto interno IDW10502.
+        if (RequiresInteractiveAuthentication(error))
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(error).Throw();
+
+        return error switch
+        {
         FileStorageException storage => Results.Problem(
             statusCode: storage.Code is FileStorageError.InvalidCredentials or FileStorageError.FileUnauthorized
                 ? StatusCodes.Status403Forbidden
@@ -402,5 +410,14 @@ public static class SolicitudesEndpoints
             title: "No fue posible completar la operación", detail: error.Message),
         _ => Results.Problem(statusCode: StatusCodes.Status422UnprocessableEntity,
             title: "No fue posible completar la operación", detail: error.Message)
-    };
+        };
+    }
+
+    private static bool RequiresInteractiveAuthentication(Exception error)
+    {
+        for (Exception? current=error;current is not null;current=current.InnerException)
+            if (current.GetType().FullName is "Microsoft.Identity.Web.MicrosoftIdentityWebChallengeUserException"
+                or "Microsoft.Identity.Client.MsalUiRequiredException") return true;
+        return false;
+    }
 }
