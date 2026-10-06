@@ -84,10 +84,20 @@ internal sealed partial class DataverseSolicitudesWorkflowExecutionWriter
         var definition=await definitions.ReadAsync(flowId,token)??throw new KeyNotFoundException("El flujo no existe.");
         if(!definition.Steps.Any(x=>x.Id==stepId&&x.Active))throw new KeyNotFoundException("La etapa no pertenece al flujo o ya fue eliminada.");
         var route=await DataverseMetadataResolver.TableAsync(client,"gaia_rutaflujo",token);
-        foreach(var item in definition.Routes.Where(x=>x.Active&&(x.SourceStepId==stepId||x.TargetStepId==stepId)))
-            await Patch(client,route.EntitySetName,item.Id,new Dictionary<string,object?>{{route.Attribute("gaia_Activa"),false},{"statecode",1}},token);
         var step=await DataverseMetadataResolver.TableAsync(client,"gaia_pasoflujo",token);
-        await Patch(client,step.EntitySetName,stepId,new Dictionary<string,object?>{{step.Attribute("gaia_Activo"),false},{"statecode",1}},token);
+        var form=await DataverseMetadataResolver.TableAsync(client,"gaia_formulariopaso",token);
+        var field=await DataverseMetadataResolver.TableAsync(client,"gaia_campoformulariopaso",token);
+        var option=await DataverseMetadataResolver.TableAsync(client,"gaia_opcioncampoformulariopaso",token);
+        var routeIds=(await RelatedIds(client,route,route.Relationship("gaia_PasoOrigen","gaia_pasoflujo").ReferencingAttribute,[stepId],token))
+            .Concat(await RelatedIds(client,route,route.Relationship("gaia_PasoDestino","gaia_pasoflujo").ReferencingAttribute,[stepId],token)).Distinct().ToArray();
+        var formIds=await RelatedIds(client,form,form.Relationship("gaia_PasoFlujo","gaia_pasoflujo").ReferencingAttribute,[stepId],token);
+        var fieldIds=await RelatedIds(client,field,field.Relationship("gaia_FormularioPaso","gaia_formulariopaso").ReferencingAttribute,formIds,token);
+        var optionIds=await RelatedIds(client,option,option.Relationship("gaia_CampoFormularioPaso","gaia_campoformulariopaso").ReferencingAttribute,fieldIds,token);
+        foreach(var id in optionIds)await Delete(client,option.EntitySetName,id,token);
+        foreach(var id in fieldIds)await Delete(client,field.EntitySetName,id,token);
+        foreach(var id in formIds)await Delete(client,form.EntitySetName,id,token);
+        foreach(var id in routeIds)await Delete(client,route.EntitySetName,id,token);
+        await Delete(client,step.EntitySetName,stepId,token);
     }
 
     private async Task<IReadOnlyList<string>> ValidateStageFormsAsync(Guid flowId,CancellationToken token)
@@ -107,7 +117,7 @@ internal sealed partial class DataverseSolicitudesWorkflowExecutionWriter
     private async Task CloneWorkflowAsync(Guid sourceFlowId,Guid targetFlowId,CancellationToken token)
     {
         var source=await definitions.ReadAsync(sourceFlowId,token);if(source is null)return;var map=new Dictionary<Guid,Guid>();
-        foreach(var step in source.Steps.OrderBy(x=>x.Order)){var created=await SaveStepAsync(targetFlowId,null,new(step.Code,step.Type,step.Order,step.Initial,step.Final,step.ReopeningEntry,step.AssignmentStrategy,step.UnitId,step.PersonId,step.ActivationRule,step.RequiresDecision,step.RequiresObservation,step.RequiresFile,step.AllowsRequesterReturn,step.TargetDays,step.Active),token);map[step.Id]=created;var form=await ReadStageFormAsync(step.Id,token);if(form is null)continue;await SaveStageFormAsync(created,new(form.Title,form.Instructions),token);foreach(var field in form.Fields)await SaveStageFormFieldAsync(created,null,ToSave(field),token);}
+        foreach(var step in source.Steps.OrderBy(x=>x.Order)){var created=await SaveStepAsync(targetFlowId,null,new(step.Code,step.Type,step.Order,step.Initial,step.Final,step.ReopeningEntry,step.AssignmentStrategy,step.UnitId,step.PersonId,step.ActivationRule,step.RequiresDecision,step.RequiresObservation,step.RequiresFile,step.AllowsRequesterReturn,step.TargetDays,step.Active,step.PositionX,step.PositionY),token);map[step.Id]=created;var form=await ReadStageFormAsync(step.Id,token);if(form is null)continue;await SaveStageFormAsync(created,new(form.Title,form.Instructions),token);foreach(var field in form.Fields)await SaveStageFormFieldAsync(created,null,ToSave(field),token);}
         foreach(var route in source.Routes.OrderBy(x=>x.Order))await SaveRouteAsync(targetFlowId,null,new(route.Code,map[route.SourceStepId],map[route.TargetStepId],route.RequiredResult,route.Order,route.Active),token);
     }
 

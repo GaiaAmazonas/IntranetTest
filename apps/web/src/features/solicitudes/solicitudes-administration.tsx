@@ -931,7 +931,8 @@ function ServiceWorkspace({
   purge: () => void;
   load: () => Promise<void>;
 }) {
-  const forms = data.forms.filter((item) => item.serviceId === selected.id);
+  const forms = data.forms.filter((item) => item.serviceId === selected.id && item.isActive);
+  const configurationLocked = selected.visible;
   const draftForm = forms.find((item) => item.status === 299540030) ?? null;
   const formReady = Boolean(
     (draftForm && draftForm.fieldCount > 0) || selected.currentFormId,
@@ -957,7 +958,11 @@ function ServiceWorkspace({
             </p>
           </div>
           <span className="h-fit rounded-full bg-[var(--gaia-accent-soft)] px-3 py-1 text-xs font-bold text-[var(--brand-primary)]">
-            {selected.isActive ? "Activo" : "Inactivo"}
+            {selected.visible
+              ? "Publicado · solo lectura"
+              : selected.isActive
+                ? "Borrador activo"
+                : "Inactivo"}
           </span>
         </div>
         <nav className="mt-6 flex gap-1 overflow-x-auto border-b border-[var(--gaia-line)]">
@@ -989,7 +994,7 @@ function ServiceWorkspace({
       <section className="mt-5">
         {tab === "setup" && (
           <div className="space-y-5">
-            <Overview service={selected} canEdit={canEdit} edit={edit} purge={purge} />
+            <Overview service={selected} canEdit={canEdit} canUnpublish={canEdit && configurationLocked} edit={edit} purge={purge} unpublish={async()=>{if(!window.confirm("El servicio dejará de estar disponible para nuevas solicitudes. Las solicitudes existentes y las versiones publicadas se conservarán. ¿Deseas continuar?"))return;await apiRequest(`/api/solicitudes/administration/services/${selected.id}/unpublish`,{method:"POST",body:"{}"});await load();}} />
             <FormsWorkspace
               canEdit={canEdit}
               forms={forms}
@@ -1018,14 +1023,27 @@ function ServiceWorkspace({
 function Overview({
   service,
   canEdit,
+  canUnpublish,
   edit,
   purge,
+  unpublish,
 }: {
   service: Service;
   canEdit: boolean;
+  canUnpublish: boolean;
   edit: () => void;
   purge: () => void;
+  unpublish: () => Promise<void>;
 }) {
+  const [unpublishing, setUnpublishing] = useState(false);
+  const [unpublishError, setUnpublishError] = useState("");
+  async function confirmUnpublish() {
+    setUnpublishing(true);
+    setUnpublishError("");
+    try { await unpublish(); }
+    catch (reason) { setUnpublishError(message(reason)); }
+    finally { setUnpublishing(false); }
+  }
   return (
     <article className="rounded-2xl border border-[var(--gaia-line)] bg-[var(--surface-card)] p-6">
       <div className="flex flex-wrap justify-between gap-3">
@@ -1035,15 +1053,21 @@ function Overview({
             Información operativa y disponibilidad.
           </p>
         </div>
-        {canEdit && <div className="flex flex-wrap gap-2">
+        {(canEdit || canUnpublish) && <div className="flex flex-wrap gap-2">
+          {canUnpublish && <button className="rounded-xl border border-[#b9852f] px-4 py-2 text-sm font-semibold text-[#79520f] disabled:opacity-60" disabled={unpublishing} onClick={()=>void confirmUnpublish()}>
+            {unpublishing ? "Despublicando…" : "Despublicar para editar"}
+          </button>}
+          {canEdit && <>
           <button className="rounded-xl border px-4 py-2 text-sm font-semibold" onClick={edit}>
             <Pencil className="mr-2 inline" size={15} />Editar configuración
           </button>
           <button className="rounded-xl border border-[#c96b72] px-4 py-2 text-sm font-semibold text-[#9a384d]" onClick={purge}>
             <Trash2 className="mr-2 inline" size={15} />Eliminar datos de prueba
           </button>
+          </>}
         </div>}
       </div>
+      {unpublishError && <p className="mt-4 rounded-xl bg-[#fff0f0] p-3 text-sm text-[#9a384d]" role="alert">{unpublishError}</p>}
       <div
         className={`mt-5 rounded-xl border p-4 text-sm ${service.visible ? "border-[#b8ddd2] bg-[#eef8f4]" : "border-[#d8dcda] bg-[var(--surface-muted)]"}`}
       >
@@ -1119,6 +1143,13 @@ function FormsWorkspace({
       setSaving(false);
     }
   }
+  async function removeDraft() {
+    if(!current||current.status!==299540030||!window.confirm(`¿Eliminar la versión ${current.version} en borrador? Esta acción no afecta versiones publicadas.`))return;
+    setSaving(true);setError("");
+    try{await apiRequest(`/api/solicitudes/administration/forms/${current.id}`,{method:"DELETE"});setSelected("");await load();}
+    catch(reason){setError(message(reason));}
+    finally{setSaving(false);}
+  }
   const current = forms.find((item) => item.id === selected);
   return (
     <div className="grid gap-5 lg:grid-cols-[250px_1fr]">
@@ -1182,6 +1213,7 @@ function FormsWorkspace({
                     ? "Versión vigente"
                     : "Versión retirada"}
               </span>
+              {canEdit&&current.status===299540030&&<button aria-label={`Eliminar versión ${current.version}`} className="h-fit rounded-xl border border-[#c96b72] px-3 py-2 text-xs font-semibold text-[#9a384d]" disabled={saving} onClick={()=>void removeDraft()} type="button"><Trash2 className="mr-1 inline" size={14}/>Eliminar borrador</button>}
             </div>
             {current.status === 299540030 && (
               <div className="mt-4 rounded-xl border border-[#c8ddd7] bg-[#f2f8f6] p-4 text-sm">

@@ -17,7 +17,7 @@ public static class SolicitudesWorkflowValues
 public sealed record SolicitudesWorkflowStep(Guid Id,string Code,int Type,int Order,bool Initial,bool Final,
     bool ReopeningEntry,int AssignmentStrategy,Guid? UnitId,Guid? PersonId,int ActivationRule,
     bool RequiresDecision,bool RequiresObservation,bool RequiresFile,bool AllowsRequesterReturn,
-    int? TargetDays,bool Active=true);
+    int? TargetDays,bool Active=true,decimal? PositionX=null,decimal? PositionY=null);
 public sealed record SolicitudesWorkflowRoute(Guid Id,string Code,Guid SourceStepId,Guid TargetStepId,
     int RequiredResult,int Order,bool Active=true);
 public sealed record SolicitudesWorkflowDefinition(Guid Id,Guid ServiceId,int Version,int Status,
@@ -35,8 +35,11 @@ public sealed record CreateSolicitudesWorkflowDraft(Guid ServiceId,string Name,s
 public sealed record UpdateSolicitudesWorkflowDraft(string Name,string? Description);
 public sealed record SaveSolicitudesWorkflowStep(string Code,int Type,int Order,bool Initial,bool Final,bool ReopeningEntry,
     int AssignmentStrategy,Guid? UnitId,Guid? PersonId,int ActivationRule,bool RequiresDecision,
-    bool RequiresObservation,bool RequiresFile,bool AllowsRequesterReturn,int? TargetDays,bool Active=true);
+    bool RequiresObservation,bool RequiresFile,bool AllowsRequesterReturn,int? TargetDays,bool Active=true,
+    decimal? PositionX=null,decimal? PositionY=null);
 public sealed record SaveSolicitudesWorkflowRoute(string Code,Guid SourceStepId,Guid TargetStepId,int RequiredResult,int Order,bool Active=true);
+public sealed record UpdateSolicitudesWorkflowAssignment(int AssignmentStrategy,Guid? UnitId,Guid? PersonId);
+public sealed record UpdateSolicitudesWorkflowStepPosition(decimal PositionX,decimal PositionY);
 public sealed record SolicitudesWorkflowManagementItem(Guid Id,Guid StepId,string StepCode,int Execution,int Status,int? Result,
     string? Observation,Guid? UnitId,Guid? ResponsibleId,DateTimeOffset? AvailableAt,DateTimeOffset? CompletedAt,
     bool RequiresDecision,bool RequiresObservation,bool RequiresFile,bool AllowsRequesterReturn,bool Final,
@@ -91,6 +94,7 @@ public static class SolicitudesWorkflowRules
         if(active.Count(x=>x.ReopeningEntry)>1)errors.Add("Solo puede existir un paso de entrada de reapertura.");
         if(active.Select(x=>x.Code.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).Count()!=active.Length)errors.Add("Los códigos de paso deben ser únicos.");
         if(routes.Select(x=>x.Code.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).Count()!=routes.Length)errors.Add("Los códigos de ruta deben ser únicos.");
+        if(routes.GroupBy(x=>(x.SourceStepId,x.TargetStepId,x.RequiredResult)).Any(x=>x.Count()>1))errors.Add("Existen conexiones duplicadas con el mismo origen, destino y resultado.");
         foreach(var step in active)
         {
             if(!step.Final&&!routes.Any(x=>x.SourceStepId==step.Id))errors.Add($"El paso {step.Code} no tiene ruta de salida.");
@@ -191,7 +195,10 @@ public interface ISolicitudesWorkflowStore
     Task<Guid> SaveStepAsync(Guid flowId,Guid? stepId,SaveSolicitudesWorkflowStep command,CancellationToken token);
     Task<Guid> DuplicateStepAsync(Guid flowId,Guid stepId,CancellationToken token);
     Task DeleteStepAsync(Guid flowId,Guid stepId,CancellationToken token);
+    Task UpdateStepPositionAsync(Guid flowId,Guid stepId,UpdateSolicitudesWorkflowStepPosition command,CancellationToken token);
     Task<Guid> SaveRouteAsync(Guid flowId,Guid? routeId,SaveSolicitudesWorkflowRoute command,CancellationToken token);
+    Task DeleteRouteAsync(Guid flowId,Guid routeId,CancellationToken token);
+    Task UpdateStepAssignmentAsync(Guid flowId,Guid stepId,UpdateSolicitudesWorkflowAssignment command,DateTimeOffset now,CancellationToken token);
     Task<SolicitudesStageForm?> ReadStageFormAsync(Guid stepId,CancellationToken token);
     Task<Guid> SaveStageFormAsync(Guid stepId,SaveSolicitudesStageForm command,CancellationToken token);
     Task<Guid> SaveStageFormFieldAsync(Guid stepId,Guid? fieldId,SaveSolicitudesFormField command,CancellationToken token);
@@ -255,9 +262,15 @@ public sealed class SolicitudesWorkflowApplication(ISolicitudesWorkflowStore sto
     public Task DeleteDraftAsync(Guid flowId,CancellationToken token)
     {if(flowId==Guid.Empty)throw new ArgumentException("Selecciona un flujo válido.");return store.DeleteDraftAsync(flowId,token);}
     public Task<Guid> SaveStepAsync(Guid flowId,Guid? stepId,SaveSolicitudesWorkflowStep command,CancellationToken token)
-    {ArgumentNullException.ThrowIfNull(command);var code=command.Code?.Trim().ToUpperInvariant();if(flowId==Guid.Empty||string.IsNullOrWhiteSpace(code)||code.Length>80||!System.Text.RegularExpressions.Regex.IsMatch(code,"^[A-Z0-9_-]+$"))throw new ArgumentException("El código del paso no es válido.");if(command.Order<0||command.TargetDays is <1 or >3650)throw new ArgumentException("Orden o plazo no válido.");return store.SaveStepAsync(flowId,stepId,command with{Code=code},token);}
+    {ArgumentNullException.ThrowIfNull(command);var code=command.Code?.Trim().ToUpperInvariant();if(flowId==Guid.Empty||string.IsNullOrWhiteSpace(code)||code.Length>80||!System.Text.RegularExpressions.Regex.IsMatch(code,"^[A-Z0-9_-]+$"))throw new ArgumentException("El código del paso no es válido.");if(command.Order<0||command.TargetDays is <1 or >3650)throw new ArgumentException("Orden o plazo no válido.");if(command.PositionX is <0 or >100000||command.PositionY is <0 or >100000)throw new ArgumentException("La posición de la etapa no es válida.");return store.SaveStepAsync(flowId,stepId,command with{Code=code},token);}
     public Task<Guid> SaveRouteAsync(Guid flowId,Guid? routeId,SaveSolicitudesWorkflowRoute command,CancellationToken token)
     {ArgumentNullException.ThrowIfNull(command);var code=command.Code?.Trim().ToUpperInvariant();if(flowId==Guid.Empty||command.SourceStepId==Guid.Empty||command.TargetStepId==Guid.Empty||command.SourceStepId==command.TargetStepId||string.IsNullOrWhiteSpace(code)||code.Length>80)throw new ArgumentException("La ruta no es válida.");return store.SaveRouteAsync(flowId,routeId,command with{Code=code},token);}
+    public Task DeleteRouteAsync(Guid flowId,Guid routeId,CancellationToken token)
+    {if(flowId==Guid.Empty||routeId==Guid.Empty)throw new ArgumentException("Selecciona un flujo y una conexión válidos.");return store.DeleteRouteAsync(flowId,routeId,token);}
+    public Task UpdateStepPositionAsync(Guid flowId,Guid stepId,UpdateSolicitudesWorkflowStepPosition command,CancellationToken token)
+    {ArgumentNullException.ThrowIfNull(command);if(flowId==Guid.Empty||stepId==Guid.Empty)throw new ArgumentException("Selecciona un flujo y una etapa válidos.");if(command.PositionX is <0 or >100000||command.PositionY is <0 or >100000)throw new ArgumentException("La posición de la etapa no es válida.");return store.UpdateStepPositionAsync(flowId,stepId,command,token);}
+    public Task UpdateStepAssignmentAsync(Guid flowId,Guid stepId,UpdateSolicitudesWorkflowAssignment command,CancellationToken token)
+    {ArgumentNullException.ThrowIfNull(command);if(flowId==Guid.Empty||stepId==Guid.Empty)throw new ArgumentException("Selecciona un flujo y una etapa válidos.");if(command.AssignmentStrategy==SolicitudesWorkflowValues.UnitQueue&&!command.UnitId.HasValue)throw new ArgumentException("Selecciona la unidad destino.");if(command.AssignmentStrategy==SolicitudesWorkflowValues.SpecificPerson&&!command.PersonId.HasValue)throw new ArgumentException("Selecciona la persona destino.");return store.UpdateStepAssignmentAsync(flowId,stepId,command,timeProvider.GetUtcNow(),token);}
     public Task<SolicitudesStageForm?> ReadStageFormAsync(Guid stepId,CancellationToken token)
     {if(stepId==Guid.Empty)throw new ArgumentException("Selecciona una etapa válida.");return store.ReadStageFormAsync(stepId,token);}
     public Task<Guid> SaveStageFormAsync(Guid stepId,SaveSolicitudesStageForm command,CancellationToken token)

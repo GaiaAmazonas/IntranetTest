@@ -21,7 +21,7 @@ internal sealed class DataverseSolicitudesWorkflowDefinitionReader(IDataverseDel
         var unit=step.Relationship("gaia_UnidadDestino","gaia_organizacion");
         var person=step.Relationship("gaia_PersonaDestino","gaia_terceros");
         var stepRows=await DataverseJson.ReadAllAsync(client,
-            $"{step.EntitySetName}?$select={step.PrimaryIdAttribute},{step.Attribute("gaia_Codigo")},{step.Attribute("gaia_TipoPaso")},{step.Attribute("gaia_Orden")},{step.Attribute("gaia_EsInicial")},{step.Attribute("gaia_EsFinal")},{step.Attribute("gaia_EsEntradaReapertura")},{step.Attribute("gaia_EstrategiaAsignacion")},{step.Attribute("gaia_ReglaActivacion")},{step.Attribute("gaia_RequiereDecision")},{step.Attribute("gaia_RequiereObservacion")},{step.Attribute("gaia_RequiereArchivo")},{step.Attribute("gaia_PermiteDevolverSolicitante")},{step.Attribute("gaia_DiasObjetivo")},{step.Attribute("gaia_Activo")},_{unit.ReferencingAttribute}_value,_{person.ReferencingAttribute}_value&$filter=statecode eq 0 and _{stepFlow.ReferencingAttribute}_value eq {flowId:D}",token);
+            $"{step.EntitySetName}?$select={step.PrimaryIdAttribute},{step.Attribute("gaia_Codigo")},{step.Attribute("gaia_TipoPaso")},{step.Attribute("gaia_Orden")},{step.Attribute("gaia_EsInicial")},{step.Attribute("gaia_EsFinal")},{step.Attribute("gaia_EsEntradaReapertura")},{step.Attribute("gaia_EstrategiaAsignacion")},{step.Attribute("gaia_ReglaActivacion")},{step.Attribute("gaia_RequiereDecision")},{step.Attribute("gaia_RequiereObservacion")},{step.Attribute("gaia_RequiereArchivo")},{step.Attribute("gaia_PermiteDevolverSolicitante")},{step.Attribute("gaia_DiasObjetivo")},{step.Attribute("gaia_Activo")},{step.Attribute("gaia_PosicionX")},{step.Attribute("gaia_PosicionY")},_{unit.ReferencingAttribute}_value,_{person.ReferencingAttribute}_value&$filter=statecode eq 0 and _{stepFlow.ReferencingAttribute}_value eq {flowId:D}",token);
         var steps=stepRows.Select(x=>new SolicitudesWorkflowStep(
             RequiredGuid(x,step.PrimaryIdAttribute),Text(x,step.Attribute("gaia_Codigo"))??"",
             Int(x,step.Attribute("gaia_TipoPaso")),Int(x,step.Attribute("gaia_Orden")),
@@ -31,7 +31,8 @@ internal sealed class DataverseSolicitudesWorkflowDefinitionReader(IDataverseDel
             Int(x,step.Attribute("gaia_ReglaActivacion")),Bool(x,step.Attribute("gaia_RequiereDecision")),
             Bool(x,step.Attribute("gaia_RequiereObservacion")),Bool(x,step.Attribute("gaia_RequiereArchivo")),
             Bool(x,step.Attribute("gaia_PermiteDevolverSolicitante")),NullableInt(x,step.Attribute("gaia_DiasObjetivo")),
-            Bool(x,step.Attribute("gaia_Activo")))).OrderBy(x=>x.Order).ToArray();
+            Bool(x,step.Attribute("gaia_Activo")),Decimal(x,step.Attribute("gaia_PosicionX")),
+            Decimal(x,step.Attribute("gaia_PosicionY")))).OrderBy(x=>x.Order).ToArray();
 
         var routeFlow=route.Relationship("gaia_FlujoGestion","gaia_flujogestion");
         var source=route.Relationship("gaia_PasoOrigen","gaia_pasoflujo");
@@ -57,6 +58,7 @@ internal sealed class DataverseSolicitudesWorkflowDefinitionReader(IDataverseDel
     private static string? Text(JsonElement row,string name)=>row.TryGetProperty(name,out var v)&&v.ValueKind==JsonValueKind.String?v.GetString():null;
     private static int Int(JsonElement row,string name)=>DataverseJson.OptionalInt32(row,name)??0;
     private static int? NullableInt(JsonElement row,string name)=>DataverseJson.OptionalInt32(row,name);
+    private static decimal? Decimal(JsonElement row,string name)=>row.TryGetProperty(name,out var value)&&value.ValueKind==JsonValueKind.Number&&value.TryGetDecimal(out var result)?result:null;
     private static bool Bool(JsonElement row,string name)=>row.TryGetProperty(name,out var v)&&v.ValueKind==JsonValueKind.True;
     private static Guid RequiredGuid(JsonElement row,string name)=>OptionalGuid(row,name)??throw new InvalidOperationException($"Dataverse no devolvió {name}.");
     private static Guid? OptionalGuid(JsonElement row,string name)=>Guid.TryParse(Text(row,name),out var id)?id:null;

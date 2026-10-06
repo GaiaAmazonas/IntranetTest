@@ -22,6 +22,16 @@ public sealed class SolicitudesWorkflowRulesTests
     }
 
     [Fact]
+    public void PublicationRejectsDuplicateConnections()
+    {
+        var start=Step("START",initial:true);var final=Step("FINAL",final:true);
+        var route=Route(start,final,SolicitudesWorkflowValues.Completed);
+        var duplicate=route with{Id=Guid.NewGuid(),Code="START-FINAL-2"};
+        var errors=SolicitudesWorkflowRules.ValidateForPublication(Flow([start,final],[route,duplicate]));
+        Assert.Contains(errors,x=>x.Contains("conexiones duplicadas",StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void ParallelConvergenceWaitsForAllIncomingRoutes()
     {
         var start=Step("START",initial:true);var left=Step("LEFT");var right=Step("RIGHT");var join=Step("JOIN",final:true,activation:SolicitudesWorkflowValues.AllIncoming);

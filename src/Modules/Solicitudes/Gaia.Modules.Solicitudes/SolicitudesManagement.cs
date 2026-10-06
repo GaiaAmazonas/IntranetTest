@@ -49,7 +49,9 @@ public interface ISolicitudesManagementStore
     Task<SolicitudesAdminSnapshot> ReadAdministrationAsync(CancellationToken token);
     Task<IReadOnlyList<SolicitudesRequestExportRow>> ReadExportAsync(CancellationToken token);
     Task<Guid> SaveServiceAsync(Guid? id,SaveSolicitudesService request,CancellationToken token);
+    Task UnpublishServiceAsync(Guid id,CancellationToken token);
     Task<Guid> CreateFormDraftAsync(CreateSolicitudesFormDraft request,CancellationToken token);
+    Task DeleteFormDraftAsync(Guid formId,CancellationToken token);
     Task PublishFormAsync(Guid formId,Guid actorId,DateTimeOffset now,CancellationToken token);
     Task<SolicitudesAdminFormDefinition> ReadFormAsync(Guid formId,CancellationToken token);
     Task<Guid> SaveFormFieldAsync(Guid formId,Guid? fieldId,SaveSolicitudesFormField request,CancellationToken token);
@@ -65,7 +67,9 @@ public interface ISolicitudesManagementApplication
     Task<SolicitudesAdminSnapshot> ReadAdministrationAsync(CancellationToken token);
     Task<IReadOnlyList<SolicitudesRequestExportRow>> ReadExportAsync(CancellationToken token);
     Task<Guid> SaveServiceAsync(Guid? id,SaveSolicitudesService request,CancellationToken token);
+    Task UnpublishServiceAsync(Guid id,CancellationToken token);
     Task<Guid> CreateFormDraftAsync(CreateSolicitudesFormDraft request,CancellationToken token);
+    Task DeleteFormDraftAsync(Guid formId,CancellationToken token);
     Task PublishFormAsync(Guid formId,Guid actorId,CancellationToken token);
     Task<SolicitudesAdminFormDefinition> ReadFormAsync(Guid formId,CancellationToken token);
     Task<Guid> SaveFormFieldAsync(Guid formId,Guid? fieldId,SaveSolicitudesFormField request,CancellationToken token);
@@ -98,10 +102,17 @@ public sealed class SolicitudesManagementApplication(ISolicitudesManagementStore
     {
         ArgumentNullException.ThrowIfNull(request);var code=request.Code?.Trim().ToUpperInvariant();var name=request.Name?.Trim();if(string.IsNullOrWhiteSpace(code)||code.Length>50||!System.Text.RegularExpressions.Regex.IsMatch(code,"^[A-Z0-9_-]+$"))throw new ArgumentException("El código solo admite letras, números, guion y guion bajo.");if(string.IsNullOrWhiteSpace(name)||name.Length>150)throw new ArgumentException("El nombre es obligatorio y admite máximo 150 caracteres.");if(request.BusinessDays<1||request.MaximumAttachments is <0 or >100||request.MaximumFileMb is <1 or >2048)throw new ArgumentException("Revisa los límites de atención y adjuntos.");if(request.ResponsibleId==Guid.Empty||request.UnitId==Guid.Empty)throw new ArgumentException("Responsable y unidad son obligatorios.");return store.SaveServiceAsync(id,request with{Code=code,Name=name,Description=request.Description?.Trim(),Instructions=request.Instructions?.Trim()},token);
     }
+    public Task UnpublishServiceAsync(Guid id,CancellationToken token)
+    {
+        if(id==Guid.Empty)throw new ArgumentException("Selecciona un servicio válido.");
+        return store.UnpublishServiceAsync(id,token);
+    }
     public Task<Guid> CreateFormDraftAsync(CreateSolicitudesFormDraft request,CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(request);var title=request.Title?.Trim();if(request.ServiceId==Guid.Empty||string.IsNullOrWhiteSpace(title)||title.Length>200)throw new ArgumentException("Servicio y título válido son obligatorios.");return store.CreateFormDraftAsync(request with{Title=title,Instructions=request.Instructions?.Trim()},token);
     }
+    public Task DeleteFormDraftAsync(Guid formId,CancellationToken token)
+    {if(formId==Guid.Empty)throw new ArgumentException("Selecciona un formulario válido.");return store.DeleteFormDraftAsync(formId,token);}
     public Task PublishFormAsync(Guid formId,Guid actorId,CancellationToken token){if(formId==Guid.Empty)throw new ArgumentException("Selecciona un formulario válido.");return store.PublishFormAsync(formId,actorId,timeProvider.GetUtcNow(),token);}
     public Task<SolicitudesAdminFormDefinition> ReadFormAsync(Guid formId,CancellationToken token){if(formId==Guid.Empty)throw new ArgumentException("Selecciona un formulario válido.");return store.ReadFormAsync(formId,token);}
     public Task<Guid> SaveFormFieldAsync(Guid formId,Guid? fieldId,SaveSolicitudesFormField request,CancellationToken token)

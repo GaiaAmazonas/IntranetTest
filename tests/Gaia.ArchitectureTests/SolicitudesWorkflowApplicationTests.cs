@@ -92,10 +92,33 @@ public sealed class SolicitudesWorkflowApplicationTests
         await Assert.ThrowsAsync<ArgumentException>(()=>app.SaveManagementAnswersAsync(Guid.NewGuid(),Guid.NewGuid(),command,default));
     }
 
+    [Fact]
+    public async Task DiagramPositionRejectsNegativeCoordinates()
+    {
+        var app=new SolicitudesWorkflowApplication(new Store(),TimeProvider.System);
+        await Assert.ThrowsAsync<ArgumentException>(()=>app.UpdateStepPositionAsync(Guid.NewGuid(),Guid.NewGuid(),new(-1,20),default));
+    }
+
+    [Fact]
+    public async Task RouteDeletionReachesStore()
+    {
+        var store=new Store();var app=new SolicitudesWorkflowApplication(store,TimeProvider.System);
+        await app.DeleteRouteAsync(Guid.NewGuid(),Guid.NewGuid(),default);
+        Assert.True(store.RouteDeleted);
+    }
+
+    [Fact]
+    public async Task StepDeletionReachesStore()
+    {
+        var store=new Store();var app=new SolicitudesWorkflowApplication(store,TimeProvider.System);
+        await app.DeleteStepAsync(Guid.NewGuid(),Guid.NewGuid(),default);
+        Assert.True(store.StepDeleted);
+    }
+
     private sealed class Store:ISolicitudesWorkflowStore
     {
         public IReadOnlyList<string> PublicationErrors{get;init;}=[];public bool Published{get;private set;}
-        public CompleteSolicitudesManagement? Completion{get;private set;}public ReassignSolicitudesManagement? Reassignment{get;private set;}public bool Resumed{get;private set;}
+        public CompleteSolicitudesManagement? Completion{get;private set;}public ReassignSolicitudesManagement? Reassignment{get;private set;}public bool Resumed{get;private set;}public bool RouteDeleted{get;private set;}public bool StepDeleted{get;private set;}
         public Task<SolicitudesWorkflowDefinition?> ReadFlowAsync(Guid id,CancellationToken token)=>Task.FromResult<SolicitudesWorkflowDefinition?>(null);
         public Task<IReadOnlyList<string>> ValidateForPublicationAsync(Guid id,CancellationToken token)=>Task.FromResult(PublicationErrors);
         public Task PublishAsync(Guid id,Guid actor,DateTimeOffset now,CancellationToken token){Published=true;return Task.CompletedTask;}
@@ -112,8 +135,11 @@ public sealed class SolicitudesWorkflowApplicationTests
         public Task DeleteDraftAsync(Guid flowId,CancellationToken token)=>Task.CompletedTask;
         public Task<Guid> SaveStepAsync(Guid flowId,Guid? stepId,SaveSolicitudesWorkflowStep command,CancellationToken token)=>Task.FromResult(stepId??Guid.NewGuid());
         public Task<Guid> DuplicateStepAsync(Guid flowId,Guid stepId,CancellationToken token)=>Task.FromResult(Guid.NewGuid());
-        public Task DeleteStepAsync(Guid flowId,Guid stepId,CancellationToken token)=>Task.CompletedTask;
+        public Task DeleteStepAsync(Guid flowId,Guid stepId,CancellationToken token){StepDeleted=true;return Task.CompletedTask;}
+        public Task UpdateStepPositionAsync(Guid flowId,Guid stepId,UpdateSolicitudesWorkflowStepPosition command,CancellationToken token)=>Task.CompletedTask;
         public Task<Guid> SaveRouteAsync(Guid flowId,Guid? routeId,SaveSolicitudesWorkflowRoute command,CancellationToken token)=>Task.FromResult(routeId??Guid.NewGuid());
+        public Task DeleteRouteAsync(Guid flowId,Guid routeId,CancellationToken token){RouteDeleted=true;return Task.CompletedTask;}
+        public Task UpdateStepAssignmentAsync(Guid flowId,Guid stepId,UpdateSolicitudesWorkflowAssignment command,DateTimeOffset now,CancellationToken token)=>Task.CompletedTask;
         public Task<SolicitudesStageForm?> ReadStageFormAsync(Guid stepId,CancellationToken token)=>Task.FromResult<SolicitudesStageForm?>(null);
         public Task<Guid> SaveStageFormAsync(Guid stepId,SaveSolicitudesStageForm command,CancellationToken token)=>Task.FromResult(Guid.NewGuid());
         public Task<Guid> SaveStageFormFieldAsync(Guid stepId,Guid? fieldId,SaveSolicitudesFormField command,CancellationToken token)=>Task.FromResult(fieldId??Guid.NewGuid());

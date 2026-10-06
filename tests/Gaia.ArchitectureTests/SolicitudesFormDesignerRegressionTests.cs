@@ -52,6 +52,24 @@ public sealed class SolicitudesFormDesignerRegressionTests
     }
 
     [Fact]
+    public void WorkflowStageAndRouteDeletionIsPhysicalAndCascadesDependencies()
+    {
+        var writer=ReadBackend("DataverseSolicitudesWorkflowExecutionWriter.cs");
+        var routeDeletion=Between(writer,"public async Task DeleteRouteAsync","public async Task UpdateStepPositionAsync");
+        Assert.Contains("await Delete(client,route.EntitySetName,routeId,token)",routeDeletion);
+        Assert.DoesNotContain("await Patch",routeDeletion);
+
+        var stages=ReadBackend("DataverseSolicitudesStageFormAdministration.cs");
+        var stepDeletion=Between(stages,"public async Task DeleteStepAsync","private async Task<IReadOnlyList<string>> ValidateStageFormsAsync");
+        Assert.Contains("foreach(var id in optionIds)await Delete",stepDeletion);
+        Assert.Contains("foreach(var id in fieldIds)await Delete",stepDeletion);
+        Assert.Contains("foreach(var id in formIds)await Delete",stepDeletion);
+        Assert.Contains("foreach(var id in routeIds)await Delete",stepDeletion);
+        Assert.Contains("await Delete(client,step.EntitySetName,stepId,token)",stepDeletion);
+        Assert.DoesNotContain("await Patch",stepDeletion);
+    }
+
+    [Fact]
     public void NewWorkflowStartsWithInitialAndFinalStagesAndPeopleAreSearchable()
     {
         var backend=ReadBackend("DataverseSolicitudesWorkflowExecutionWriter.cs");
@@ -124,6 +142,14 @@ public sealed class SolicitudesFormDesignerRegressionTests
     {
         var root=RepositoryRoot();
         return File.ReadAllText(Path.Combine(root,"src","Gaia.Api","Infrastructure","Dataverse","Solicitudes",file));
+    }
+
+    private static string Between(string source,string start,string end)
+    {
+        var first=source.IndexOf(start,StringComparison.Ordinal);
+        var last=source.IndexOf(end,first,StringComparison.Ordinal);
+        Assert.True(first>=0&&last>first);
+        return source[first..last];
     }
 
     private static string RepositoryRoot()

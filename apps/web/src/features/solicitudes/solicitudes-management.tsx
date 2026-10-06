@@ -16,6 +16,7 @@ import {
   ArrowRightCircle,
   Building2,
   CheckCircle2,
+  FileDown,
   Inbox,
   MessageSquareText,
   LoaderCircle,
@@ -65,6 +66,7 @@ import {
   type QueuePage,
 } from "./solicitudes-queue";
 import { SolicitudesManagementFormDialog } from "./solicitudes-management-form";
+import { downloadClosurePdf } from "./solicitudes-closure-pdf";
 type Comment = {
   id: string;
   content: string;
@@ -2069,14 +2071,25 @@ function WorkflowPanel(props: WorkflowPanelProps) {
               </span>
             </div>
           </div>
-          <button
-            aria-label="Cerrar expediente"
-            className="rounded-full border border-[var(--gaia-line)] p-2 transition hover:bg-[var(--surface-muted)]"
-            onClick={onClose}
-            type="button"
-          >
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            {workflow.status === 299540182 && (
+              <button
+                className="inline-flex items-center gap-2 rounded-xl border border-[var(--brand-primary)] px-3 py-2 text-xs font-semibold text-[var(--brand-primary)]"
+                onClick={() => downloadClosurePdf({ ...detail, managements: workflow.managements })}
+                type="button"
+              >
+                <FileDown size={16} /> Descargar constancia PDF
+              </button>
+            )}
+            <button
+              aria-label="Cerrar expediente"
+              className="rounded-full border border-[var(--gaia-line)] p-2 transition hover:bg-[var(--surface-muted)]"
+              onClick={onClose}
+              type="button"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </header>
         <div className="grid flex-1 gap-5 overflow-auto p-5 lg:grid-cols-[minmax(0,1fr)_minmax(380px,.82fr)] sm:p-7">
           <div className="space-y-5">
@@ -2739,7 +2752,13 @@ function ManagementCard({
                       )
                     }
                   >
-                    {item.requiresDecision ? "Aprobar" : "Completar"}
+                    {item.final
+                      ? item.requiresDecision
+                        ? "Cerrar solicitud como aprobada"
+                        : "Cerrar solicitud"
+                      : item.requiresDecision
+                        ? "Aprobar"
+                        : "Completar"}
                   </button>
                   {item.requiresDecision && (
                     <button
@@ -2747,7 +2766,7 @@ function ManagementCard({
                       disabled={busy}
                       onClick={() => void complete(item, 299540172)}
                     >
-                      Rechazar
+                      {item.final ? "Cerrar solicitud como rechazada" : "Rechazar"}
                     </button>
                   )}
                   {item.allowsRequesterReturn && (

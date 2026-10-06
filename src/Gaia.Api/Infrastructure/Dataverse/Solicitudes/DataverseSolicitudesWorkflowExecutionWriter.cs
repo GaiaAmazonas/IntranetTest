@@ -110,7 +110,7 @@ internal sealed partial class DataverseSolicitudesWorkflowExecutionWriter(
     {
         var client=await clients.CreateAsync();await RequireDraft(flowId,client,token);var table=await DataverseMetadataResolver.TableAsync(client,"gaia_pasoflujo",token);var flow=await DataverseMetadataResolver.TableAsync(client,"gaia_flujogestion",token);var unit=await DataverseMetadataResolver.TableAsync(client,"gaia_organizacion",token);var third=await DataverseMetadataResolver.TableAsync(client,"gaia_terceros",token);
         if(command.AssignmentStrategy==SolicitudesWorkflowValues.UnitQueue&&!command.UnitId.HasValue)throw new ArgumentException("Selecciona la unidad destino.");if(command.AssignmentStrategy==SolicitudesWorkflowValues.SpecificPerson&&!command.PersonId.HasValue)throw new ArgumentException("Selecciona la persona destino.");
-        var payload=new Dictionary<string,object?>{{table.PrimaryNameAttribute,command.Code},{table.Attribute("gaia_Codigo"),command.Code},{table.Attribute("gaia_TipoPaso"),table.EncodedIntegerValue("gaia_TipoPaso",command.Type)},{table.Attribute("gaia_Orden"),command.Order},{table.Attribute("gaia_EsInicial"),command.Initial},{table.Attribute("gaia_EsFinal"),command.Final},{table.Attribute("gaia_EsEntradaReapertura"),command.ReopeningEntry},{table.Attribute("gaia_EstrategiaAsignacion"),table.EncodedIntegerValue("gaia_EstrategiaAsignacion",command.AssignmentStrategy)},{table.Attribute("gaia_ReglaActivacion"),table.EncodedIntegerValue("gaia_ReglaActivacion",command.ActivationRule)},{table.Attribute("gaia_RequiereDecision"),command.RequiresDecision},{table.Attribute("gaia_RequiereObservacion"),command.RequiresObservation},{table.Attribute("gaia_RequiereArchivo"),command.RequiresFile},{table.Attribute("gaia_PermiteDevolverSolicitante"),command.AllowsRequesterReturn},{table.Attribute("gaia_DiasObjetivo"),command.TargetDays},{table.Attribute("gaia_Activo"),command.Active},{table.Relationship("gaia_UnidadDestino","gaia_organizacion").NavigationProperty+"@odata.bind",command.UnitId.HasValue?$"/{unit.EntitySetName}({command.UnitId:D})":null},{table.Relationship("gaia_PersonaDestino","gaia_terceros").NavigationProperty+"@odata.bind",command.PersonId.HasValue?$"/{third.EntitySetName}({command.PersonId:D})":null},{"statecode",command.Active?0:1}};
+        var payload=new Dictionary<string,object?>{{table.PrimaryNameAttribute,command.Code},{table.Attribute("gaia_Codigo"),command.Code},{table.Attribute("gaia_TipoPaso"),table.EncodedIntegerValue("gaia_TipoPaso",command.Type)},{table.Attribute("gaia_Orden"),command.Order},{table.Attribute("gaia_EsInicial"),command.Initial},{table.Attribute("gaia_EsFinal"),command.Final},{table.Attribute("gaia_EsEntradaReapertura"),command.ReopeningEntry},{table.Attribute("gaia_EstrategiaAsignacion"),table.EncodedIntegerValue("gaia_EstrategiaAsignacion",command.AssignmentStrategy)},{table.Attribute("gaia_ReglaActivacion"),table.EncodedIntegerValue("gaia_ReglaActivacion",command.ActivationRule)},{table.Attribute("gaia_RequiereDecision"),command.RequiresDecision},{table.Attribute("gaia_RequiereObservacion"),command.RequiresObservation},{table.Attribute("gaia_RequiereArchivo"),command.RequiresFile},{table.Attribute("gaia_PermiteDevolverSolicitante"),command.AllowsRequesterReturn},{table.Attribute("gaia_DiasObjetivo"),command.TargetDays},{table.Attribute("gaia_Activo"),command.Active},{table.Attribute("gaia_PosicionX"),command.PositionX},{table.Attribute("gaia_PosicionY"),command.PositionY},{table.Relationship("gaia_UnidadDestino","gaia_organizacion").NavigationProperty+"@odata.bind",command.UnitId.HasValue?$"/{unit.EntitySetName}({command.UnitId:D})":null},{table.Relationship("gaia_PersonaDestino","gaia_terceros").NavigationProperty+"@odata.bind",command.PersonId.HasValue?$"/{third.EntitySetName}({command.PersonId:D})":null},{"statecode",command.Active?0:1}};
         if(stepId.HasValue){await Patch(client,table.EntitySetName,stepId.Value,payload,token);return stepId.Value;}payload[table.Relationship("gaia_FlujoGestion","gaia_flujogestion").NavigationProperty+"@odata.bind"]=$"/{flow.EntitySetName}({flowId:D})";return await Create(client,table.EntitySetName,payload,token);
     }
 
@@ -118,8 +118,61 @@ internal sealed partial class DataverseSolicitudesWorkflowExecutionWriter(
     {
         var client=await clients.CreateAsync();await RequireDraft(flowId,client,token);var table=await DataverseMetadataResolver.TableAsync(client,"gaia_rutaflujo",token);var flow=await DataverseMetadataResolver.TableAsync(client,"gaia_flujogestion",token);var step=await DataverseMetadataResolver.TableAsync(client,"gaia_pasoflujo",token);
         var definition=await definitions.ReadAsync(flowId,token)??throw new KeyNotFoundException("El flujo no existe.");if(!definition.Steps.Any(x=>x.Id==command.SourceStepId)||!definition.Steps.Any(x=>x.Id==command.TargetStepId))throw new ArgumentException("Los pasos de la ruta no pertenecen al flujo.");
+        if(definition.Routes.Any(x=>x.Active&&x.Id!=routeId&&x.SourceStepId==command.SourceStepId&&x.TargetStepId==command.TargetStepId&&x.RequiredResult==command.RequiredResult))throw new InvalidOperationException("Ya existe una conexión con el mismo origen, destino y resultado.");
         var payload=new Dictionary<string,object?>{{table.PrimaryNameAttribute,command.Code},{table.Attribute("gaia_Codigo"),command.Code},{table.Attribute("gaia_ResultadoRequerido"),table.EncodedIntegerValue("gaia_ResultadoRequerido",command.RequiredResult)},{table.Attribute("gaia_Orden"),command.Order},{table.Attribute("gaia_Activa"),command.Active},{table.Relationship("gaia_PasoOrigen","gaia_pasoflujo").NavigationProperty+"@odata.bind",$"/{step.EntitySetName}({command.SourceStepId:D})"},{table.Relationship("gaia_PasoDestino","gaia_pasoflujo").NavigationProperty+"@odata.bind",$"/{step.EntitySetName}({command.TargetStepId:D})"},{"statecode",command.Active?0:1}};
         if(routeId.HasValue){await Patch(client,table.EntitySetName,routeId.Value,payload,token);return routeId.Value;}payload[table.Relationship("gaia_FlujoGestion","gaia_flujogestion").NavigationProperty+"@odata.bind"]=$"/{flow.EntitySetName}({flowId:D})";return await Create(client,table.EntitySetName,payload,token);
+    }
+
+    public async Task DeleteRouteAsync(Guid flowId,Guid routeId,CancellationToken token)
+    {
+        var client=await clients.CreateAsync();await RequireDraft(flowId,client,token);
+        var definition=await definitions.ReadAsync(flowId,token)??throw new KeyNotFoundException("El flujo no existe.");
+        if(!definition.Routes.Any(x=>x.Id==routeId&&x.Active))throw new KeyNotFoundException("La conexión no pertenece al flujo o ya fue eliminada.");
+        var route=await DataverseMetadataResolver.TableAsync(client,"gaia_rutaflujo",token);
+        await Delete(client,route.EntitySetName,routeId,token);
+    }
+
+    public async Task UpdateStepPositionAsync(Guid flowId,Guid stepId,UpdateSolicitudesWorkflowStepPosition command,CancellationToken token)
+    {
+        var client=await clients.CreateAsync();await RequireDraft(flowId,client,token);
+        var definition=await definitions.ReadAsync(flowId,token)??throw new KeyNotFoundException("El flujo no existe.");
+        if(!definition.Steps.Any(x=>x.Id==stepId&&x.Active))throw new KeyNotFoundException("La etapa no pertenece al flujo o está inactiva.");
+        var step=await DataverseMetadataResolver.TableAsync(client,"gaia_pasoflujo",token);
+        await Patch(client,step.EntitySetName,stepId,new Dictionary<string,object?>{{step.Attribute("gaia_PosicionX"),command.PositionX},{step.Attribute("gaia_PosicionY"),command.PositionY}},token);
+    }
+
+    public async Task UpdateStepAssignmentAsync(Guid flowId,Guid stepId,UpdateSolicitudesWorkflowAssignment command,DateTimeOffset now,CancellationToken token)
+    {
+        var client=await clients.CreateAsync();var definition=await definitions.ReadAsync(flowId,token)??throw new KeyNotFoundException("El flujo no existe.");
+        if(definition.Status==SolicitudesWorkflowValues.Retired)throw new InvalidOperationException("No se puede modificar una versión retirada.");
+        if(!definition.Steps.Any(item=>item.Id==stepId&&item.Active))throw new KeyNotFoundException("La etapa no pertenece al flujo.");
+        var step=await DataverseMetadataResolver.TableAsync(client,"gaia_pasoflujo",token);var unit=await DataverseMetadataResolver.TableAsync(client,"gaia_organizacion",token);var third=await DataverseMetadataResolver.TableAsync(client,"gaia_terceros",token);
+        if(command.UnitId.HasValue){var row=await DataverseMetadataResolver.ReadOneAsync(client,$"{unit.EntitySetName}({command.UnitId:D})?$select=statecode",token);if(row is null||Int(row.Value,"statecode")!=0)throw new ArgumentException("La unidad seleccionada no existe o está inactiva.");}
+        if(command.PersonId.HasValue){var row=await DataverseMetadataResolver.ReadOneAsync(client,$"{third.EntitySetName}({command.PersonId:D})?$select=statecode",token);if(row is null||Int(row.Value,"statecode")!=0)throw new ArgumentException("La persona seleccionada no existe o está inactiva.");}
+        await Patch(client,step.EntitySetName,stepId,new Dictionary<string,object?>
+        {
+            [step.Attribute("gaia_EstrategiaAsignacion")]=step.EncodedIntegerValue("gaia_EstrategiaAsignacion",command.AssignmentStrategy),
+            [step.Relationship("gaia_UnidadDestino","gaia_organizacion").NavigationProperty+"@odata.bind"]=command.UnitId.HasValue?$"/{unit.EntitySetName}({command.UnitId:D})":null,
+            [step.Relationship("gaia_PersonaDestino","gaia_terceros").NavigationProperty+"@odata.bind"]=command.PersonId.HasValue?$"/{third.EntitySetName}({command.PersonId:D})":null
+        },token);
+        var management=await DataverseMetadataResolver.TableAsync(client,"gaia_gestionsolicitud",token);var request=await DataverseMetadataResolver.TableAsync(client,"gaia_solicitud",token);var managementStep=management.Relationship("gaia_PasoFlujo","gaia_pasoflujo");var managementRequest=management.Relationship("gaia_Solicitud","gaia_solicitud");var managementUnit=management.Relationship("gaia_UnidadResponsable","gaia_organizacion");var managementPerson=management.Relationship("gaia_Responsable","gaia_terceros");var status=management.Attribute("gaia_Estado");
+        var active=await DataverseJson.ReadAllAsync(client,$"{management.EntitySetName}?$select={management.PrimaryIdAttribute},{status},_{managementRequest.ReferencingAttribute}_value&$filter=statecode eq 0 and _{managementStep.ReferencingAttribute}_value eq {stepId:D}",token);
+        foreach(var row in active.Where(row=>Int(row,status) is SolicitudesWorkflowValues.ManagementAvailable or SolicitudesWorkflowValues.ManagementInProgress or SolicitudesWorkflowValues.ManagementWaiting))
+        {
+            Guid? targetUnit=command.UnitId,targetPerson=command.PersonId;
+            if(command.AssignmentStrategy==SolicitudesWorkflowValues.UnitQueue)targetPerson=null;
+            if(command.AssignmentStrategy==SolicitudesWorkflowValues.RequestOwner)
+            {
+                var requestId=RequiredGuid(row,$"_{managementRequest.ReferencingAttribute}_value");var owner=request.Relationship("gaia_ResponsableInterno","gaia_terceros");var requestUnit=request.Relationship("gaia_UnidadResponsable","gaia_organizacion");var requestRow=await DataverseMetadataResolver.ReadOneAsync(client,$"{request.EntitySetName}({requestId:D})?$select=_{owner.ReferencingAttribute}_value,_{requestUnit.ReferencingAttribute}_value",token);targetPerson=requestRow is null?null:OptionalGuid(requestRow.Value,$"_{owner.ReferencingAttribute}_value");targetUnit=requestRow is null?null:OptionalGuid(requestRow.Value,$"_{requestUnit.ReferencingAttribute}_value");
+            }
+            var wasInProgress=Int(row,status)==SolicitudesWorkflowValues.ManagementInProgress;var payload=new Dictionary<string,object?>
+            {
+                [managementUnit.NavigationProperty+"@odata.bind"]=targetUnit.HasValue?$"/{unit.EntitySetName}({targetUnit:D})":null,
+                [managementPerson.NavigationProperty+"@odata.bind"]=targetPerson.HasValue?$"/{third.EntitySetName}({targetPerson:D})":null
+            };
+            if(wasInProgress){payload[status]=management.EncodedIntegerValue("gaia_Estado",SolicitudesWorkflowValues.ManagementAvailable);payload[management.Attribute("gaia_FechaInicio")]=null;payload[management.Attribute("gaia_FechaDisponibilidad")]=now;}
+            await Patch(client,management.EntitySetName,RequiredGuid(row,management.PrimaryIdAttribute),payload,token);
+        }
     }
 
     public async Task<SolicitudesRequestWorkflowState?> ReadRequestStateAsync(Guid requestId,Guid actorId,bool managementAccess,CancellationToken token)

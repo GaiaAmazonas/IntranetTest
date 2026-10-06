@@ -63,9 +63,19 @@ public sealed class SolicitudesManagementApplicationTests
         Assert.True(store.DeleteRequested);
     }
 
+    [Fact]
+    public async Task UnpublishRequiresAValidServiceAndDelegates()
+    {
+        var store=new Store();var application=new SolicitudesManagementApplication(store,TimeProvider.System);
+        await Assert.ThrowsAsync<ArgumentException>(()=>application.UnpublishServiceAsync(Guid.Empty,default));
+        Assert.False(store.UnpublishRequested);
+        await application.UnpublishServiceAsync(Guid.NewGuid(),default);
+        Assert.True(store.UnpublishRequested);
+    }
+
     private sealed class Store:ISolicitudesManagementStore
     {
-        public bool QueueRead{get;private set;}public bool DeleteRequested{get;private set;}public SolicitudesQueueFilter? Filter{get;private set;}public ReassignSolicitudesRequest? Reassignment{get;private set;}
+        public bool QueueRead{get;private set;}public bool DeleteRequested{get;private set;}public bool UnpublishRequested{get;private set;}public SolicitudesQueueFilter? Filter{get;private set;}public ReassignSolicitudesRequest? Reassignment{get;private set;}
         public Task<SolicitudesQueuePage> ReadQueueAsync(Guid actorId,SolicitudesQueueFilter filter,CancellationToken token){QueueRead=true;Filter=filter;return Task.FromResult(new SolicitudesQueuePage(0,1,25,[]));}
         public Task<SolicitudesManagementCatalog> ReadCatalogAsync(CancellationToken token)=>Task.FromResult(new SolicitudesManagementCatalog([],[],[],[]));
         public Task<IReadOnlyList<SolicitudesRequestExportRow>> ReadExportAsync(CancellationToken token)=>Task.FromResult<IReadOnlyList<SolicitudesRequestExportRow>>([]);
@@ -73,7 +83,9 @@ public sealed class SolicitudesManagementApplicationTests
         public Task DeleteResolvedAsync(Guid requestId,Guid actorId,DateTimeOffset now,CancellationToken token){DeleteRequested=true;return Task.CompletedTask;}
         public Task<SolicitudesAdminSnapshot> ReadAdministrationAsync(CancellationToken token)=>Task.FromResult(new SolicitudesAdminSnapshot([],[],[],[],[]));
         public Task<Guid> SaveServiceAsync(Guid? id,SaveSolicitudesService request,CancellationToken token)=>Task.FromResult(id??Guid.NewGuid());
+        public Task UnpublishServiceAsync(Guid id,CancellationToken token){UnpublishRequested=true;return Task.CompletedTask;}
         public Task<Guid> CreateFormDraftAsync(CreateSolicitudesFormDraft request,CancellationToken token)=>Task.FromResult(Guid.NewGuid());
+        public Task DeleteFormDraftAsync(Guid formId,CancellationToken token)=>Task.CompletedTask;
         public Task PublishFormAsync(Guid formId,Guid actorId,DateTimeOffset now,CancellationToken token)=>Task.CompletedTask;
         public Task<SolicitudesAdminFormDefinition> ReadFormAsync(Guid formId,CancellationToken token)=>throw new NotImplementedException();
         public Task<Guid> SaveFormFieldAsync(Guid formId,Guid? fieldId,SaveSolicitudesFormField request,CancellationToken token)=>Task.FromResult(fieldId??Guid.NewGuid());
