@@ -27,6 +27,8 @@ import {
   GitBranch,
   HelpCircle,
   LayoutGrid,
+  Maximize2,
+  Minimize2,
   Pencil,
   Plus,
   Send,
@@ -184,7 +186,8 @@ export function SolicitudesWorkflowManager({
     [workflow, setWorkflow] = useState<Summary | null>(null),
     [deleteWorkflowTarget, setDeleteWorkflowTarget] = useState<Summary | null>(null),
     [deleteStepTarget, setDeleteStepTarget] = useState<Step | null>(null),
-    [deleteRouteTarget, setDeleteRouteTarget] = useState<Route | null>(null);
+    [deleteRouteTarget, setDeleteRouteTarget] = useState<Route | null>(null),
+    [designerExpanded, setDesignerExpanded] = useState(false);
   async function load(preferred?: string) {
     const values = await apiRequest<Summary[]>(
       `/api/solicitudes/administration/services/${serviceId}/workflows`,
@@ -415,8 +418,8 @@ export function SolicitudesWorkflowManager({
     ready = allChecks.every((x) => x.ok);
   return (
     <section className="mt-6 rounded-2xl border border-[var(--gaia-line)] bg-[var(--surface-card)] p-5 shadow-sm">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex gap-3">
+      <header className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
+        <div className="flex min-w-0 gap-3">
           <span className="grid size-10 place-items-center rounded-xl bg-[var(--gaia-accent-soft)] text-[var(--brand-primary)]">
             <GitBranch size={18} />
           </span>
@@ -433,7 +436,10 @@ export function SolicitudesWorkflowManager({
             </p>
           </div>
         </div>
-        {canEdit && !items.some((x) => x.status === 299540130) && <Action disabled={busy} onClick={()=>setCreatingWorkflow(true)} type="button"><Plus size={14}/>{items.length?"Nueva versión":"Crear flujo"}</Action>}
+        <div className="flex max-w-full flex-wrap items-center justify-end gap-2 lg:justify-self-end">
+          {items.map((x) => (<div className={`flex items-stretch overflow-hidden rounded-xl border ${selected===x.id?"border-[var(--brand-primary)] bg-[var(--gaia-accent-pale)]":"border-[var(--gaia-line)] bg-white"}`} key={x.id}><button className="px-3 py-2 text-left text-xs" onClick={()=>setSelected(x.id)} type="button"><strong>{x.name} · v{x.version}</strong><span className="block text-[var(--gaia-ink-500)]">{status(x.status)} · {x.stepCount} pasos · {x.routeCount} rutas</span></button>{canEdit&&x.status===299540130&&<span className="flex items-center gap-1 border-l border-[var(--gaia-line)] px-1"><button aria-label={`Editar ${x.name}`} className="rounded-lg p-2 text-[var(--brand-primary)] hover:bg-white" onClick={()=>setWorkflow(x)} title="Editar flujo" type="button"><Pencil size={14}/></button><button aria-label={`Eliminar ${x.name}`} className="rounded-lg p-2 text-[#9a384d] hover:bg-[#fff0f0]" onClick={()=>setDeleteWorkflowTarget(x)} title="Eliminar flujo" type="button"><Trash2 size={14}/></button></span>}</div>))}
+          {canEdit && !items.some((x) => x.status === 299540130) && <Action disabled={busy} onClick={()=>setCreatingWorkflow(true)} type="button"><Plus size={14}/>{items.length?"Nueva versión":"Crear flujo"}</Action>}
+        </div>
       </header>
       <div className="mt-5 grid gap-3 md:grid-cols-3">
         {[
@@ -469,11 +475,6 @@ export function SolicitudesWorkflowManager({
           {error}
         </p>
       )}
-      {items.length > 0 && (
-        <div className="mt-5 flex flex-wrap gap-2">
-          {items.map((x) => (<div className={`flex items-stretch overflow-hidden rounded-xl border ${selected===x.id?"border-[var(--brand-primary)] bg-[var(--gaia-accent-pale)]":"border-[var(--gaia-line)]"}`} key={x.id}><button className="px-3 py-2 text-left text-xs" onClick={()=>setSelected(x.id)} type="button"><strong>{x.name} · v{x.version}</strong><span className="block text-[var(--gaia-ink-500)]">{status(x.status)} · {x.stepCount} pasos · {x.routeCount} rutas</span></button>{canEdit&&x.status===299540130&&<span className="flex items-center gap-1 border-l border-[var(--gaia-line)] px-1"><button aria-label={`Editar ${x.name}`} className="rounded-lg p-2 text-[var(--brand-primary)] hover:bg-white" onClick={()=>setWorkflow(x)} title="Editar flujo" type="button"><Pencil size={14}/></button><button aria-label={`Eliminar ${x.name}`} className="rounded-lg p-2 text-[#9a384d] hover:bg-[#fff0f0]" onClick={()=>setDeleteWorkflowTarget(x)} title="Eliminar flujo" type="button"><Trash2 size={14}/></button></span>}</div>))}
-        </div>
-      )}
       {!items.length && (
         <div className="mt-5 rounded-2xl border border-dashed border-[var(--gaia-line)] bg-[var(--gaia-canvas)] p-8 text-center">
           <GitBranch className="mx-auto text-[var(--brand-primary)]" />
@@ -487,7 +488,7 @@ export function SolicitudesWorkflowManager({
         </div>
       )}
       {definition && (
-        <div className="mt-5 grid gap-5 xl:grid-cols-[1fr_340px]">
+        <div className={`mt-5 grid gap-5 ${designerExpanded?"":"xl:grid-cols-[1fr_340px]"}`}>
           <div className="rounded-2xl border border-[var(--gaia-line)] p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -511,7 +512,7 @@ export function SolicitudesWorkflowManager({
                 </Action>
               )}
             </div>
-            <WorkflowDiagram canAdminister={canEdit} canEdit={Boolean(canEdit&&draft)} definition={definition} onArrange={saveStepPositions} onConnect={(sourceStepId,targetStepId)=>setRoute({...blankRoute,sourceStepId,targetStepId,code:`${name(definition.steps,sourceStepId)}_A_${name(definition.steps,targetStepId)}`.slice(0,80),order:(definition.routes.length+1)*10})} onMoveStep={saveStepPosition} onNodeAction={(action,item)=>{if(action==="form")setFormStep(item);else if(action==="edit")setStep(item);else if(action==="duplicate")void duplicateStep(item);else if(action==="delete")setDeleteStepTarget(item);else if(action==="view")setViewStep(item);else if(action==="assignment")setAssignmentStep(item)}} onSelectRoute={item=>setRoute(item)} people={people} published={definition.status===299540131} units={units}/>
+            <WorkflowDiagram canAdminister={canEdit} canEdit={Boolean(canEdit&&draft)} definition={definition} expanded={designerExpanded} onArrange={saveStepPositions} onConnect={(sourceStepId,targetStepId)=>setRoute({...blankRoute,sourceStepId,targetStepId,code:`${name(definition.steps,sourceStepId)}_A_${name(definition.steps,targetStepId)}`.slice(0,80),order:(definition.routes.length+1)*10})} onMoveStep={saveStepPosition} onNodeAction={(action,item)=>{if(action==="form")setFormStep(item);else if(action==="edit")setStep(item);else if(action==="duplicate")void duplicateStep(item);else if(action==="delete")setDeleteStepTarget(item);else if(action==="view")setViewStep(item);else if(action==="assignment")setAssignmentStep(item)}} onSelectRoute={item=>setRoute(item)} onToggleExpanded={()=>setDesignerExpanded(value=>!value)} people={people} published={definition.status===299540131} units={units}/>
           </div>
           <aside className="h-fit rounded-2xl border border-[var(--gaia-line)] bg-[var(--gaia-canvas)] p-4">
             <div className="flex items-center gap-2">
@@ -521,7 +522,7 @@ export function SolicitudesWorkflowManager({
             <p className="mt-1 text-xs text-[var(--gaia-ink-500)]">
               Revisa lo necesario antes de activar esta versión.
             </p>
-            <ul className="mt-4 space-y-3">
+            <ul className={`mt-4 gap-3 ${designerExpanded ? "grid md:grid-cols-2 xl:grid-cols-3" : "space-y-3"}`}>
               {allChecks.map((x) => (
                 <li className="flex gap-2 text-sm" key={x.label}>
                   {x.ok ? (
@@ -1148,13 +1149,14 @@ function diagramElements(definition:Definition,units:Unit[],people:Person[],canE
   const nodes:DiagramNode[]=ordered.map((step,index)=>{const calculated=automatic.get(step.id)??{x:index*(diagramWidth+110),y:0};return{id:step.id,type:"workflowStep",position:{x:step.positionX??calculated.x,y:step.positionY??calculated.y},data:{step,index,assignment:assignmentDetail(step,units,people),canEdit,canAdminister,published,warnings:warnings.get(step.id)??[],onAction},draggable:canEdit};});
   const parallel=new Map<string,number>();const edges:Edge[]=definition.routes.filter(item=>item.active).map(route=>{const key=`${route.sourceStepId}:${route.targetStepId}`,index=parallel.get(key)??0;parallel.set(key,index+1);return{id:route.id,source:route.sourceStepId,target:route.targetStepId,label:result(route.requiredResult),markerEnd:{type:MarkerType.ArrowClosed,color:"#386d65"},style:{stroke:"#386d65",strokeWidth:2},labelStyle:{fill:"#315e58",fontSize:10,fontWeight:700},labelBgStyle:{fill:"#f8fbfa",fillOpacity:.96},labelBgPadding:[6,4],labelBgBorderRadius:6,type:"default",pathOptions:{curvature:.22+(index*.14)},data:{route}}});return{nodes,edges};
 }
-function WorkflowDiagram({definition,canEdit,canAdminister,onArrange,onConnect,onMoveStep,onNodeAction,onSelectRoute,people,published,units}:{definition:Definition;canEdit:boolean;canAdminister:boolean;onArrange:(positions:Array<{id:string;x:number;y:number}>)=>Promise<void>;onConnect:(source:string,target:string)=>void;onMoveStep:(stepId:string,position:{x:number;y:number})=>Promise<void>;onNodeAction:(action:NodeAction,step:Step)=>void;onSelectRoute:(route:Route)=>void;people:Person[];published:boolean;units:Unit[]}){
+function WorkflowDiagram({definition,canEdit,canAdminister,expanded,onArrange,onConnect,onMoveStep,onNodeAction,onSelectRoute,onToggleExpanded,people,published,units}:{definition:Definition;canEdit:boolean;canAdminister:boolean;expanded:boolean;onArrange:(positions:Array<{id:string;x:number;y:number}>)=>Promise<void>;onConnect:(source:string,target:string)=>void;onMoveStep:(stepId:string,position:{x:number;y:number})=>Promise<void>;onNodeAction:(action:NodeAction,step:Step)=>void;onSelectRoute:(route:Route)=>void;onToggleExpanded:()=>void;people:Person[];published:boolean;units:Unit[]}){
  const initial=useMemo(()=>diagramElements(definition,units,people,canEdit,canAdminister,published,onNodeAction),[definition,units,people,canEdit,canAdminister,published,onNodeAction]);const [nodes,setNodes,onNodesChange]=useNodesState<DiagramNode>(initial.nodes);const [edges,setEdges,onEdgesChange]=useEdgesState(initial.edges);
  const [instance,setInstance]=useState<ReactFlowInstance<DiagramNode,Edge>|null>(null);const warningCount=publicationChecks(definition).filter(item=>!item.ok).length;
  useEffect(()=>{const next=diagramElements(definition,units,people,canEdit,canAdminister,published,onNodeAction);setNodes(next.nodes);setEdges(next.edges)},[definition,units,people,canEdit,canAdminister,published,onNodeAction,setEdges,setNodes]);
+ useEffect(()=>{window.setTimeout(()=>void instance?.fitView({padding:.18,maxZoom:1,duration:300}),120)},[expanded,instance]);
  const connect=useCallback((connection:Connection)=>{if(canEdit&&connection.source&&connection.target&&connection.source!==connection.target)onConnect(connection.source,connection.target)},[canEdit,onConnect]);
  const arrange=useCallback(()=>{if(!canEdit)return;const positions=automaticPositions(definition),arranged=nodes.map(node=>({...node,position:positions.get(node.id)??node.position}));setNodes(arranged);void onArrange(arranged.map(node=>({id:node.id,x:node.position.x,y:node.position.y})));window.setTimeout(()=>void instance?.fitView({padding:.22,maxZoom:1,duration:350}),120)},[canEdit,definition,nodes,onArrange,instance,setNodes]);
- return <section className="mt-4 overflow-hidden rounded-2xl border border-[#b9d8d0] bg-[#f3f9f7]"><header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#cde1db] px-4 py-3"><div><strong className="text-sm">Diseñador visual</strong><p className="text-xs text-[var(--gaia-ink-500)]">{canEdit?"Mueve las etapas o arrastra desde un punto de salida hasta el destino para conectarlas.":"Vista gráfica de la versión publicada."}</p></div><div className="flex flex-wrap items-center gap-2">{warningCount>0&&<span className="rounded-full bg-[#fff3d8] px-3 py-1 text-[10px] font-bold text-[#8b5d12]">{warningCount} validación{warningCount===1?"":"es"} pendiente{warningCount===1?"":"s"}</span>}<span className="rounded-full bg-white px-3 py-1 text-[10px] font-bold">{definition.steps.length} etapas</span><span className="rounded-full bg-white px-3 py-1 text-[10px] font-bold">{definition.routes.length} conexiones</span>{canEdit&&<button className="inline-flex items-center gap-1.5 rounded-lg border border-[#b9d8d0] bg-white px-3 py-1.5 text-[10px] font-bold text-[var(--brand-primary)] hover:bg-[var(--gaia-accent-pale)]" onClick={arrange} type="button"><LayoutGrid size={13}/>Organizar automáticamente</button>}</div></header><div className="h-[560px] bg-[#f8fbfa]"><ReactFlow colorMode="light" edges={edges} fitView fitViewOptions={{padding:.22,maxZoom:1}} maxZoom={1.6} minZoom={.35} nodeTypes={diagramNodeTypes} nodes={nodes} nodesConnectable={canEdit} nodesDraggable={canEdit} onConnect={connect} onEdgesChange={onEdgesChange} onEdgeClick={(_,edge)=>{const route=edge.data?.route as Route|undefined;if(route&&canEdit)onSelectRoute(route)}} onInit={setInstance} onNodeDragStop={(_,node)=>{if(canEdit)void onMoveStep(node.id,node.position)}} onNodesChange={onNodesChange} panOnDrag snapGrid={[16,16]} snapToGrid><Background color="#c9d9d4" gap={20} size={1.2} variant={BackgroundVariant.Dots}/><Controls position="bottom-left" showInteractive={false}/><MiniMap className="!border !border-[#cde1db] !bg-white" maskColor="rgba(232,241,238,.7)" nodeColor={node=>{const step=(node.data as DiagramNodeData).step;return step.initial?"#4d8b82":step.final?"#6f3873":"#8bb5aa"}} pannable zoomable/></ReactFlow></div></section>
+ return <section className="mt-4 overflow-hidden rounded-2xl border border-[#b9d8d0] bg-[#f3f9f7]"><header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#cde1db] px-4 py-3"><div><strong className="text-sm">Diseñador visual</strong><p className="text-xs text-[var(--gaia-ink-500)]">{canEdit?"Mueve las etapas o arrastra desde un punto de salida hasta el destino para conectarlas.":"Vista gráfica de la versión publicada."}</p></div><div className="flex flex-wrap items-center gap-2">{warningCount>0&&<span className="rounded-full bg-[#fff3d8] px-3 py-1 text-[10px] font-bold text-[#8b5d12]">{warningCount} validación{warningCount===1?"":"es"} pendiente{warningCount===1?"":"s"}</span>}<span className="rounded-full bg-white px-3 py-1 text-[10px] font-bold">{definition.steps.length} etapas</span><span className="rounded-full bg-white px-3 py-1 text-[10px] font-bold">{definition.routes.length} conexiones</span>{canEdit&&<button className="inline-flex items-center gap-1.5 rounded-lg border border-[#b9d8d0] bg-white px-3 py-1.5 text-[10px] font-bold text-[var(--brand-primary)] hover:bg-[var(--gaia-accent-pale)]" onClick={arrange} type="button"><LayoutGrid size={13}/>Organizar automáticamente</button>}<button aria-pressed={expanded} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--brand-primary)] bg-[var(--brand-primary)] px-3 py-1.5 text-[10px] font-bold text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg" onClick={onToggleExpanded} type="button">{expanded?<Minimize2 size={13}/>:<Maximize2 size={13}/>} {expanded?"Restaurar vista":"Ampliar diseñador"}</button></div></header><div className={`${expanded?"h-[calc(100vh-10rem)] min-h-[720px]":"h-[560px]"} bg-[#f8fbfa] transition-[height] duration-300`}><ReactFlow colorMode="light" edges={edges} fitView fitViewOptions={{padding:.22,maxZoom:1}} maxZoom={1.6} minZoom={.35} nodeTypes={diagramNodeTypes} nodes={nodes} nodesConnectable={canEdit} nodesDraggable={canEdit} onConnect={connect} onEdgesChange={onEdgesChange} onEdgeClick={(_,edge)=>{const route=edge.data?.route as Route|undefined;if(route&&canEdit)onSelectRoute(route)}} onInit={setInstance} onNodeDragStop={(_,node)=>{if(canEdit)void onMoveStep(node.id,node.position)}} onNodesChange={onNodesChange} panOnDrag snapGrid={[16,16]} snapToGrid><Background color="#c9d9d4" gap={20} size={1.2} variant={BackgroundVariant.Dots}/><Controls position="bottom-left" showInteractive={false}/><MiniMap className="!border !border-[#cde1db] !bg-white" maskColor="rgba(232,241,238,.7)" nodeColor={node=>{const step=(node.data as DiagramNodeData).step;return step.initial?"#4d8b82":step.final?"#6f3873":"#8bb5aa"}} pannable zoomable/></ReactFlow></div></section>
 }
 const stepOptions = [
   {

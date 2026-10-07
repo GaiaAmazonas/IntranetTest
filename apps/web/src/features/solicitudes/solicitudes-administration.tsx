@@ -957,13 +957,21 @@ function ServiceWorkspace({
               {selected.description || "Configura la experiencia de atención."}
             </p>
           </div>
-          <span className="h-fit rounded-full bg-[var(--gaia-accent-soft)] px-3 py-1 text-xs font-bold text-[var(--brand-primary)]">
+          <div className={`flex h-fit max-w-xl items-center gap-2 rounded-xl border px-3 py-2 text-sm ${selected.visible ? "border-[#63a998] bg-[#e7f6f1] text-[#175f53]" : "border-[#d59a3a] bg-[#fff7e7] text-[#80510e]"}`}>
             {selected.visible
-              ? "Publicado · solo lectura"
-              : selected.isActive
-                ? "Borrador activo"
-                : "Inactivo"}
-          </span>
+              ? <CheckCircle2 className="shrink-0" size={18} />
+              : <EyeOff className="shrink-0" size={18} />}
+            <strong className="shrink-0 uppercase tracking-wide">
+              {selected.visible ? "Publicado" : "No publicado"}
+            </strong>
+            <span className="text-xs font-medium">
+              {selected.visible
+                ? "Disponible en la intranet para recibir solicitudes."
+                : selected.isActive
+                  ? "Borrador activo; publícalo desde el paso final cuando esté listo."
+                  : "Servicio inactivo y no disponible en la intranet."}
+            </span>
+          </div>
         </div>
         <nav className="mt-6 flex gap-1 overflow-x-auto border-b border-[var(--gaia-line)]">
           {(
@@ -994,7 +1002,7 @@ function ServiceWorkspace({
       <section className="mt-5">
         {tab === "setup" && (
           <div className="space-y-5">
-            <Overview service={selected} canEdit={canEdit} canUnpublish={canEdit && configurationLocked} edit={edit} purge={purge} unpublish={async()=>{if(!window.confirm("El servicio dejará de estar disponible para nuevas solicitudes. Las solicitudes existentes y las versiones publicadas se conservarán. ¿Deseas continuar?"))return;await apiRequest(`/api/solicitudes/administration/services/${selected.id}/unpublish`,{method:"POST",body:"{}"});await load();}} />
+            <Overview canEdit={canEdit} canUnpublish={canEdit && configurationLocked} edit={edit} purge={purge} unpublish={async()=>{if(!window.confirm("El servicio dejará de estar disponible para nuevas solicitudes. Las solicitudes existentes y las versiones publicadas se conservarán. ¿Deseas continuar?"))return;await apiRequest(`/api/solicitudes/administration/services/${selected.id}/unpublish`,{method:"POST",body:"{}"});await load();}} />
             <FormsWorkspace
               canEdit={canEdit}
               forms={forms}
@@ -1021,14 +1029,12 @@ function ServiceWorkspace({
   );
 }
 function Overview({
-  service,
   canEdit,
   canUnpublish,
   edit,
   purge,
   unpublish,
 }: {
-  service: Service;
   canEdit: boolean;
   canUnpublish: boolean;
   edit: () => void;
@@ -1068,34 +1074,6 @@ function Overview({
         </div>}
       </div>
       {unpublishError && <p className="mt-4 rounded-xl bg-[#fff0f0] p-3 text-sm text-[#9a384d]" role="alert">{unpublishError}</p>}
-      <div
-        className={`mt-5 rounded-xl border p-4 text-sm ${service.visible ? "border-[#b8ddd2] bg-[#eef8f4]" : "border-[#d8dcda] bg-[var(--surface-muted)]"}`}
-      >
-        <strong>
-          {service.visible ? "Publicado en la intranet" : "No publicado"}
-        </strong>
-        <p className="mt-1 text-[var(--gaia-ink-500)]">
-          {service.visible
-            ? "Está disponible para que las personas creen solicitudes nuevas."
-            : "Se activará en la intranet cuando publiques el servicio completo desde el paso final."}
-        </p>
-      </div>
-      <dl className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Fact label="Código" value={service.code} />
-        <Fact label="Plazo" value={`${service.businessDays} días hábiles`} />
-        <Fact
-          label="Adjuntos"
-          value={
-            service.allowsAttachments
-              ? `${service.maximumAttachments} archivos · ${service.maximumFileMb} MB`
-              : "No permitidos"
-          }
-        />
-        <Fact
-          label="Publicación"
-          value={service.visible ? "Publicado" : "No publicado"}
-        />
-      </dl>
     </article>
   );
 }
@@ -1876,14 +1854,6 @@ function Actions({ close, saving }: { close: () => void; saving: boolean }) {
       >
         {saving ? "Guardando cambios…" : "Guardar cambios"}
       </button>
-    </div>
-  );
-}
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl bg-[var(--surface-muted)] p-4">
-      <dt className="text-xs text-[var(--gaia-ink-500)]">{label}</dt>
-      <dd className="mt-1 font-semibold">{value}</dd>
     </div>
   );
 }

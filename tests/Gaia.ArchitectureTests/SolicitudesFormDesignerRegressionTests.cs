@@ -52,6 +52,32 @@ public sealed class SolicitudesFormDesignerRegressionTests
     }
 
     [Fact]
+    public void WorkflowDesignerCanExpandInlineAndKeepsVersionInHeader()
+    {
+        var source=Read("solicitudes-workflow-manager.tsx");
+        Assert.Contains("designerExpanded",source);
+        Assert.Contains("Ampliar diseñador",source);
+        Assert.Contains("Restaurar vista",source);
+        Assert.Contains("h-[calc(100vh-10rem)]",source);
+        Assert.Contains("lg:grid-cols-[minmax(0,1fr)_auto]",source);
+        Assert.Contains("bg-[var(--brand-primary)]",source);
+        Assert.Contains("designerExpanded ? \"grid md:grid-cols-2 xl:grid-cols-3\"",source);
+        Assert.DoesNotContain("!designerExpanded&&<aside",source);
+    }
+
+    [Fact]
+    public void ServiceConfigurationShowsOneProminentPublicationStatusWithoutTechnicalCode()
+    {
+        var source=ReadDesigner();
+        var workspace=Between(source,"function ServiceWorkspace","function Overview");
+        var configuration=Between(source,"function Overview","function FormsWorkspace");
+        Assert.Contains("Disponible en la intranet para recibir solicitudes",workspace);
+        Assert.Contains("Borrador activo; publícalo desde el paso final",workspace);
+        Assert.DoesNotContain("<Fact",configuration);
+        Assert.DoesNotContain("<Fact",source);
+    }
+
+    [Fact]
     public void WorkflowStageAndRouteDeletionIsPhysicalAndCascadesDependencies()
     {
         var writer=ReadBackend("DataverseSolicitudesWorkflowExecutionWriter.cs");
