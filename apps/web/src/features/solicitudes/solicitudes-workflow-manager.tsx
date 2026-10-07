@@ -328,7 +328,7 @@ export function SolicitudesWorkflowManager({
   async function publish() {
     if (!definition) return;
     await run(async () => {
-      if (draftFormId) {
+      if (definition.status === 299540130 && draftFormId) {
         await apiRequest(
           `/api/solicitudes/administration/forms/${draftFormId}/publish`,
           { method: "POST", body: "{}" },
@@ -409,6 +409,7 @@ export function SolicitudesWorkflowManager({
     }
   }
   const draft = definition?.status === 299540130,
+    canRepublish = Boolean(canEdit && !service.visible && definition?.status === 299540131),
     checks = definition ? publicationChecks(definition) : [],
     allChecks = [
       { label: "Servicio activo", ok: service.isActive },
@@ -540,14 +541,14 @@ export function SolicitudesWorkflowManager({
                 </li>
               ))}
             </ul>
-            {canEdit && draft && (
+            {canEdit && (draft || canRepublish) && (
               <Action
                 className="mt-5 w-full justify-center"
                 disabled={busy || !ready}
                 onClick={() => setConfirmPublish(true)}
               >
                 <Send size={14} />
-                Revisar y publicar
+                {canRepublish ? "Volver a publicar" : "Revisar y publicar"}
               </Action>
             )}
             {draft && !ready && (
@@ -555,7 +556,7 @@ export function SolicitudesWorkflowManager({
                 Completa los puntos pendientes para publicar.
               </p>
             )}
-            {!draft && (
+            {!draft && !canRepublish && (
               <p className="mt-5 rounded-xl bg-[var(--gaia-accent-soft)] p-3 text-center text-xs font-semibold text-[var(--brand-primary)]">
                 Esta versión está {status(definition.status).toLowerCase()}. Su
                 configuración, etapas y formularios son de solo lectura.
@@ -884,12 +885,12 @@ export function SolicitudesWorkflowManager({
               <Send size={19} />
             </span>
             <h2 className="mt-4 text-xl font-semibold">
-              Publicar versión {definition.version}
+              {canRepublish ? "Volver a publicar el servicio" : `Publicar versión ${definition.version}`}
             </h2>
             <p className="mt-2 text-sm text-[var(--gaia-ink-500)]">
-              Se publicarán juntos la configuración, el formulario y este flujo.
-              El servicio quedará disponible para solicitudes nuevas y las
-              versiones publicadas se conservarán como historial.
+              {canRepublish
+                ? "Se reactivará la versión publicada vigente sin crear copias ni modificar las solicitudes existentes. El servicio volverá a estar disponible para solicitudes nuevas."
+                : "Se publicarán juntos la configuración, el formulario y este flujo. El servicio quedará disponible para solicitudes nuevas y las versiones publicadas se conservarán como historial."}
             </p>
             <div className="mt-5 flex justify-end gap-2">
               <button
@@ -899,7 +900,7 @@ export function SolicitudesWorkflowManager({
                 Seguir editando
               </button>
               <Action disabled={busy} onClick={() => void publish()}>
-                {busy ? "Publicando servicio…" : "Publicar servicio completo"}
+                {busy ? "Publicando servicio…" : canRepublish ? "Volver a publicar" : "Publicar servicio completo"}
               </Action>
             </div>
           </div>

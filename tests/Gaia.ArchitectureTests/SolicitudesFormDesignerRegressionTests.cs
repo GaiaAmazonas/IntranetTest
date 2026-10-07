@@ -66,6 +66,17 @@ public sealed class SolicitudesFormDesignerRegressionTests
     }
 
     [Fact]
+    public void UnpublishedServiceCanReactivateItsPublishedWorkflow()
+    {
+        var source=Read("solicitudes-workflow-manager.tsx");
+        Assert.Contains("canRepublish",source);
+        Assert.Contains("!service.visible && definition?.status === 299540131",source);
+        Assert.Contains("Volver a publicar",source);
+        Assert.Contains("sin crear copias ni modificar las solicitudes existentes",source);
+        Assert.Contains("/publish",source);
+    }
+
+    [Fact]
     public void ServiceConfigurationShowsOneProminentPublicationStatusWithoutTechnicalCode()
     {
         var source=ReadDesigner();
