@@ -132,7 +132,7 @@ const blankStep = {
   requiresDecision: false,
   requiresObservation: false,
   requiresFile: false,
-  allowsRequesterReturn: false,
+  allowsRequesterReturn: true,
   targetDays: null as number | null,
   active: true,
   positionX: null as number | null,
@@ -259,6 +259,7 @@ export function SolicitudesWorkflowManager({
     await run(async () => {
       const body = {
         ...step,
+        type: step.final ? 299540144 : step.requiresDecision ? 299540142 : 299540140,
         unitId:
           step.assignmentStrategy === 299540150 ? step.unitId || null : null,
         personId:
@@ -591,31 +592,6 @@ export function SolicitudesWorkflowManager({
               />
             </Input>
             <Input
-              help={stepTypeHelp(step.type)}
-              info={<ContextHelp content={helpTopics.activity} />}
-              label="Tipo de actividad"
-            >
-              <select
-                value={step.type}
-                onChange={(e) =>
-                  setStep({ ...step, type: Number(e.target.value) })
-                }
-              >
-                {[
-                  [299540140, "Gestión"],
-                  [299540141, "Revisión"],
-                  [299540142, "Aprobación"],
-                  [299540143, "Firma"],
-                  [299540144, "Respuesta final"],
-                  [299540145, "Automática"],
-                ].map((x) => (
-                  <option key={x[0]} value={x[0]}>
-                    {x[1]}
-                  </option>
-                ))}
-              </select>
-            </Input>
-            <Input
               help={assignmentHelp(step.assignmentStrategy)}
               info={<ContextHelp content={helpTopics.assignment} />}
               label="¿Quién atenderá esta etapa?"
@@ -747,14 +723,26 @@ export function SolicitudesWorkflowManager({
               Define qué se exige para completarla
             </legend>
             <p className="mt-1 text-xs text-[var(--gaia-ink-500)]">
-              Selecciona solamente los controles que realmente necesita la
-              persona responsable.
+              Define las acciones disponibles y cuáles evidencias serán obligatorias.
             </p>
+            <div className="mt-3">
+              <strong className="text-sm">¿Cómo se completa esta etapa?</strong>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                <label className={`flex cursor-pointer gap-3 rounded-xl border p-3 ${!step.requiresDecision ? "border-[var(--brand-primary)] bg-[var(--gaia-accent-pale)]" : "border-[var(--gaia-line)]"}`}>
+                  <input checked={!step.requiresDecision} name="completion-mode" onChange={()=>setStep({...step,requiresDecision:false})} type="radio" />
+                  <span><strong className="block text-sm">Completar</strong><small className="text-[var(--gaia-ink-500)]">Muestra una única acción para registrar que el trabajo terminó.</small></span>
+                </label>
+                <label className={`flex cursor-pointer gap-3 rounded-xl border p-3 ${step.requiresDecision ? "border-[var(--brand-primary)] bg-[var(--gaia-accent-pale)]" : "border-[var(--gaia-line)]"}`}>
+                  <input checked={step.requiresDecision} name="completion-mode" onChange={()=>setStep({...step,requiresDecision:true})} type="radio" />
+                  <span><strong className="block text-sm">Aprobar o rechazar</strong><small className="text-[var(--gaia-ink-500)]">Muestra dos acciones y permite dirigir el recorrido según la decisión.</small></span>
+                </label>
+              </div>
+            </div>
             <div className="mt-2 grid gap-2 sm:grid-cols-2">
               {stepOptions
                 .filter(
                   (option) =>
-                    !["initial", "final", "reopeningEntry"].includes(
+                    !["initial", "final", "reopeningEntry", "requiresDecision"].includes(
                       option.key,
                     ),
                 )
@@ -984,7 +972,7 @@ function StageGuide() {
   return (
     <ol className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
       {[
-        ["1", "Identifica", "Nombre y tipo"],
+        ["1", "Identifica", "Nombre de la etapa"],
         ["2", "Asigna", "Unidad o persona"],
         ["3", "Programa", "Activación y plazo"],
         ["4", "Condiciona", "Inicio, cierre y requisitos"],
@@ -1172,8 +1160,8 @@ const stepOptions = [
   },
   {
     key: "reopeningEntry",
-    label: "Recibe las reaperturas",
-    help: "Si el solicitante reabre el caso, la gestión regresa a esta etapa.",
+    label: "Es el punto de retorno al reabrir",
+    help: "Solo se usa después de cerrar una solicitud: si se reabre, se crea una nueva gestión en esta etapa. El flujo puede tener un único punto de retorno.",
   },
   {
     key: "requiresDecision",
@@ -1182,30 +1170,21 @@ const stepOptions = [
   },
   {
     key: "requiresObservation",
-    label: "Requiere una observación",
-    help: "No permite completar la etapa sin escribir un comentario.",
+    label: "Hacer obligatoria la observación",
+    help: "El campo de observación siempre está disponible; al marcarlo no se podrá finalizar sin escribirla.",
   },
   {
     key: "requiresFile",
-    label: "Requiere un archivo",
-    help: "Exige adjuntar un soporte antes de completar la etapa.",
+    label: "Exigir al menos un archivo adjunto",
+    help: "No crea un campo nuevo. Obliga a adjuntar un archivo a la gestión, ya sea desde su formulario o desde la opción de adjuntos.",
   },
   {
     key: "allowsRequesterReturn",
-    label: "Permite devolver al solicitante",
-    help: "La gestión puede regresar al usuario para pedir información adicional.",
+    label: "Permitir pedir información al solicitante",
+    help: "Agrega la acción «Pedir información». La etapa queda en espera y se reactiva cuando el solicitante responde.",
   },
 ] as const;
 const helpTopics = {
-  activity: {
-    title: "Tipo de actividad",
-    summary:
-      "Indica la naturaleza del trabajo que se realizará. Ayuda a presentar acciones y resultados apropiados durante la atención.",
-    example:
-      "Gestión: resolver un incidente.\nRevisión: comprobar documentos.\nAprobación: aceptar o rechazar.\nRespuesta final: comunicar la solución y cerrar.",
-    recommendation:
-      "Para una atención normal usa Gestión. Elige Aprobación solamente cuando realmente exista una decisión formal.",
-  },
   assignment: {
     title: "Responsable de la etapa",
     summary:
@@ -1227,9 +1206,9 @@ const helpTopics = {
   behavior: {
     title: "Comportamiento de la etapa",
     summary:
-      "Configúralo en orden: 1) decide si inicia o termina el recorrido; 2) define si recibe reaperturas; 3) agrega solamente los requisitos que la persona deberá cumplir.",
+      "Configúralo en orden: 1) decide si inicia o termina el recorrido; 2) elige si se completa o se aprueba/rechaza; 3) agrega solamente las evidencias obligatorias.",
     example:
-      "FLUJO DE UNA SOLA APROBACIÓN\n1. Nombre: Aprobación de coordinación.\n2. Tipo: Aprobación.\n3. Responsable: coordinación correspondiente.\n4. Marca Inicial + Final + Requiere decisión.\n5. No agregues conexiones.\n\nFLUJO SECUENCIAL\nRecepción: Inicial.\nAprobación: Requiere decisión.\nComunicar solución: Final.\n\nFLUJO PARALELO\nMarca como Inicial cada revisión que debe comenzar al radicar (por ejemplo TI, Financiera y Jurídica). Conéctalas a una etapa final configurada para esperar todas las entradas.",
+      "FLUJO DE UNA SOLA APROBACIÓN\n1. Nombre: Aprobación de coordinación.\n2. Responsable: coordinación correspondiente.\n3. Marca Inicial + Final.\n4. Elige Aprobar o rechazar.\n5. No agregues conexiones.\n\nFLUJO SECUENCIAL\nRecepción: Inicial y Completar.\nAprobación: Aprobar o rechazar.\nComunicar solución: Final.\n\nFLUJO PARALELO\nMarca como Inicial cada revisión que debe comenzar al radicar. Conéctalas a una etapa final configurada para esperar todas las entradas.",
     recommendation:
       "Activa solo las condiciones necesarias. Demasiados requisitos pueden dificultar la atención o bloquear el recorrido.",
   },
@@ -1243,17 +1222,6 @@ const workflowCode = (value: string) =>
     .replace(/[^A-Z0-9_-]+/g, "_")
     .replace(/_+/g, "_")
     .slice(0, 80);
-const stepTypeHelp = (value: number) =>
-  (
-    ({
-      299540140: "Trabajo operativo realizado por una persona o unidad.",
-      299540141: "Verificación de información o del trabajo realizado.",
-      299540142: "Decisión formal de aprobación o rechazo.",
-      299540143: "Actividad que requiere formalizar una firma.",
-      299540144: "Comunicación que concluye la atención al solicitante.",
-      299540145: "Actividad ejecutada por el sistema sin intervención manual.",
-    }) as Record<number, string>
-  )[value] ?? "Selecciona la naturaleza de la actividad.";
 const assignmentHelp = (value: number) =>
   (
     ({

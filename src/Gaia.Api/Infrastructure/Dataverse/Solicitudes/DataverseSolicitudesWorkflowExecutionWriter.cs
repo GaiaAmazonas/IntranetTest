@@ -78,9 +78,9 @@ internal sealed partial class DataverseSolicitudesWorkflowExecutionWriter(
             var unitId=OptionalGuid(existingService.Value,$"_{serviceUnit.ReferencingAttribute}_value");
             var strategy=unitId.HasValue?SolicitudesWorkflowValues.UnitQueue:SolicitudesWorkflowValues.RequestOwner;
             var initial=await SaveStepAsync(created,null,new("REVISION_INICIAL",299540141,10,true,false,false,
-                strategy,unitId,null,SolicitudesWorkflowValues.AnyIncoming,false,false,false,false,null,true),token);
+                strategy,unitId,null,SolicitudesWorkflowValues.AnyIncoming,false,false,false,true,null,true),token);
             var final=await SaveStepAsync(created,null,new("CIERRE_FINAL",299540144,20,false,true,false,
-                strategy,unitId,null,SolicitudesWorkflowValues.AllIncoming,false,true,false,false,null,true),token);
+                strategy,unitId,null,SolicitudesWorkflowValues.AllIncoming,false,true,false,true,null,true),token);
             await SaveRouteAsync(created,null,new("REVISION_INICIAL_A_CIERRE",initial,final,
                 SolicitudesWorkflowValues.Completed,10,true),token);
         }

@@ -77,6 +77,20 @@ public sealed class SolicitudesFormDesignerRegressionTests
     }
 
     [Fact]
+    public void StageEditorUsesExplicitActionsInsteadOfRedundantActivityType()
+    {
+        var source=Read("solicitudes-workflow-manager.tsx");
+        Assert.DoesNotContain("label=\"Tipo de actividad\"",source);
+        Assert.Contains("¿Cómo se completa esta etapa?",source);
+        Assert.Contains("Aprobar o rechazar",source);
+        Assert.Contains("type: step.final ? 299540144 : step.requiresDecision ? 299540142 : 299540140",source);
+        Assert.Contains("Hacer obligatoria la observación",source);
+        Assert.Contains("No crea un campo nuevo",source);
+        Assert.Contains("Es el punto de retorno al reabrir",source);
+        Assert.Contains("allowsRequesterReturn: true",source);
+    }
+
+    [Fact]
     public void ServiceConfigurationShowsOneProminentPublicationStatusWithoutTechnicalCode()
     {
         var source=ReadDesigner();
