@@ -3,6 +3,8 @@ using System.Net.Http.Json;
 using System.Text;
 using Gaia.BuildingBlocks.Files;
 using Gaia.Modules.Security;
+using Gaia.Modules.Solicitudes;
+using System.Security.Claims;
 
 namespace Gaia.Api.Infrastructure.Dataverse.Solicitudes;
 
@@ -29,15 +31,23 @@ internal static class DevelopmentSolicitudesDataReset
             .RequireAuthorization(AdminCorePermissions.SolicitudesCatalogosAdministrar);
         group.MapGet("",Preview);
         group.MapPost("",Execute).DisableAntiforgery();
-        group.MapDelete("/services/{serviceId:guid}",ExecuteService);
+        group.MapDelete("/services/{serviceId:guid}",ExecuteServiceLocal);
+        endpoints.MapDelete("/api/solicitudes/administration/services/{serviceId:guid}/data",ExecuteService)
+            .RequireAuthorization(AdminCorePermissions.SolicitudesCatalogosAdministrar);
         return endpoints;
     }
 
-    private static async Task<IResult> ExecuteService(Guid serviceId,HttpContext context,IDataverseDelegatedClientFactory clients,IFileStorage storage,IFileStorageMaintenance maintenance,ILoggerFactory loggerFactory,CancellationToken token)
+    private static Task<IResult> ExecuteServiceLocal(Guid serviceId,HttpContext context,ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,IDataverseDelegatedClientFactory clients,IFileStorage storage,IFileStorageMaintenance maintenance,ILoggerFactory loggerFactory,CancellationToken token)
+    {
+        DemandLoopback(context);
+        return ExecuteService(serviceId,context,principal,access,clients,storage,maintenance,loggerFactory,token);
+    }
+
+    private static async Task<IResult> ExecuteService(Guid serviceId,HttpContext context,ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,IDataverseDelegatedClientFactory clients,IFileStorage storage,IFileStorageMaintenance maintenance,ILoggerFactory loggerFactory,CancellationToken token)
     {
         try
         {
-            DemandLoopback(context);
+            await access.DemandServiceAsync(await access.ResolveAsync(principal,token),serviceId,token);
             var client=await clients.CreateAsync();
             var inventory=await ServiceInventory(client,serviceId,token);
             if(inventory[^1].Ids.Count==0)return Results.NotFound(new{detail="El servicio no existe o ya fue eliminado."});
@@ -59,6 +69,10 @@ internal static class DevelopmentSolicitudesDataReset
             var remaining=await ServiceInventory(client,serviceId,token);
             if(remaining.Sum(item=>item.Ids.Count)!=0)throw new InvalidOperationException("La verificación encontró registros relacionados pendientes.");
             return Results.Ok(new{serviceId,deleted=inventory.Sum(item=>item.Ids.Count)});
+        }
+        catch(UnauthorizedAccessException error)
+        {
+            return Results.Problem(title:"Acceso denegado",detail:error.Message,statusCode:StatusCodes.Status403Forbidden);
         }
         catch(Exception error) when(error is InvalidOperationException or FileStorageException or HttpRequestException)
         {

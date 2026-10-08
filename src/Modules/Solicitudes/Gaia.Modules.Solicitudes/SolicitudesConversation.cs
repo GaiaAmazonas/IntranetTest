@@ -9,7 +9,8 @@ public sealed record SolicitudesHistoryEvent(Guid Id,string Title,string? Detail
 public sealed record SolicitudesRequestDetail(Guid Id, string Number, string Subject, string Description,
     string Service, string Status, string? StatusColor, DateTimeOffset? SubmittedAt, DateOnly? DueDate,
     bool AllowsRequesterComments, bool IsManager, IReadOnlyList<SolicitudesComment> Comments,
-    IReadOnlyList<SolicitudesTransition> Transitions,IReadOnlyList<SolicitudesHistoryEvent>? History=null);
+    IReadOnlyList<SolicitudesTransition> Transitions,IReadOnlyList<SolicitudesHistoryEvent>? History=null,
+    IReadOnlyList<SolicitudesWorkflowAnswerItem>? FormAnswers=null);
 public sealed record AddSolicitudesComment(string Content, bool Internal = false);
 public sealed record ApplySolicitudesTransition(Guid TransitionId, string? Comment, string? Reason, string? Solution,
     int? Rating=null,string? RatingComment=null);

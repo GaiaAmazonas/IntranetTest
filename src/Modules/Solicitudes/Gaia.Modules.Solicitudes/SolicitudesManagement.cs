@@ -1,4 +1,17 @@
+using System.Security.Claims;
+
 namespace Gaia.Modules.Solicitudes;
+
+public sealed record SolicitudesAdministrationScope(bool IsGlobalAdministrator,IReadOnlySet<Guid> UnitIds);
+public interface ISolicitudesAdministrationAuthorization
+{
+    Task<SolicitudesAdministrationScope> ResolveAsync(ClaimsPrincipal principal,CancellationToken token);
+    Task DemandUnitAsync(SolicitudesAdministrationScope scope,Guid unitId,CancellationToken token);
+    Task DemandServiceAsync(SolicitudesAdministrationScope scope,Guid serviceId,CancellationToken token);
+    Task DemandFormAsync(SolicitudesAdministrationScope scope,Guid formId,CancellationToken token);
+    Task DemandWorkflowAsync(SolicitudesAdministrationScope scope,Guid flowId,CancellationToken token);
+    Task DemandStepAsync(SolicitudesAdministrationScope scope,Guid stepId,CancellationToken token);
+}
 
 public sealed record SolicitudesQueueFilter(string? Search=null,Guid? ServiceId=null,Guid? StateId=null,
     Guid? ResponsibleId=null,bool? Overdue=null,int Page=1,int PageSize=25,
@@ -22,7 +35,7 @@ public sealed record SolicitudesAdminResponsible(Guid Id,string Name,IReadOnlyLi
 public sealed record SolicitudesAdminUnit(Guid Id,string Code,string Name,Guid? ParentId,int Level);
 public sealed record SolicitudesAdminServiceMetrics(Guid ServiceId,int TotalRequests,int OpenRequests,
     int ResolvedRequests,int PendingClosureRequests,int OverdueRequests);
-public sealed record SolicitudesRequestExportRow(Guid Id,string Number,string Subject,string? Description,string Service,
+public sealed record SolicitudesRequestExportRow(Guid Id,string Number,string Subject,string? Description,Guid ServiceId,string Service,
     string Requester,string? RequesterUnit,DateTimeOffset? SubmittedAt,DateTimeOffset? FirstManagementAt,
     string? Responsible,string? ResponsibleUnit,string Status,bool IsFinal,DateOnly? DueDate,
     DateTimeOffset? ClosedAt,int? BusinessManagementDays,int CalendarElapsedDays,bool? MetSla,string? SolutionSummary);

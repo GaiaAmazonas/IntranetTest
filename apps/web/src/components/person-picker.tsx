@@ -30,7 +30,7 @@ export function PersonPicker({ people, units, value, onChange, required = false,
     return () => document.removeEventListener("mousedown", close);
   }, []);
   const areas = (person: PersonOption) => person.unitIds.map((id) => unitNames.get(id)).filter((name): name is string => Boolean(name));
-  return <div className="relative mt-2" ref={root}>
+  return <div className="relative" ref={root}>
     <button aria-expanded={open} aria-haspopup="listbox" className="flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-[var(--gaia-line-strong)] bg-white px-3 text-left text-sm outline-none focus:border-[var(--brand-primary)] disabled:bg-[var(--surface-muted)]" disabled={disabled} onClick={() => setOpen((current) => !current)} type="button">
       <span className={selected ? "min-w-0" : "text-[var(--gaia-muted)]"}>{selected ? <><strong className="block truncate">{selected.name}</strong>{areas(selected).length > 0 && <small className="block truncate text-[var(--gaia-muted)]">{areas(selected).join(" · ")}</small>}</> : placeholder}</span><ChevronDown className="shrink-0" size={16}/>
     </button>

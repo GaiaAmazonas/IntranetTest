@@ -16,8 +16,10 @@ internal sealed partial class DataverseSolicitudesManagementStore
         var state = await DataverseMetadataResolver.TableAsync(client, "gaia_estadosolicitud", token);
         var third = await DataverseMetadataResolver.TableAsync(client, "gaia_terceros", token);
         var unit = await DataverseMetadataResolver.TableAsync(client, "gaia_organizacion", token);
-        var accessibleRequests = await ReadAccessibleRequestIds(client, actorId, filter.View, token);
-        if (accessibleRequests.Count == 0) return new(0, filter.Page, filter.PageSize, [], false, 0);
+        var accessibleRequests = filter.View == "all"
+            ? null
+            : await ReadAccessibleRequestIds(client, actorId, filter.View, token);
+        if (accessibleRequests is { Count: 0 }) return new(0, filter.Page, filter.PageSize, [], false, 0);
         var path = BuildQueueQuery(filter, request, service, state, third, unit, DateOnly.FromDateTime(DateTime.UtcNow), accessibleRequests);
         var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{client.BaseAddress}|{filter.PageSize}|{path}")));
         var protector = protection.CreateProtector("Gaia.Solicitudes.Queue.v1");
@@ -66,15 +68,18 @@ internal sealed partial class DataverseSolicitudesManagementStore
             {
                 var status = Nested(row, stateNav);
                 var statusCode = Text(status, state.Attribute("gaia_Codigo"));
+                var isFinal = Bool(status, state.Attribute("gaia_EsFinal"));
+                var isClosed = string.Equals(statusCode,"RESUELTA",StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(statusCode,"CERRADA",StringComparison.OrdinalIgnoreCase);
                 var due = Date(row, request.Attribute("gaia_FechaLimiteActual"));
                 return new SolicitudesQueueItem(RequiredGuid(row, request.PrimaryIdAttribute), Text(row, request.PrimaryNameAttribute) ?? "",
                     DisplaySubject(Text(row, request.Attribute("gaia_Asunto"))), Text(Nested(row, serviceNav), service.PrimaryNameAttribute) ?? "Servicio",
-                    Text(status, state.PrimaryNameAttribute) ?? "Sin estado", Text(status, state.Attribute("gaia_Color")),
+                    isClosed ? "Cerrada" : Text(status, state.PrimaryNameAttribute) ?? "Sin estado", Text(status, state.Attribute("gaia_Color")),
                     Text(Nested(row, requesterNav), third.PrimaryNameAttribute) ?? "Sin solicitante",
                     Text(Nested(row, responsibleNav), third.PrimaryNameAttribute), Text(Nested(row, unitNav), unit.PrimaryNameAttribute),
                     DateTimeValue(row, request.Attribute("gaia_FechaRadicacion")), due,
-                    !Bool(status, state.Attribute("gaia_EsFinal")) && due.HasValue && due < today,
-                    string.Equals(statusCode,"RESUELTA",StringComparison.OrdinalIgnoreCase));
+                    !isFinal && due.HasValue && due < today,
+                    isClosed);
             }).ToArray();
             var activeAssignments = await ReadActiveAssignments(client, items.Select(item => item.Id).ToArray(), token);
             items = items.Select(item => activeAssignments.TryGetValue(item.Id, out var assignment)

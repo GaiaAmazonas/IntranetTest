@@ -14,6 +14,7 @@ internal sealed partial class DataverseSolicitudesManagementStore
         var third=await DataverseMetadataResolver.TableAsync(client,"gaia_terceros",token);
         var unit=await DataverseMetadataResolver.TableAsync(client,"gaia_organizacion",token);
         var serviceNav=request.Relationship("gaia_Servicio",service.LogicalName).NavigationProperty;
+        var serviceLookup=request.Relationship("gaia_Servicio",service.LogicalName).ReferencingAttribute;
         var stateNav=request.Relationship("gaia_EstadoActual",state.LogicalName).NavigationProperty;
         var requesterNav=request.Relationship("gaia_Solicitante",third.LogicalName).NavigationProperty;
         var requesterUnitNav=request.Relationship("gaia_UnidadSolicitante",unit.LogicalName).NavigationProperty;
@@ -24,7 +25,7 @@ internal sealed partial class DataverseSolicitudesManagementStore
         var due=request.Attribute("gaia_FechaLimiteActual");var closed=request.Attribute("gaia_FechaCierre");
         var managementDays=request.Attribute("gaia_DiasGestionReales");var metSla=request.Attribute("gaia_CumplioSLA");
         var solution=request.Attribute("gaia_ResumenSolucion");var final=state.Attribute("gaia_EsFinal");
-        var select=string.Join(',',request.PrimaryIdAttribute,request.PrimaryNameAttribute,subject,description,submitted,
+        var select=string.Join(',',request.PrimaryIdAttribute,request.PrimaryNameAttribute,subject,description,$"_{serviceLookup}_value",submitted,
             firstManagement,due,closed,managementDays,metSla,solution);
         var expand=$"{serviceNav}($select={service.PrimaryNameAttribute}),{stateNav}($select={state.PrimaryNameAttribute},{final}),"+
             $"{requesterNav}($select={third.PrimaryNameAttribute}),{requesterUnitNav}($select={unit.PrimaryNameAttribute}),"+
@@ -37,7 +38,7 @@ internal sealed partial class DataverseSolicitudesManagementStore
             var stateRow=NestedExport(row,stateNav);var isFinal=Bool(stateRow,final);
             var elapsedEnd=closedAt??now;var elapsed=submittedAt.HasValue?Math.Max(0,(int)Math.Floor((elapsedEnd-submittedAt.Value).TotalDays)):0;
             return new SolicitudesRequestExportRow(RequiredGuid(row,request.PrimaryIdAttribute),Text(row,request.PrimaryNameAttribute)??"",
-                Text(row,subject)??"",Text(row,description),Text(NestedExport(row,serviceNav),service.PrimaryNameAttribute)??"Sin servicio",
+                Text(row,subject)??"",Text(row,description),OptionalGuid(row,$"_{serviceLookup}_value")??Guid.Empty,Text(NestedExport(row,serviceNav),service.PrimaryNameAttribute)??"Sin servicio",
                 Text(NestedExport(row,requesterNav),third.PrimaryNameAttribute)??"Sin solicitante",
                 Text(NestedExport(row,requesterUnitNav),unit.PrimaryNameAttribute),submittedAt,DateTimeValue(row,firstManagement),
                 Text(NestedExport(row,responsibleNav),third.PrimaryNameAttribute),Text(NestedExport(row,responsibleUnitNav),unit.PrimaryNameAttribute),

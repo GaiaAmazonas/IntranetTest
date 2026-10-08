@@ -58,7 +58,7 @@ internal sealed class DataverseSecurityStore(
         {
             [ModuleTable] = ["gaia_Codigo", "gaia_Descripcion", "gaia_Icono", "gaia_Modulopadre", "gaia_Nombre", "gaia_Orden", "gaia_Ruta", "gaia_Tipodemodulo", "gaia_Visiblenavegacion"],
             [PermissionTable] = ["gaia_Accion", "gaia_Codigo", "gaia_Descripcion", "gaia_ModuloPermiso", "gaia_Nombre"],
-            [RoleTable] = ["gaia_Codigo", "gaia_Descripcion", "gaia_EsSistema", "gaia_Nombre"],
+            [RoleTable] = ["gaia_Codigo", "gaia_Descripcion", "gaia_EsSistema", "gaia_AdministracionGlobal", "gaia_Nombre"],
             [RolePermissionTable] = ["gaia_Nombre", "gaia_Permiso", "gaia_Rol"],
             [UserTable] = ["gaia_Correo", "gaia_EntraObjectId", "gaia_Nombre", "gaia_Tercero", "gaia_UltimoAcceso"],
             [UserRoleTable] = ["gaia_FechaFin", "gaia_FechaInicio", "gaia_Nombre", "gaia_Observaciones", "gaia_Rol", "gaia_Usuario"]
@@ -319,9 +319,12 @@ internal sealed class DataverseSecurityStore(
         var assignments = await DataverseJson.ReadAllAsync(client,
             $"{userRoleMeta.EntitySetName}?$select=_{roleLookup}_value&$filter=_{userLookup}_value eq {userId:D} and statecode eq 0 and {start} le {today} and ({end} eq null or {end} ge {today})", token);
         var roleIds = assignments.Select(x => OptionalGuid(x, $"_{roleLookup}_value")).Where(x => x.HasValue).Select(x => x!.Value).Distinct().ToArray();
-        if (roleIds.Length == 0) return new(new(userId, name, email, entraObjectId, thirdPartyId, document, null, active), [], [], []);
+        if (roleIds.Length == 0) return new(new(userId, name, email, entraObjectId, thirdPartyId, document, null, active), [], [], [], false);
         var roleFilter = string.Join(" or ", roleIds.Select(x => $"{roleMeta.PrimaryIdAttribute} eq {x:D}"));
-        var roles = await DataverseJson.ReadAllAsync(client, $"{roleMeta.EntitySetName}?$select={roleMeta.Attribute("gaia_Codigo")}&$filter=statecode eq 0 and ({roleFilter})", token);
+        var globalAdministration=roleMeta.OptionalAttribute("gaia_AdministracionGlobal");
+        var roleSelect=roleMeta.Attribute("gaia_Codigo")+(globalAdministration is null?"":$",{globalAdministration}");
+        var roles = await DataverseJson.ReadAllAsync(client, $"{roleMeta.EntitySetName}?$select={roleSelect}&$filter=statecode eq 0 and ({roleFilter})", token);
+        var isGlobalAdministrator=globalAdministration is not null&&roles.Any(row=>BoolValue(row,globalAdministration));
         var rolePermissionRole = rolePermissionMeta.Attribute("gaia_Rol");
         var rolePermissionPermission = rolePermissionMeta.Attribute("gaia_Permiso");
         var rpFilter = string.Join(" or ", roleIds.Select(x => $"_{rolePermissionRole}_value eq {x:D}"));
@@ -418,7 +421,7 @@ internal sealed class DataverseSecurityStore(
                 .ToArray();
         }
         return new(new(userId, name, email, entraObjectId, thirdPartyId, document, DateTimeOffset.UtcNow, active),
-            roles.Select(x => StringValue(x, roleMeta.Attribute("gaia_Codigo"))).Where(x => !string.IsNullOrWhiteSpace(x)).Cast<string>().ToArray(), permissions, navigationModules);
+            roles.Select(x => StringValue(x, roleMeta.Attribute("gaia_Codigo"))).Where(x => !string.IsNullOrWhiteSpace(x)).Cast<string>().ToArray(), permissions, navigationModules,isGlobalAdministrator);
     }
 
     public async Task<IReadOnlyList<SecurityUserDetail>> ListUsersAsync(CancellationToken token)
@@ -642,7 +645,9 @@ internal sealed class DataverseSecurityStore(
         var startField = userRole.Attribute("gaia_FechaInicio");
         var endField = userRole.Attribute("gaia_FechaFin");
 
-        var roleRowsTask = DataverseJson.ReadAllAsync(client, $"{role.EntitySetName}?$select={role.PrimaryIdAttribute},{role.Attribute("gaia_Codigo")},{role.Attribute("gaia_Nombre")},{role.Attribute("gaia_Descripcion")},{role.Attribute("gaia_EsSistema")},statecode&$orderby={role.Attribute("gaia_Nombre")}", token);
+        var globalAdministration=role.OptionalAttribute("gaia_AdministracionGlobal");
+        var globalSelect=globalAdministration is null?"":$",{globalAdministration}";
+        var roleRowsTask = DataverseJson.ReadAllAsync(client, $"{role.EntitySetName}?$select={role.PrimaryIdAttribute},{role.Attribute("gaia_Codigo")},{role.Attribute("gaia_Nombre")},{role.Attribute("gaia_Descripcion")},{role.Attribute("gaia_EsSistema")}{globalSelect},statecode&$orderby={role.Attribute("gaia_Nombre")}", token);
         var permissionRowsTask = DataverseJson.ReadAllAsync(client, $"{permission.EntitySetName}?$select={permission.PrimaryIdAttribute},{permission.Attribute("gaia_Codigo")}&$filter=statecode eq 0", token);
         var rolePermissionRowsTask = DataverseJson.ReadAllAsync(client, $"{rolePermission.EntitySetName}?$select=_{rolePermissionRole}_value,_{rolePermissionPermission}_value&$filter=statecode eq 0", token);
         var userRoleRowsTask = DataverseJson.ReadAllAsync(client, $"{userRole.EntitySetName}?$select=_{userRoleRole}_value,_{userRoleUser}_value,{startField},{endField}&$filter=statecode eq 0", token);
@@ -666,8 +671,39 @@ internal sealed class DataverseSecurityStore(
         return roleRowsTask.Result.Select(row =>
         {
             var id = GuidValue(row, role.PrimaryIdAttribute);
-            return new SecurityRoleItem(id, StringValue(row, role.Attribute("gaia_Codigo")) ?? "", StringValue(row, role.Attribute("gaia_Nombre")) ?? "", StringValue(row, role.Attribute("gaia_Descripcion")), BoolValue(row, role.Attribute("gaia_EsSistema")), (DataverseJson.OptionalInt32(row, "statecode") ?? 0) == 0, usersByRole.GetValueOrDefault(id), permissionsByRole.GetValueOrDefault(id) ?? []);
+            return new SecurityRoleItem(id, StringValue(row, role.Attribute("gaia_Codigo")) ?? "", StringValue(row, role.Attribute("gaia_Nombre")) ?? "", StringValue(row, role.Attribute("gaia_Descripcion")), BoolValue(row, role.Attribute("gaia_EsSistema")), (DataverseJson.OptionalInt32(row, "statecode") ?? 0) == 0, usersByRole.GetValueOrDefault(id), permissionsByRole.GetValueOrDefault(id) ?? [],globalAdministration is not null&&BoolValue(row,globalAdministration),globalAdministration is not null);
         }).ToArray();
+    }
+
+    public async Task SetRoleGlobalAdministrationAsync(Guid roleId,bool enabled,CancellationToken token)
+    {
+        var client=await clientFactory.CreateAsync();
+        var role=await DataverseMetadataResolver.TableAsync(client,RoleTable,token);
+        var field=role.OptionalAttribute("gaia_AdministracionGlobal")
+            ??throw new SecurityRoleValidationException("Dataverse no contiene el campo gaia_AdministracionGlobal en la tabla gaia_rol.");
+        var current=await DataverseMetadataResolver.ReadOneAsync(client,$"{role.EntitySetName}({roleId:D})?$select={role.PrimaryIdAttribute},{field},statecode",token)
+            ??throw new KeyNotFoundException("El rol solicitado no existe.");
+        if((DataverseJson.OptionalInt32(current,"statecode")??0)!=0&&enabled)
+            throw new SecurityRoleValidationException("No se puede otorgar administración global a un rol inactivo.");
+        await PatchReturn(client,role.EntitySetName,roleId,new Dictionary<string,object?>{{field,enabled}},token);
+        InvalidateAll();
+    }
+
+    public async Task<bool> IsRoleGlobalAdministratorAsync(Guid roleId,CancellationToken token)
+    {
+        var client=await clientFactory.CreateAsync();var role=await DataverseMetadataResolver.TableAsync(client,RoleTable,token);
+        var field=role.OptionalAttribute("gaia_AdministracionGlobal");if(field is null)return false;
+        var row=await DataverseMetadataResolver.ReadOneAsync(client,$"{role.EntitySetName}({roleId:D})?$select={field},statecode",token);
+        return row is not null&&(DataverseJson.OptionalInt32(row.Value,"statecode")??0)==0&&BoolValue(row.Value,field);
+    }
+
+    public async Task<bool> IsUserRoleAssignmentGlobalAsync(Guid assignmentId,CancellationToken token)
+    {
+        var client=await clientFactory.CreateAsync();var assignment=await DataverseMetadataResolver.TableAsync(client,UserRoleTable,token);
+        var role=assignment.RelationshipTo(RoleTable);
+        var row=await DataverseMetadataResolver.ReadOneAsync(client,$"{assignment.EntitySetName}({assignmentId:D})?$select=_{role.ReferencingAttribute}_value",token);
+        var roleId=row is null?null:OptionalGuid(row.Value,$"_{role.ReferencingAttribute}_value");
+        return roleId.HasValue&&await IsRoleGlobalAdministratorAsync(roleId.Value,token);
     }
 
     public async Task<IReadOnlyList<SecurityModuleItem>> ListModulesAsync(CancellationToken token)

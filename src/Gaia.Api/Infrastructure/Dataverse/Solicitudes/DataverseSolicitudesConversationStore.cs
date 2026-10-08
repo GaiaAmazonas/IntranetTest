@@ -47,7 +47,45 @@ internal sealed class DataverseSolicitudesConversationStore(IDataverseDelegatedC
         var historyFilter=$"statecode eq 0 and _{historyRequest.ReferencingAttribute}_value eq {requestId:D}"+(isManager?"":$" and {visible} eq true");
         var historyRows=await DataverseJson.ReadAllAsync(client,$"{historyTable.EntitySetName}?$select={historyTable.PrimaryIdAttribute},{historyTable.PrimaryNameAttribute},{movement},{origin},{detail},{visible},{occurred},_{historyActor.ReferencingAttribute}_value&$expand={historyActor.NavigationProperty}($select={actorTable.PrimaryNameAttribute})&$filter={historyFilter}&$orderby={occurred} asc&$top=500",token);
         var events=historyRows.Select(item=>new SolicitudesHistoryEvent(GuidValue(item,historyTable.PrimaryIdAttribute),Text(item,historyTable.PrimaryNameAttribute)??"Actividad registrada",Text(item,detail),Date(item,occurred)??DateTimeOffset.MinValue,Text(Nested(item,historyActor.NavigationProperty),actorTable.PrimaryNameAttribute)??"Sistema",Int(item,movement),Int(item,origin),Bool(item,visible))).ToArray();
-        return new(requestId,Text(row.Value,request.PrimaryNameAttribute)??"",Text(row.Value,fields.Subject)??"",Text(row.Value,fields.Description)??"",Text(serviceRow.Value,service.PrimaryNameAttribute)??"Servicio",stateName,Text(stateRow.Value,color),Date(row.Value,fields.Submitted),DateOnlyValue(row.Value,fields.Due),isManager||requesterCanReply,isManager,comments,transitions,events);
+        var formAnswers=await ReadRequestAnswers(client,requestId,GuidValue(row.Value,fields.Form),token);
+        return new(requestId,Text(row.Value,request.PrimaryNameAttribute)??"",Text(row.Value,fields.Subject)??"",Text(row.Value,fields.Description)??"",Text(serviceRow.Value,service.PrimaryNameAttribute)??"Servicio",stateName,Text(stateRow.Value,color),Date(row.Value,fields.Submitted),DateOnlyValue(row.Value,fields.Due),isManager||requesterCanReply,isManager,comments,transitions,events,formAnswers);
+    }
+
+    private static async Task<IReadOnlyList<SolicitudesWorkflowAnswerItem>> ReadRequestAnswers(HttpClient client,Guid requestId,Guid formId,CancellationToken token)
+    {
+        if(formId==Guid.Empty)return [];
+        var field=await DataverseMetadataResolver.TableAsync(client,"gaia_campoformulario",token);
+        var response=await DataverseMetadataResolver.TableAsync(client,"gaia_respuestacampo",token);
+        var option=await DataverseMetadataResolver.TableAsync(client,"gaia_opcioncampoformulario",token);
+        var junction=await DataverseMetadataResolver.TableAsync(client,"gaia_respuestaopcioncampo",token);
+        var fieldForm=field.Relationship("gaia_Formulario","gaia_formularioservicio");
+        var visible=field.Attribute("gaia_Visible");var order=field.Attribute("gaia_Orden");var code=field.Attribute("gaia_Codigo");var dataType=field.Attribute("gaia_TipoDato");
+        var fields=await DataverseJson.ReadAllAsync(client,$"{field.EntitySetName}?$select={field.PrimaryIdAttribute},{field.PrimaryNameAttribute},{code},{dataType},{order},{visible}&$filter=statecode eq 0 and _{fieldForm.ReferencingAttribute}_value eq {formId:D}",token);
+        var definitions=fields.Where(item=>Bool(item,visible)&&!string.Equals(Text(item,code),"ADJUNTOS",StringComparison.OrdinalIgnoreCase)).OrderBy(item=>Int(item,order)).ToArray();
+        if(definitions.Length==0)return [];
+        var responseRequest=response.Relationship("gaia_Solicitud","gaia_solicitud");var responseField=response.Relationship("gaia_CampoFormulario","gaia_campoformulario");
+        var text=response.Attribute("gaia_ValorTexto");var integer=response.Attribute("gaia_ValorEntero");var number=response.Attribute("gaia_ValorDecimal");var date=response.Attribute("gaia_ValorFecha");var dateTime=response.Attribute("gaia_ValorFechaHora");var boolean=response.Attribute("gaia_ValorBooleano");
+        var responses=await DataverseJson.ReadAllAsync(client,$"{response.EntitySetName}?$select={response.PrimaryIdAttribute},{text},{integer},{number},{date},{dateTime},{boolean},_{responseField.ReferencingAttribute}_value&$filter=statecode eq 0 and _{responseRequest.ReferencingAttribute}_value eq {requestId:D}",token);
+        var responseByField=responses.Where(item=>GuidValue(item,responseField.ReferencingAttribute)!=Guid.Empty).GroupBy(item=>GuidValue(item,responseField.ReferencingAttribute)).ToDictionary(group=>group.Key,group=>group.First());
+        var responseIds=responses.Select(item=>GuidValue(item,response.PrimaryIdAttribute)).ToHashSet();
+        var junctionResponse=junction.Relationship("gaia_RespuestaCampo","gaia_respuestacampo");var junctionOption=junction.Relationship("gaia_OpcionCampoFormulario","gaia_opcioncampoformulario");
+        var selections=responseIds.Count==0?[]:await DataverseJson.ReadAllAsync(client,$"{junction.EntitySetName}?$select=_{junctionResponse.ReferencingAttribute}_value,_{junctionOption.ReferencingAttribute}_value&$filter=statecode eq 0",token);
+        var selectedByResponse=selections.Where(item=>responseIds.Contains(GuidValue(item,junctionResponse.ReferencingAttribute))).GroupBy(item=>GuidValue(item,junctionResponse.ReferencingAttribute)).ToDictionary(group=>group.Key,group=>group.Select(item=>GuidValue(item,junctionOption.ReferencingAttribute)).Where(id=>id!=Guid.Empty).ToHashSet());
+        var optionField=option.Relationship("gaia_CampoFormulario","gaia_campoformulario");var optionOrder=option.Attribute("gaia_Orden");
+        var options=await DataverseJson.ReadAllAsync(client,$"{option.EntitySetName}?$select={option.PrimaryIdAttribute},{option.PrimaryNameAttribute},{optionOrder},_{optionField.ReferencingAttribute}_value&$filter=statecode eq 0",token);
+        var optionLabels=options.ToDictionary(item=>GuidValue(item,option.PrimaryIdAttribute),item=>Text(item,option.PrimaryNameAttribute)??"");
+        return definitions.Select(definition=>
+        {
+            var fieldId=GuidValue(definition,field.PrimaryIdAttribute);responseByField.TryGetValue(fieldId,out var answer);var responseId=answer.ValueKind==JsonValueKind.Undefined?Guid.Empty:GuidValue(answer,response.PrimaryIdAttribute);
+            var labels=selectedByResponse.GetValueOrDefault(responseId,[]).Select(id=>optionLabels.TryGetValue(id,out var label)?label:null).OfType<string>().Where(label=>!string.IsNullOrWhiteSpace(label)).ToArray();
+            string? value=null;
+            if(answer.ValueKind!=JsonValueKind.Undefined)value=Int(definition,dataType) switch
+            {
+                299540041=>JsonValue(answer,integer),299540042=>JsonValue(answer,number),299540043=>Text(answer,date),
+                299540044=>Text(answer,dateTime),299540045=>answer.TryGetProperty(boolean,out var booleanValue)&&booleanValue.ValueKind is JsonValueKind.True or JsonValueKind.False?(booleanValue.GetBoolean()?"Sí":"No"):null,_=>Text(answer,text)
+            };
+            return new SolicitudesWorkflowAnswerItem(fieldId,Text(definition,field.PrimaryNameAttribute)??"Campo",value,labels);
+        }).ToArray();
     }
 
     public async Task<SolicitudesComment> AddAsync(Guid requestId,Guid actorId,string content,bool internalOnly,bool managementAccess,DateTimeOffset now,CancellationToken token)
@@ -211,6 +249,7 @@ internal sealed class DataverseSolicitudesConversationStore(IDataverseDelegatedC
     static Guid GuidValue(JsonElement x,string lookup)=>Guid.TryParse(Text(x,lookup)??Text(x,lookup.StartsWith('_')?lookup:$"_{lookup}_value"),out var id)?id:Guid.Empty;
     static DateTimeOffset? Date(JsonElement x,string p)=>DateTimeOffset.TryParse(Text(x,p),CultureInfo.InvariantCulture,DateTimeStyles.AssumeUniversal,out var d)?d:null;
     static DateOnly? DateOnlyValue(JsonElement x,string p)=>DateOnly.TryParse(Text(x,p),out var d)?d:null;
+    static string? JsonValue(JsonElement x,string p)=>x.TryGetProperty(p,out var value)&&value.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined)?value.ToString():null;
     static Guid CreatedId(HttpResponseMessage r){var uri=r.Headers.TryGetValues("OData-EntityId",out var values)?values.SingleOrDefault():null;var m=Regex.Match(uri??"",@"\(([0-9a-f-]{36})\)$");return m.Success?Guid.Parse(m.Groups[1].Value):throw new InvalidOperationException("Dataverse no devolvió el comentario creado.");}
-    sealed record RequestFields(string Subject,string Description,string Submitted,string Due,string Service,string State,string Requester,string Manager){public string Select=>string.Join(',',"statecode",Subject,Description,Submitted,Due,$"_{Service}_value",$"_{State}_value",$"_{Requester}_value",$"_{Manager}_value");public static RequestFields From(DataverseTableMetadata m)=>new(m.Attribute("gaia_Asunto"),m.Attribute("gaia_DescripcionInicial"),m.Attribute("gaia_FechaRadicacion"),m.Attribute("gaia_FechaLimiteActual"),m.Attribute("gaia_Servicio"),m.Attribute("gaia_EstadoActual"),m.Attribute("gaia_Solicitante"),m.Attribute("gaia_ResponsableInterno"));}
+    sealed record RequestFields(string Subject,string Description,string Submitted,string Due,string Service,string State,string Requester,string Manager,string Form){public string Select=>string.Join(',',"statecode",Subject,Description,Submitted,Due,$"_{Service}_value",$"_{State}_value",$"_{Requester}_value",$"_{Manager}_value",$"_{Form}_value");public static RequestFields From(DataverseTableMetadata m)=>new(m.Attribute("gaia_Asunto"),m.Attribute("gaia_DescripcionInicial"),m.Attribute("gaia_FechaRadicacion"),m.Attribute("gaia_FechaLimiteActual"),m.Attribute("gaia_Servicio"),m.Attribute("gaia_EstadoActual"),m.Attribute("gaia_Solicitante"),m.Attribute("gaia_ResponsableInterno"),m.Attribute("gaia_FormularioUtilizado"));}
 }

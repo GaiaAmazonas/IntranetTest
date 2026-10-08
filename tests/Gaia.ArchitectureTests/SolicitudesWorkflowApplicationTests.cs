@@ -85,6 +85,28 @@ public sealed class SolicitudesWorkflowApplicationTests
     }
 
     [Fact]
+    public void StageFormOptionCodesAreGeneratedFromVisibleLabels()
+    {
+        var field=new SaveSolicitudesFormField("TIPO_CONTRATO","Tipo de contrato",299540046,299540058,null,null,true,10,12,null,null,null,null,false,null,null,true,
+            [new(null,"","Laboral",0,true),new(null,"","Consultoría",1,false),new(null,"","Otro",2,false)]);
+
+        var normalized=SolicitudesFormFieldValidation.Normalize(field);
+
+        Assert.Equal(["LABORAL","CONSULTORIA","OTRO"],normalized.Options.Select(option=>option.Code));
+    }
+
+    [Fact]
+    public void StageFormOptionsRejectRepeatedVisibleLabels()
+    {
+        var field=new SaveSolicitudesFormField("TIPO_CONTRATO","Tipo de contrato",299540046,299540058,null,null,true,10,12,null,null,null,null,false,null,null,true,
+            [new(null,"","Laboral",0,true),new(null,""," laboral ",1,false)]);
+
+        var error=Assert.Throws<ArgumentException>(()=>SolicitudesFormFieldValidation.Normalize(field));
+
+        Assert.Contains("No repitas opciones",error.Message);
+    }
+
+    [Fact]
     public async Task ManagementFormRejectsDuplicateFieldAnswers()
     {
         var app=new SolicitudesWorkflowApplication(new Store(),TimeProvider.System);var fieldId=Guid.NewGuid();

@@ -49,7 +49,8 @@ public sealed record SolicitudesWorkflowAnswerItem(Guid FieldId,string Label,str
 public sealed record SolicitudesWorkflowNextAction(int Result,IReadOnlyList<SolicitudesWorkflowDestination> Destinations);
 public sealed record SolicitudesWorkflowDestination(Guid StepId,string Code,string Name,bool Final);
 public sealed record SolicitudesRequestWorkflowState(Guid InstanceId,Guid FlowId,int Version,int Status,
-    IReadOnlyList<SolicitudesWorkflowManagementItem> Managements);
+    IReadOnlyList<SolicitudesWorkflowManagementItem> Managements,
+    IReadOnlyList<SolicitudesWorkflowStep>? Steps=null,IReadOnlyList<SolicitudesWorkflowRoute>? Routes=null);
 public sealed record SolicitudesWorkflowQueueItem(Guid ManagementId,Guid RequestId,string RequestNumber,string Subject,
     string StepCode,int Execution,int Status,Guid? UnitId,string? UnitName,Guid? ResponsibleId,DateTimeOffset? AvailableAt,
     int? TargetDays,DateOnly? TargetDueDate,bool IsOverdue,bool RequiresDecision);
@@ -302,6 +303,38 @@ public static class SolicitudesFormFieldValidation
 {
     public static SaveSolicitudesFormField Normalize(SaveSolicitudesFormField request)
     {
-        ArgumentNullException.ThrowIfNull(request);var code=request.Code?.Trim().ToUpperInvariant();var label=request.Label?.Trim();if(string.IsNullOrWhiteSpace(code)||code.Length>80||!System.Text.RegularExpressions.Regex.IsMatch(code,"^[A-Z0-9_-]+$")||string.IsNullOrWhiteSpace(label)||label.Length>150)throw new ArgumentException("Código y etiqueta del campo no son válidos.");if(request.DataType is <299540040 or >299540047||request.ControlType is <299540050 or >299540062||request.Width is <1 or >12||request.Order<0)throw new ArgumentException("Tipo, control, ancho u orden del campo no son válidos.");if(request.MinimumLength.HasValue&&request.MaximumLength.HasValue&&request.MinimumLength>request.MaximumLength||request.MinimumValue.HasValue&&request.MaximumValue.HasValue&&request.MinimumValue>request.MaximumValue)throw new ArgumentException("Los valores mínimos no pueden superar los máximos.");if(request.DataType==299540046&&request.Options.Count==0)throw new ArgumentException("Un campo de opción debe tener opciones.");var optionCodes=request.Options.Select(x=>x.Code.Trim().ToUpperInvariant()).ToArray();if(optionCodes.Distinct().Count()!=optionCodes.Length||request.Options.Any(x=>string.IsNullOrWhiteSpace(x.Code)||string.IsNullOrWhiteSpace(x.Label)))throw new ArgumentException("Las opciones deben tener códigos y etiquetas únicos.");return request with{Code=code,Label=label,HelpText=request.HelpText?.Trim(),Placeholder=request.Placeholder?.Trim(),ValidationPattern=request.ValidationPattern?.Trim(),ValidationMessage=request.ValidationMessage?.Trim(),DefaultValue=request.DefaultValue?.Trim(),ConfigurationJson=request.ConfigurationJson?.Trim(),Options=request.Options.Select(x=>x with{Code=x.Code.Trim().ToUpperInvariant(),Label=x.Label.Trim()}).ToArray()};
+        ArgumentNullException.ThrowIfNull(request);
+        var code=request.Code?.Trim().ToUpperInvariant();var label=request.Label?.Trim();
+        if(string.IsNullOrWhiteSpace(code)||code.Length>80||!System.Text.RegularExpressions.Regex.IsMatch(code,"^[A-Z0-9_-]+$")||string.IsNullOrWhiteSpace(label)||label.Length>150)throw new ArgumentException("Código y etiqueta del campo no son válidos.");
+        if(request.DataType is <299540040 or >299540047||request.ControlType is <299540050 or >299540062||request.Width is <1 or >12||request.Order<0)throw new ArgumentException("Tipo, control, ancho u orden del campo no son válidos.");
+        if(request.MinimumLength.HasValue&&request.MaximumLength.HasValue&&request.MinimumLength>request.MaximumLength||request.MinimumValue.HasValue&&request.MaximumValue.HasValue&&request.MinimumValue>request.MaximumValue)throw new ArgumentException("Los valores mínimos no pueden superar los máximos.");
+        if(request.DataType==299540046&&request.Options.Count==0)throw new ArgumentException("Agrega al menos una opción.");
+        var labels=request.Options.Select(option=>option.Label?.Trim()??"").ToArray();
+        if(labels.Any(string.IsNullOrWhiteSpace)||labels.Select(ComparableLabel).Distinct(StringComparer.OrdinalIgnoreCase).Count()!=labels.Length)throw new ArgumentException("No repitas opciones. Cada opción debe tener un texto diferente.");
+        var used=new HashSet<string>(StringComparer.OrdinalIgnoreCase);var options=new List<SaveSolicitudesFormOption>();
+        for(var index=0;index<request.Options.Count;index++)
+        {
+            var option=request.Options[index];var candidate=option.Code?.Trim().ToUpperInvariant();
+            if(string.IsNullOrWhiteSpace(candidate)||candidate.Length>80||!System.Text.RegularExpressions.Regex.IsMatch(candidate,"^[A-Z0-9_-]+$"))candidate=InternalCode(labels[index],index);
+            var root=candidate;var suffix=2;
+            while(!used.Add(candidate)){var ending=$"_{suffix++}";candidate=$"{root[..Math.Min(root.Length,80-ending.Length)]}{ending}";}
+            options.Add(option with{Code=candidate,Label=labels[index]});
+        }
+        return request with{Code=code,Label=label,HelpText=request.HelpText?.Trim(),Placeholder=request.Placeholder?.Trim(),ValidationPattern=request.ValidationPattern?.Trim(),ValidationMessage=request.ValidationMessage?.Trim(),DefaultValue=request.DefaultValue?.Trim(),ConfigurationJson=request.ConfigurationJson?.Trim(),Options=options};
+    }
+
+    private static string InternalCode(string value,int index)
+    {
+        var decomposed=value.Normalize(System.Text.NormalizationForm.FormD);
+        var withoutMarks=new string(decomposed.Where(character=>System.Globalization.CharUnicodeInfo.GetUnicodeCategory(character)!=System.Globalization.UnicodeCategory.NonSpacingMark).ToArray());
+        var code=System.Text.RegularExpressions.Regex.Replace(withoutMarks.ToUpperInvariant(),"[^A-Z0-9]+","_").Trim('_');
+        var normalized=string.IsNullOrWhiteSpace(code)?$"OPCION_{index+1}":code;
+        return normalized[..Math.Min(normalized.Length,80)];
+    }
+
+    private static string ComparableLabel(string value)
+    {
+        var decomposed=value.Normalize(System.Text.NormalizationForm.FormD);
+        return new string(decomposed.Where(character=>System.Globalization.CharUnicodeInfo.GetUnicodeCategory(character)!=System.Globalization.UnicodeCategory.NonSpacingMark).ToArray()).Trim();
     }
 }

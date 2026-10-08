@@ -22,6 +22,7 @@ internal static class SecurityEndpoints
   group.MapPost("/roles",(RoleWriteRequest request,ISecurityStore store,CancellationToken ct)=>WriteRoleAsync(null,request,store,ct)).RequireAuthorization(AdminCorePermissions.TiRolesCrear);
   group.MapPut("/roles/{id:guid}",(Guid id,RoleWriteRequest request,ISecurityStore store,CancellationToken ct)=>WriteRoleAsync(id,request,store,ct)).RequireAuthorization(AdminCorePermissions.TiRolesActualizar);
   group.MapPut("/roles/{id:guid}/permissions",SetRolePermissionsAsync).RequireAuthorization(AdminCorePermissions.TiRolesAdministrar);
+  group.MapPut("/roles/{id:guid}/global-administration",SetRoleGlobalAdministrationAsync).RequireAuthorization(AdminCorePermissions.TiRolesAdministrar);
   group.MapGet("/modules",(ISecurityStore store,CancellationToken ct)=>store.ListModulesAsync(ct)).RequireAuthorization(AdminCorePermissions.TiModulosVer);
   group.MapPost("/modules",(ModuleWriteRequest request,ISecurityStore store,CancellationToken ct)=>WriteModuleAsync(null,request,store,ct)).RequireAuthorization(AdminCorePermissions.TiModulosCrear);
   group.MapPut("/modules/{id:guid}",(Guid id,ModuleWriteRequest request,ISecurityStore store,CancellationToken ct)=>WriteModuleAsync(id,request,store,ct)).RequireAuthorization(AdminCorePermissions.TiModulosActualizar);
@@ -42,9 +43,14 @@ internal static class SecurityEndpoints
   { return Results.Problem(statusCode:StatusCodes.Status422UnprocessableEntity,title:"No fue posible inicializar Seguridad",detail:exception.Message); }
  }
 
- private static async Task<IResult> AssignUserRoleAsync(Guid userId,UserRoleWriteRequest request,ISecurityStore store,CancellationToken ct)
+ private static async Task<IResult> AssignUserRoleAsync(Guid userId,UserRoleWriteRequest request,ClaimsPrincipal principal,ISecurityStore store,CancellationToken ct)
  {
-  try { return Results.Ok(await store.AssignUserRoleAsync(userId,request,ct)); }
+  try
+  {
+   if(await store.IsRoleGlobalAdministratorAsync(request.RoleId,ct)&&!(await store.GetOrProvisionAsync(principal,ct)).IsGlobalAdministrator)
+    return Results.Problem(statusCode:StatusCodes.Status403Forbidden,title:"Acceso denegado",detail:"Solo un administrador global vigente puede asignar un rol con alcance global.");
+   return Results.Ok(await store.AssignUserRoleAsync(userId,request,ct));
+  }
   catch(SecurityAssignmentConflictException exception)
   { return Results.Conflict(new { title="El rol ya está asignado",detail=exception.Message }); }
   catch(SecurityAssignmentValidationException exception)
@@ -53,9 +59,14 @@ internal static class SecurityEndpoints
   { return Results.NotFound(new { title="No fue posible asignar el rol",detail=exception.Message }); }
  }
 
- private static async Task<IResult> EndUserRoleAsync(Guid userId,Guid assignmentId,DateOnly endDate,ISecurityStore store,CancellationToken ct)
+ private static async Task<IResult> EndUserRoleAsync(Guid userId,Guid assignmentId,DateOnly endDate,ClaimsPrincipal principal,ISecurityStore store,CancellationToken ct)
  {
-  try { await store.EndUserRoleAsync(userId,assignmentId,endDate,ct); return Results.NoContent(); }
+  try
+  {
+   if(await store.IsUserRoleAssignmentGlobalAsync(assignmentId,ct)&&!(await store.GetOrProvisionAsync(principal,ct)).IsGlobalAdministrator)
+    return Results.Problem(statusCode:StatusCodes.Status403Forbidden,title:"Acceso denegado",detail:"Solo un administrador global vigente puede finalizar esta asignación.");
+   await store.EndUserRoleAsync(userId,assignmentId,endDate,ct); return Results.NoContent();
+  }
   catch(SecurityAssignmentValidationException exception)
   { return Results.ValidationProblem(new Dictionary<string,string[]>{{"assignment",[exception.Message]}}); }
   catch(KeyNotFoundException exception)
@@ -66,6 +77,21 @@ internal static class SecurityEndpoints
  {
   await store.SetRolePermissionsAsync(id,request,ct);
   return Results.NoContent();
+ }
+
+ private static async Task<IResult> SetRoleGlobalAdministrationAsync(Guid id,RoleGlobalAdministrationRequest request,ClaimsPrincipal principal,ISecurityStore store,CancellationToken ct)
+ {
+  try
+  {
+   var actor=await store.GetOrProvisionAsync(principal,ct);
+   if(!actor.IsGlobalAdministrator)return Results.Problem(statusCode:StatusCodes.Status403Forbidden,title:"Acceso denegado",detail:"Solo un administrador global vigente puede modificar este privilegio.");
+   await store.SetRoleGlobalAdministrationAsync(id,request.Enabled,ct);
+   return Results.NoContent();
+  }
+  catch(SecurityRoleValidationException exception)
+  { return Results.ValidationProblem(new Dictionary<string,string[]>{{"globalAdministration",[exception.Message]}}); }
+  catch(KeyNotFoundException exception)
+  { return Results.NotFound(new { title="Rol no encontrado",detail=exception.Message }); }
  }
 
  private static async Task<IResult> WriteRoleAsync(Guid? id,RoleWriteRequest request,ISecurityStore store,CancellationToken ct)

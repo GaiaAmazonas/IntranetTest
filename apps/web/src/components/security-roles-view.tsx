@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, ChevronDown, Copy, Edit3, Eye, EyeOff, KeyRound, LoaderCircle, Plus, Search, ShieldCheck, UsersRound } from "lucide-react";
+import { Check, ChevronDown, Copy, Edit3, Eye, EyeOff, Globe2, KeyRound, LoaderCircle, Plus, Search, ShieldCheck, UsersRound } from "lucide-react";
 import { apiRequest } from "@/lib/api-client";
 import { applyVisiblePermissions, permissionDelta } from "@/lib/security-admin-rules";
 import { useFeedback } from "./feedback";
@@ -13,7 +13,7 @@ export type SecurityPermission = { id: string; code: string; name: string; actio
 export type SecurityModule = { id: string; code: string; name: string; description?: string | null; type: string; parentId?: string | null; route?: string | null; icon?: string | null; order: number; visible: boolean; supportsVisibility: boolean; isActive: boolean };
 type RoleForm = { id?: string; code: string; name: string; description: string; isActive: boolean; duplicate?: boolean };
 
-export function SecurityRolesView({ roles, permissions, modules, onReload, onPermissionsPublished }: { roles: SecurityRole[]; permissions: SecurityPermission[]; modules: SecurityModule[]; onReload: () => Promise<void>; onPermissionsPublished: () => Promise<void> }) {
+export function SecurityRolesView({ roles, permissions, modules, canManageGlobal, onReload, onPermissionsPublished }: { roles: SecurityRole[]; permissions: SecurityPermission[]; modules: SecurityModule[]; canManageGlobal: boolean; onReload: () => Promise<void>; onPermissionsPublished: () => Promise<void> }) {
   const feedback = useFeedback();
   const [roleQuery, setRoleQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(roles[0]?.id ?? null);
@@ -96,6 +96,13 @@ export function SecurityRolesView({ roles, permissions, modules, onReload, onPer
     finally { setSaving(false); }
   }
 
+  async function toggleGlobalAdministration() {
+    if(!selected||!canManageGlobal||!selected.supportsGlobalAdministration)return;setSaving(true);
+    try{await apiRequest(`/api/security/roles/${selected.id}/global-administration`,{method:"PUT",body:JSON.stringify({enabled:!selected.isGlobalAdministrator})});feedback.notify({tone:"success",title:selected.isGlobalAdministrator?"Alcance global retirado":"Alcance global habilitado",description:"El cambio se aplicará a las asignaciones vigentes de este rol."});await Promise.all([onReload(),onPermissionsPublished()]);}
+    catch(reason){feedback.notify({tone:"error",title:"No fue posible cambiar el alcance global",description:reason instanceof Error?reason.message:undefined});}
+    finally{setSaving(false);}
+  }
+
   return <div className="gaia-roles-workspace">
     <aside className="gaia-role-master" aria-label="Catálogo de roles">
       <div className="gaia-role-master-head"><label><Search size={16} /><span className="sr-only">Buscar rol</span><input onChange={event => setRoleQuery(event.target.value)} placeholder="Buscar rol…" type="search" value={roleQuery} /></label><Button onClick={() => setRoleForm({ code: "", name: "", description: "", isActive: true })}><Plus size={16} />Nuevo rol</Button></div>
@@ -105,7 +112,8 @@ export function SecurityRolesView({ roles, permissions, modules, onReload, onPer
 
     <section className="gaia-role-detail" aria-live="polite">
       {!selected ? <EmptyState title="No hay roles configurados" description="Crea el primer rol para comenzar." /> : <>
-        <header className="gaia-role-detail-head"><div><div><ShieldCheck size={22} /><Badge tone={selected.isActive ? "success" : "danger"}>{selected.isActive ? "Activo" : "Inactivo"}</Badge>{selected.isSystem && <Badge>Rol del sistema</Badge>}</div><h2>{selected.name}</h2><p>{selected.description || "Sin descripción funcional."}</p><span><UsersRound size={14} />{selected.assignedUsers} usuario{selected.assignedUsers === 1 ? "" : "s"} con asignación vigente</span></div><div className="gaia-role-actions">{!selected.isSystem && <Button onClick={() => setRoleForm({ id: selected.id, code: selected.code, name: selected.name, description: selected.description ?? "", isActive: selected.isActive })} variant="secondary"><Edit3 size={15} />Editar</Button>}<Button onClick={() => setRoleForm({ code: uniqueCopyCode(selected.code, roles), name: `${selected.name} (copia)`, description: selected.description ?? "", isActive: true, duplicate: true })} variant="secondary"><Copy size={15} />Duplicar</Button>{!selected.isSystem && <Button onClick={() => setStateRole(selected)} variant="secondary">{selected.isActive ? <EyeOff size={15} /> : <Eye size={15} />}{selected.isActive ? "Inactivar" : "Activar"}</Button>}</div></header>
+        <header className="gaia-role-detail-head"><div><div><ShieldCheck size={22} /><Badge tone={selected.isActive ? "success" : "danger"}>{selected.isActive ? "Activo" : "Inactivo"}</Badge>{selected.isSystem && <Badge>Rol del sistema</Badge>}{selected.isGlobalAdministrator&&<Badge tone="warning">Administración global</Badge>}</div><h2>{selected.name}</h2><p>{selected.description || "Sin descripción funcional."}</p><span><UsersRound size={14} />{selected.assignedUsers} usuario{selected.assignedUsers === 1 ? "" : "s"} con asignación vigente</span></div><div className="gaia-role-actions">{canManageGlobal&&selected.supportsGlobalAdministration&&<Button disabled={saving||(!selected.isActive&&!selected.isGlobalAdministrator)} onClick={()=>void toggleGlobalAdministration()} variant="secondary"><Globe2 size={15}/>{selected.isGlobalAdministrator?"Retirar alcance global":"Habilitar alcance global"}</Button>}{!selected.isSystem && <Button onClick={() => setRoleForm({ id: selected.id, code: selected.code, name: selected.name, description: selected.description ?? "", isActive: selected.isActive })} variant="secondary"><Edit3 size={15} />Editar</Button>}<Button onClick={() => setRoleForm({ code: uniqueCopyCode(selected.code, roles), name: `${selected.name} (copia)`, description: selected.description ?? "", isActive: true, duplicate: true })} variant="secondary"><Copy size={15} />Duplicar</Button>{!selected.isSystem && <Button onClick={() => setStateRole(selected)} variant="secondary">{selected.isActive ? <EyeOff size={15} /> : <Eye size={15} />}{selected.isActive ? "Inactivar" : "Activar"}</Button>}</div></header>
+        {!selected.supportsGlobalAdministration&&<div className="mx-4 mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><strong>Configuración pendiente en Dataverse.</strong> Crea el campo booleano <code>gaia_AdministracionGlobal</code> en <code>gaia_rol</code> para administrar este alcance desde aquí.</div>}
 
         <div className="gaia-permission-toolbar"><label className="gaia-permission-search"><Search size={16} /><span className="sr-only">Buscar permisos</span><input onChange={event => setPermissionQuery(event.target.value)} placeholder="Buscar funcionalidad o acción…" type="search" value={permissionQuery} /></label><select aria-label="Filtrar por módulo" onChange={event => setModuleFilter(event.target.value)} value={moduleFilter}><option value="">Todos los módulos</option>{rootModules.map(module => <option key={module.id} value={module.id}>{module.name}</option>)}</select><label className="gaia-assigned-only"><input checked={assignedOnly} onChange={event => setAssignedOnly(event.target.checked)} type="checkbox" />Solo asignados</label><button aria-expanded={technical} className="gaia-technical-toggle" onClick={() => setTechnical(value => !value)} type="button">{technical ? "Ocultar" : "Ver"} códigos técnicos</button></div>
         <div className="gaia-permission-summary"><span><strong>{selectedCodes.size}</strong> de {permissions.filter(permission => permission.isActive).length} permisos · <b>{addedCount} agregados</b> · <b>{removedCount} retirados</b></span><div><Button onClick={() => setBulkChange(true)} variant="secondary">Seleccionar visibles</Button><Button onClick={() => setBulkChange(false)} variant="secondary">Quitar visibles</Button><Button disabled={!dirty || saving} onClick={discardDraft} variant="secondary">Descartar</Button><Button disabled={!dirty || saving} onClick={() => setConfirmPermissions(true)}>{saving ? <LoaderCircle className="gaia-spin" size={16} /> : <Check size={16} />}Publicar cambios</Button></div></div>

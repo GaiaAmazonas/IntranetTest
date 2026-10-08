@@ -3,7 +3,7 @@ using System.Globalization;
 namespace Gaia.Modules.Solicitudes;
 
 public sealed record CreateSolicitudesRequest(Guid ServiceId, string Subject, string Description,
-    IReadOnlyList<SolicitudesFieldAnswer>? Answers = null);
+    IReadOnlyList<SolicitudesFieldAnswer>? Answers = null, bool HasAttachments = false);
 public sealed record CreatedSolicitudesRequest(Guid Id, string Number, DateTimeOffset SubmittedAt, DateOnly DueDate);
 
 public interface ISolicitudesRequestStore
@@ -32,17 +32,22 @@ public sealed class SolicitudesRequestApplication(ISolicitudesRequestStore store
         if (string.IsNullOrWhiteSpace(request.Description) || request.Description.Trim().Length is < 10 or > 4000)
             throw new ArgumentException("La descripción debe tener entre 10 y 4000 caracteres.");
         var form=await forms.ReadForServiceAsync(request.ServiceId,cancellationToken);
-        ValidateAnswers(form,request.Answers??[]);
+        ValidateAnswers(form,request.Answers??[],request.HasAttachments);
         return await store.CreateAsync(request with { Subject = request.Subject.Trim(), Description = request.Description.Trim() },
             requesterThirdPartyId, timeProvider.GetUtcNow(), cancellationToken);
     }
 
-    private static void ValidateAnswers(SolicitudesServiceForm? form,IReadOnlyList<SolicitudesFieldAnswer> answers)
+    private static void ValidateAnswers(SolicitudesServiceForm? form,IReadOnlyList<SolicitudesFieldAnswer> answers,bool hasAttachments)
     {
         if(form is null){if(answers.Count>0)throw new ArgumentException("El servicio no tiene un formulario publicado.");return;}
         if(answers.Select(x=>x.FieldId).Distinct().Count()!=answers.Count)throw new ArgumentException("No repitas respuestas para el mismo campo.");
         foreach(var field in form.Fields)
         {
+            if(string.Equals(field.Code,"ADJUNTOS",StringComparison.OrdinalIgnoreCase))
+            {
+                if(field.Required&&!hasAttachments)throw new ArgumentException($"El campo {field.Label} es obligatorio.");
+                continue;
+            }
             var answer=answers.SingleOrDefault(x=>x.FieldId==field.Id);var value=answer?.Value?.Trim();var present=answer is not null&&(!string.IsNullOrWhiteSpace(value)||answer.OptionIds?.Count>0);
             if(field.Required&&!present)throw new ArgumentException($"El campo {field.Label} es obligatorio.");if(answer is null)continue;
             if(field.MaximumLength.HasValue&&value?.Length>field.MaximumLength)throw new ArgumentException($"El campo {field.Label} supera la longitud permitida.");if(field.MinimumLength.HasValue&&!string.IsNullOrEmpty(value)&&value.Length<field.MinimumLength)throw new ArgumentException($"El campo {field.Label} no alcanza la longitud mínima.");

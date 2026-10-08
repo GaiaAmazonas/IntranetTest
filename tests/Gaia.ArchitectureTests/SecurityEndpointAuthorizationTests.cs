@@ -57,6 +57,9 @@ public sealed class SecurityEndpointAuthorizationTests
         public Task<IReadOnlyList<SecurityModuleItem>> ListModulesAsync(CancellationToken token) => Unused<IReadOnlyList<SecurityModuleItem>>();
         public Task<IReadOnlyList<SecurityPermissionItem>> ListPermissionsAsync(CancellationToken token) => Unused<IReadOnlyList<SecurityPermissionItem>>();
         public Task<Guid> UpsertRoleAsync(Guid? id, RoleWriteRequest request, CancellationToken token) => Unused<Guid>();
+        public Task SetRoleGlobalAdministrationAsync(Guid roleId,bool enabled,CancellationToken token)=>UnusedAction();
+        public Task<bool> IsRoleGlobalAdministratorAsync(Guid roleId,CancellationToken token)=>Unused<bool>();
+        public Task<bool> IsUserRoleAssignmentGlobalAsync(Guid assignmentId,CancellationToken token)=>Unused<bool>();
         public Task SetRolePermissionsAsync(Guid roleId, RolePermissionsRequest request, CancellationToken token) => UnusedAction();
         public Task<Guid> AssignUserRoleAsync(Guid userId, UserRoleWriteRequest request, CancellationToken token) => Unused<Guid>();
         public Task EndUserRoleAsync(Guid userId, Guid assignmentId, DateOnly endDate, CancellationToken token) => UnusedAction();

@@ -1,6 +1,6 @@
 export const pageSize = 10;
 export const queueSort = "submitted-desc";
-export type QueueView = "mine"|"waiting"|"tracking"|"resolved";
+export type QueueView = "mine"|"waiting"|"tracking"|"resolved"|"all";
 export type QueueFilters = { search: string; serviceId: string; stateId: string; overdue: string; view: QueueView };
 export type QueueQuery = QueueFilters & { page: number };
 export type QueueItem = {id:string;number:string;subject:string;service:string;status:string;statusColor:string|null;requester:string;responsible:string|null;unit:string|null;submittedAt:string|null;dueDate:string|null;isOverdue:boolean;canDelete?:boolean};
@@ -14,7 +14,7 @@ export function filterKey(filters:QueueFilters) {
 }
 export function readQueueQuery(search:string):QueueQuery {
   const params = new URLSearchParams(search), page = Number(params.get("page") || 1);
-  const requestedView=params.get("view")||"mine",view:QueueView=(["mine","waiting","tracking","resolved"] as string[]).includes(requestedView)?requestedView as QueueView:"mine";
+  const requestedView=params.get("view")||"mine",view:QueueView=(["mine","waiting","tracking","resolved","all"] as string[]).includes(requestedView)?requestedView as QueueView:"mine";
   return {search:(params.get("search")||"").slice(0,100),serviceId:params.get("serviceId")||"",stateId:"",overdue:["true","false"].includes(params.get("overdue")||"")?params.get("overdue")!:"",view,page:Number.isSafeInteger(page)&&page>0?page:1};
 }
 export function queueSearch(query:QueueQuery) {

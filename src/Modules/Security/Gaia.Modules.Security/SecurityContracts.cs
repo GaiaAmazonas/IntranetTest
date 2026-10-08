@@ -66,11 +66,11 @@ public static class PermissionScope
 
 public sealed record SecurityUser(Guid Id,string Name,string Email,string EntraObjectId,Guid? ThirdPartyId,string? DocumentNumber,DateTimeOffset? LastAccess,bool IsActive);
 public sealed record SecurityUserListItem(Guid? Id,string Name,string Email,string? EntraObjectId,Guid? ThirdPartyId,string? DocumentNumber,DateTimeOffset? LastAccess,bool IsActive,string ProvisioningStatus);
-public sealed record SecurityContextResponse(SecurityUser User,IReadOnlyList<string> Roles,IReadOnlyList<string> Permissions,IReadOnlyList<SecurityNavigationModule> Modules);
+public sealed record SecurityContextResponse(SecurityUser User,IReadOnlyList<string> Roles,IReadOnlyList<string> Permissions,IReadOnlyList<SecurityNavigationModule> Modules,bool IsGlobalAdministrator=false);
 public sealed record SecurityNavigationModule(Guid Id,string Code,string Name,string? Description,Guid? ParentId,string Route,string? Icon,int Order);
 public sealed record SecurityModuleItem(Guid Id,string Code,string Name,string? Description,string Type,Guid? ParentId,string? Route,string? Icon,int Order,bool Visible,bool SupportsVisibility,bool IsActive);
 public sealed record SecurityPermissionItem(Guid Id,string Code,string Name,string Action,Guid ModuleId,bool IsActive);
-public sealed record SecurityRoleItem(Guid Id,string Code,string Name,string? Description,bool IsSystem,bool IsActive,int AssignedUsers,IReadOnlyList<string> Permissions);
+public sealed record SecurityRoleItem(Guid Id,string Code,string Name,string? Description,bool IsSystem,bool IsActive,int AssignedUsers,IReadOnlyList<string> Permissions,bool IsGlobalAdministrator=false,bool SupportsGlobalAdministration=false);
 public sealed record SecurityUserRoleItem(Guid Id,Guid RoleId,string RoleCode,string RoleName,DateOnly StartDate,DateOnly? EndDate,bool IsActive);
 public sealed record SecurityUserDetail(SecurityUserListItem User,IReadOnlyList<SecurityUserRoleItem> Roles);
 public sealed record SecurityMetadataTable(string LogicalName,string EntitySetName,string PrimaryId,string PrimaryName,IReadOnlyDictionary<string,string> Fields);
@@ -80,6 +80,7 @@ public sealed record SecurityPreprovisionIssue(string Code,string Description,st
 public sealed record SecurityPreprovisionAudit(int ActiveThirdParties,int WithInstitutionalEmail,int Eligible,int ExistingApplicationUsers,int ToPreprovision,int DuplicateEmails,int MultipleInstitutionalEmails,bool EntraObjectIdAllowsNull,IReadOnlyList<SecurityPreprovisionIssue> Issues);
 public sealed record SecurityPreprovisionResult(int CreatedUsers,int ExistingUsers,int AssignedConsulta,int AssignedAdmin,int Errors,IReadOnlyList<SecurityPreprovisionIssue> Issues);
 public sealed record RoleWriteRequest(string Code,string Name,string? Description,bool IsActive);
+public sealed record RoleGlobalAdministrationRequest(bool Enabled);
 public sealed record RolePermissionsRequest(IReadOnlyList<Guid> PermissionIds);
 public sealed record UserRoleWriteRequest(Guid RoleId,DateOnly StartDate,DateOnly? EndDate,string? Observations);
 public sealed record ModuleWriteRequest(string Code,string Name,string? Description,string Type,Guid? ParentId,string? Route,string? Icon,int Order,bool Visible,bool IsActive);
@@ -96,6 +97,9 @@ public interface ISecurityStore
     Task<IReadOnlyList<SecurityModuleItem>> ListModulesAsync(CancellationToken token);
     Task<IReadOnlyList<SecurityPermissionItem>> ListPermissionsAsync(CancellationToken token);
     Task<Guid> UpsertRoleAsync(Guid? id,RoleWriteRequest request,CancellationToken token);
+    Task SetRoleGlobalAdministrationAsync(Guid roleId,bool enabled,CancellationToken token);
+    Task<bool> IsRoleGlobalAdministratorAsync(Guid roleId,CancellationToken token);
+    Task<bool> IsUserRoleAssignmentGlobalAsync(Guid assignmentId,CancellationToken token);
     Task SetRolePermissionsAsync(Guid roleId,RolePermissionsRequest request,CancellationToken token);
     Task<Guid> AssignUserRoleAsync(Guid userId,UserRoleWriteRequest request,CancellationToken token);
     Task EndUserRoleAsync(Guid userId,Guid assignmentId,DateOnly endDate,CancellationToken token);

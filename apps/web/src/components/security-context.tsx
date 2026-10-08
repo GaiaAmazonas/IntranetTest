@@ -22,6 +22,7 @@ export type SecurityContextValue = {
   roles: string[];
   permissions: string[];
   modules: SecurityNavigationModule[];
+  isGlobalAdministrator: boolean;
   loading: boolean;
   error: string | null;
   can: (permission: string) => boolean;
@@ -46,6 +47,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
   const [roles, setRoles] = useState<string[]>([]);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [modules, setModules] = useState<SecurityNavigationModule[]>([]);
+  const [isGlobalAdministrator,setIsGlobalAdministrator]=useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const inactivityLogoutStarted = useRef(false);
@@ -60,15 +62,17 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         setRoles([]);
         setPermissions([]);
         setModules([]);
+        setIsGlobalAdministrator(false);
         setError(null);
         return;
       }
       if (!response.ok) throw new Error("No fue posible cargar tus permisos de acceso.");
-      const result = await response.json() as { user: SecurityUser; roles: string[]; permissions: string[]; modules?: SecurityNavigationModule[] };
+      const result = await response.json() as { user: SecurityUser; roles: string[]; permissions: string[]; modules?: SecurityNavigationModule[]; isGlobalAdministrator?: boolean };
       setUser(result.user);
       setRoles(result.roles);
       setPermissions(result.permissions);
       setModules(result.modules ?? []);
+      setIsGlobalAdministrator(Boolean(result.isGlobalAdministrator));
       setError(null);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "No fue posible cargar tus permisos.");
@@ -132,10 +136,10 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
   const permissionSet = useMemo(() => new Set(permissions.map(value => value.toUpperCase())), [permissions]);
   const value = useMemo<SecurityContextValue>(() => ({
-    user, roles, permissions, modules, loading, error,
+    user, roles, permissions, modules, isGlobalAdministrator, loading, error,
     can: permission => hasPermission(permissionSet, permission),
     refresh,
-  }), [user, roles, permissions, modules, loading, error, permissionSet, refresh]);
+  }), [user, roles, permissions, modules, isGlobalAdministrator, loading, error, permissionSet, refresh]);
 
   return <SecurityContext.Provider value={value}>{children}</SecurityContext.Provider>;
 }

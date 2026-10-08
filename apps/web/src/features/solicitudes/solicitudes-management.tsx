@@ -14,6 +14,7 @@ import { apiRequest } from "@/lib/api-client";
 import {
   AlertTriangle,
   ArrowRightCircle,
+  CheckCircle2,
   CircleHelp,
   FileDown,
   Inbox,
@@ -107,6 +108,7 @@ type Detail = {
   comments: Comment[];
   transitions: Transition[];
   history: HistoryEvent[] | null;
+  formAnswers: WorkflowAnswer[] | null;
 };
 type Attachment = {
   id: string;
@@ -163,12 +165,33 @@ type Workflow = {
   version: number;
   status: number;
   managements: WorkflowItem[];
+  steps: WorkflowStep[] | null;
+  routes: WorkflowRoute[] | null;
+};
+type WorkflowStep = {
+  id: string;
+  code: string;
+  order: number;
+  initial: boolean;
+  final: boolean;
+  active: boolean;
+  positionX: number | null;
+  positionY: number | null;
+};
+type WorkflowRoute = {
+  id: string;
+  sourceStepId: string;
+  targetStepId: string;
+  requiredResult: number;
+  order: number;
+  active: boolean;
 };
 const quickQueueViews: QueueView[] = [
   "mine",
   "waiting",
   "tracking",
   "resolved",
+  "all",
 ];
 
 export function SolicitudesManagement() {
@@ -202,10 +225,7 @@ export function SolicitudesManagement() {
       item: WorkflowItem;
       result: number;
     } | null>(null),
-    [takingManagementId, setTakingManagementId] = useState<string | null>(null),
-    [uploadingManagementId, setUploadingManagementId] = useState<string | null>(
-      null,
-    );
+    [takingManagementId, setTakingManagementId] = useState<string | null>(null);
   const [queue] = useState(
     () =>
       new SolicitudesQueue((path, options) =>
@@ -609,42 +629,6 @@ export function SolicitudesManagement() {
       setSaving(false);
     }
   }
-  async function uploadManagementFile(item: WorkflowItem, file: File) {
-    if (!detail) return;
-    setUploadingManagementId(item.id);
-    setSaving(true);
-    setError("");
-    try {
-      const body = new FormData();
-      body.append("file", file);
-      body.append("visibility", "internal");
-      body.append("managementId", item.id);
-      await apiRequest(`/api/solicitudes/requests/${detail.id}/attachments`, {
-        method: "POST",
-        body,
-      });
-      await manage(detail.id);
-      notify({
-        tone: "success",
-        title: "Archivo adjuntado",
-        description: `${file.name} quedó asociado a esta etapa.`,
-      });
-    } catch (value) {
-      const description =
-        value instanceof Error
-          ? value.message
-          : "No fue posible adjuntar el archivo a la gestión.";
-      setError(description);
-      notify({
-        tone: "error",
-        title: "No se pudo adjuntar el archivo",
-        description,
-      });
-    } finally {
-      setUploadingManagementId(null);
-      setSaving(false);
-    }
-  }
   async function reassignStage(
     managementId: string,
     responsibleId: string,
@@ -729,6 +713,7 @@ export function SolicitudesManagement() {
               ["waiting", "Esperando respuesta", viewTotals.waiting],
               ["tracking", "En gestión", viewTotals.tracking],
               ["resolved", "Cerradas", viewTotals.resolved],
+              ["all", "Todas", viewTotals.all],
             ] as [QueueView, string, number | undefined][]).map(([value, label, count]) => (
               <button
                 aria-pressed={view === value}
@@ -762,7 +747,7 @@ export function SolicitudesManagement() {
               className="border-b border-[var(--gaia-line)] bg-[var(--gaia-accent-pale)] px-4 py-3 sm:px-5"
               id="queue-help"
             >
-              <div className="grid gap-2 text-xs md:grid-cols-2 xl:grid-cols-4">
+              <div className="grid gap-2 text-xs md:grid-cols-2 xl:grid-cols-5">
                 {queueHelpItems.map((item) => (
                   <div className="rounded-xl border border-white/80 bg-white/75 p-3" key={item.title}>
                     <strong className="text-[var(--gaia-ink-900)]">{item.title}</strong>
@@ -874,8 +859,6 @@ export function SolicitudesManagement() {
             take={takeManagement}
             takingManagementId={takingManagementId}
             transitionId={transitionId}
-            upload={uploadManagementFile}
-            uploadingManagementId={uploadingManagementId}
             workflow={workflow}
           />
         )}
@@ -1381,10 +1364,14 @@ export function SolicitudesManagement() {
       {completion && detail && (
         <SolicitudesManagementFormDialog
           finalStep={completion.item.final}
+          hasRelatedFile={attachments.some(
+            (item) => item.managementId === completion.item.id,
+          )}
           managementId={completion.item.id}
           onCancel={() => setCompletion(null)}
           onCompleted={finishManagement}
           requestId={detail.id}
+          requiresFile={completion.item.requiresFile}
           requiresObservation={completion.item.requiresObservation}
           result={completion.result}
         />
@@ -1713,8 +1700,6 @@ type WorkflowPanelProps = {
   complete: (item: WorkflowItem, result: number) => Promise<void>;
   take: (item: WorkflowItem) => Promise<void>;
   resume: (item: WorkflowItem) => Promise<void>;
-  upload: (item: WorkflowItem, file: File) => Promise<void>;
-  uploadingManagementId: string | null;
   takingManagementId: string | null;
   onClose: () => void;
   onComment: (event: FormEvent) => Promise<void>;
@@ -1737,8 +1722,6 @@ function WorkflowPanel(props: WorkflowPanelProps) {
     complete,
     take,
     resume,
-    upload,
-    uploadingManagementId,
     takingManagementId,
     onClose,
     onComment,
@@ -1755,22 +1738,44 @@ function WorkflowPanel(props: WorkflowPanelProps) {
     [299540194, 299540195].includes(item.status),
   );
   const hasAvailable = current.some((item) => item.canTake),
-    hasInProgress = current.some((item) => item.canManage),
-    hasWaiting = current.some((item) => item.status === 299540193),
-    hasExternal = current.some(
-      (item) => !item.canTake && !item.canManage && item.status !== 299540193,
-    );
+    hasInProgress = current.some((item) => item.canManage);
+  const completedForms = previous.filter((item) => item.answers.length > 0);
+  const conversationEntries = [
+    ...detail.comments.map((item) => ({
+      id: `comment-${item.id}`,
+      content: item.content,
+      occurredAt: item.publishedAt,
+      author: item.authorRole,
+      internal: item.isInternal,
+      mine: item.isMine,
+      label: item.isInternal ? "Nota interna" : "Comentario",
+    })),
+    ...workflow.managements
+      .filter((item) => item.observation && (item.completedAt || item.availableAt))
+      .map((item) => ({
+        id: `management-${item.id}-${item.status}`,
+        content: item.observation!,
+        occurredAt: item.completedAt || item.availableAt!,
+        author: item.responsibleName || item.unitName || "Equipo Gaia",
+        internal: true,
+        mine: false,
+        label: `${item.formTitle || friendlyStep(item.stepCode)} · ${workflowResult(item.result ?? (item.status === 299540193 ? 299540173 : 299540170))}`,
+      })),
+  ].sort(
+    (left, right) =>
+      new Date(left.occurredAt).getTime() - new Date(right.occurredAt).getTime(),
+  );
   return (
     <div className="fixed inset-0 z-[70] grid place-items-center bg-black/45 p-2 backdrop-blur-[2px] sm:p-5">
       <section className="flex h-[min(96vh,980px)] w-full max-w-[1180px] flex-col overflow-hidden rounded-[28px] border border-[var(--gaia-line)] bg-[#f6f8f7] shadow-2xl">
         <header className="z-10 flex flex-wrap items-center justify-between gap-4 border-b border-[var(--gaia-line)] bg-white px-5 py-4 sm:px-8">
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-[.13em] text-[var(--brand-primary)]">
-                {detail.number}
-              </span>
+            <div className="flex min-w-0 flex-wrap items-center gap-3">
+              <h2 className="truncate text-lg font-semibold sm:text-xl">
+                {detail.service}
+              </h2>
               <span
-                className="rounded-full px-2.5 py-1 text-[11px] font-semibold"
+                className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold"
                 style={{
                   background: `${detail.statusColor || "#64748b"}18`,
                   color: detail.statusColor || "#64748b",
@@ -1779,9 +1784,6 @@ function WorkflowPanel(props: WorkflowPanelProps) {
                 {detail.status}
               </span>
             </div>
-            <h2 className="mt-1 truncate text-lg font-semibold sm:text-xl">
-              {detail.service} · Flujo v{workflow.version}
-            </h2>
           </div>
           <div className="flex items-center gap-2">
             {workflow.status === 299540182 && (
@@ -1815,14 +1817,25 @@ function WorkflowPanel(props: WorkflowPanelProps) {
             <section className="overflow-hidden rounded-2xl border border-[var(--gaia-line)] bg-white">
               <div className="p-5 sm:p-6">
                 <p className="text-[10px] font-bold uppercase tracking-[.14em] text-[var(--brand-primary)]">
-                  Solicitud
+                  Formulario de la solicitud
                 </p>
-                <h3 className="mt-2 text-xl font-semibold leading-tight sm:text-2xl">
-                  {detail.subject}
-                </h3>
-                <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[var(--gaia-ink-700)]">
-                  {detail.description}
-                </p>
+                <h3 className="mt-2 text-lg font-semibold">Información enviada por el solicitante</h3>
+                <div className="mt-4 rounded-2xl border border-[#cfe2dd] bg-[#f5faf8] p-4 sm:p-5">
+                  <div className="flex items-center gap-2">
+                    <span className="grid size-8 shrink-0 place-items-center rounded-full bg-white text-[var(--brand-primary)] shadow-sm"><MessageSquareText size={16}/></span>
+                    <div><h4 className="text-sm font-semibold">Datos de radicación</h4><p className="text-xs text-[var(--gaia-ink-500)]">Respuestas registradas por la persona solicitante</p></div>
+                  </div>
+                  <AnswerList answers={detail.formAnswers ?? []} />
+                </div>
+                {completedForms.length>0&&<div className="mt-6"><div className="mb-3 flex items-end justify-between gap-3"><div><h4 className="font-semibold">Información de las etapas</h4><p className="mt-1 text-xs text-[var(--gaia-ink-500)]">Datos registrados durante el recorrido de atención</p></div><span className="rounded-full bg-[var(--gaia-accent-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--brand-primary)]">{completedForms.length} {completedForms.length===1?"etapa":"etapas"}</span></div><div className="grid gap-3 md:grid-cols-2">{completedForms.map((item,index) => (
+                  <article className="rounded-2xl border border-[var(--gaia-line)] bg-white p-4 shadow-[0_2px_10px_rgba(25,55,48,.05)]" key={item.id}>
+                    <div className="flex items-start gap-3 border-b border-[var(--gaia-line)] pb-3">
+                      <span className="relative grid size-9 shrink-0 place-items-center rounded-xl bg-[#e5f3ef] text-[var(--brand-primary)]"><CheckCircle2 size={18}/><small className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full bg-[var(--brand-primary)] text-[9px] font-bold text-white">{index+1}</small></span>
+                      <div className="min-w-0"><h5 className="text-sm font-semibold leading-5">{item.formTitle || friendlyStep(item.stepCode)}</h5><p className="mt-0.5 text-xs text-[var(--gaia-ink-500)]">Etapa finalizada · {workflowResult(item.result ?? 299540170)}</p></div>
+                    </div>
+                    <AnswerList answers={item.answers} compact />
+                  </article>
+                ))}</div></div>}
               </div>
               <div className="grid border-t border-[var(--gaia-line)] bg-[#fafcfb] sm:grid-cols-3 sm:divide-x sm:divide-[var(--gaia-line)]">
                 <div className="px-5 py-3.5">
@@ -1846,30 +1859,9 @@ function WorkflowPanel(props: WorkflowPanelProps) {
               </div>
             </section>
 
-            <section className="rounded-2xl border-2 border-[#a9cfc7] bg-white p-5 shadow-sm sm:p-6">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="grid size-7 place-items-center rounded-full bg-[var(--brand-primary)] text-xs font-bold text-white">
-                      1
-                    </span>
-                    <p className="text-[10px] font-bold uppercase tracking-[.14em] text-[var(--brand-primary)]">
-                      Gestión actual
-                    </p>
-                  </div>
-                  <h3 className="mt-2 text-xl font-semibold">Qué debes hacer ahora</h3>
-                  <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--gaia-ink-500)]">
-                    {hasInProgress
-                      ? "La gestión está a tu cargo. Revisa la etapa y selecciona la acción necesaria para continuar el recorrido."
-                      : hasAvailable
-                        ? "Esta etapa está disponible para tu equipo. Tómala para habilitar sus acciones y formulario."
-                        : hasWaiting
-                          ? "La etapa está esperando información del solicitante. Podrás continuar cuando responda."
-                          : hasExternal
-                            ? "La etapa está asignada a otra unidad. Puedes consultar su avance, pero ese equipo debe gestionarla."
-                            : "Consulta la etapa vigente y su estado actual."}
-                  </p>
-                </div>
+            <section className="rounded-2xl border-2 border-[#a9cfc7] bg-white p-4 shadow-sm sm:p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h3 className="text-lg font-semibold">Gestión actual</h3>
                 <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ${hasInProgress || hasAvailable ? "bg-[#e2f3ec] text-[#17695b]" : "bg-[var(--surface-muted)] text-[var(--gaia-ink-500)]"}`}>
                   {hasInProgress
                     ? "Acción requerida"
@@ -1878,10 +1870,9 @@ function WorkflowPanel(props: WorkflowPanelProps) {
                       : "Solo consulta"}
                 </span>
               </div>
-              <div className="mt-5 space-y-4">
+              <div className="mt-3 space-y-3">
                 {current.map((item) => (
                   <ManagementCard
-                    attachments={attachments}
                     busy={busy}
                     complete={complete}
                     item={item}
@@ -1889,8 +1880,6 @@ function WorkflowPanel(props: WorkflowPanelProps) {
                     resume={resume}
                     take={take}
                     taking={takingManagementId === item.id}
-                    upload={upload}
-                    uploading={uploadingManagementId === item.id}
                   />
                 ))}
                 {!current.length && (
@@ -1906,9 +1895,9 @@ function WorkflowPanel(props: WorkflowPanelProps) {
                 </p>
                 <nav className="mt-2 flex gap-1 overflow-x-auto" aria-label="Contenido del expediente">
                   {([
-                    ["conversation", "Conversación", detail.comments.length],
+                    ["conversation", "Conversación", conversationEntries.length],
                     ["files", "Archivos", attachments.length],
-                    ["history", "Historial", previous.length],
+                    ["history", "Ruta de la solicitud", previous.length],
                   ] as const).map(([value, label, count]) => (
                     <button
                       aria-current={supportView === value ? "page" : undefined}
@@ -1930,20 +1919,20 @@ function WorkflowPanel(props: WorkflowPanelProps) {
                 {supportView === "conversation" && (
                   <div>
                     <div className="max-h-72 space-y-2 overflow-auto rounded-xl bg-[var(--surface-muted)] p-3">
-                      {detail.comments.map((item) => (
+                      {conversationEntries.map((item) => (
                         <article
-                          className={`rounded-xl p-3 text-sm ${item.isMine ? "ml-5 bg-[var(--gaia-accent-soft)]" : "mr-5 bg-white"}`}
+                          className={`rounded-xl p-3 text-sm ${item.mine ? "ml-5 bg-[var(--gaia-accent-soft)]" : "mr-5 bg-white"}`}
                           key={item.id}
                         >
                           <small className="text-[var(--gaia-ink-500)]">
-                            {item.authorRole}
-                            {item.isInternal ? " · Nota interna" : ""} ·{" "}
-                            {formatWorkflowDate(item.publishedAt)}
+                            {item.author} · {item.label}
+                            {item.internal ? " · Interno" : ""} ·{" "}
+                            {formatWorkflowDate(item.occurredAt)}
                           </small>
                           <p className="mt-1 whitespace-pre-wrap">{item.content}</p>
                         </article>
                       ))}
-                      {!detail.comments.length && (
+                      {!conversationEntries.length && (
                         <p className="p-5 text-center text-sm text-[var(--gaia-ink-500)]">
                           Aún no hay mensajes en esta solicitud.
                         </p>
@@ -2017,6 +2006,13 @@ function WorkflowPanel(props: WorkflowPanelProps) {
 
                 {supportView === "history" && (
                   <div className="space-y-3">
+                    <WorkflowRouteMap workflow={workflow} />
+                    <div className="border-t border-[var(--gaia-line)] pt-4">
+                      <h3 className="text-sm font-semibold">Detalle del historial</h3>
+                      <p className="mt-1 text-xs text-[var(--gaia-ink-500)]">
+                        Registro cronológico de las etapas que ya finalizaron.
+                      </p>
+                    </div>
                     {[...previous].reverse().map((item, index) => (
                       <article className="relative rounded-xl border border-[var(--gaia-line)] p-4 pl-14" key={item.id}>
                         <span className="absolute left-4 top-4 grid size-7 place-items-center rounded-full bg-[var(--surface-muted)] text-xs font-bold text-[var(--brand-primary)]">
@@ -2409,33 +2405,126 @@ function LegacyWorkflowPanel({
   );
 }
 void LegacyWorkflowPanel;
+
+function AnswerList({ answers, compact = false }: { answers: WorkflowAnswer[]; compact?: boolean }) {
+  if (!answers.length)
+    return (
+      <p className="mt-3 rounded-xl bg-[var(--surface-muted)] p-4 text-sm text-[var(--gaia-ink-500)]">
+        No se registraron respuestas visibles en este formulario.
+      </p>
+    );
+  return (
+    <dl className={`mt-4 grid gap-2.5 ${compact ? "grid-cols-1" : "sm:grid-cols-2"}`}>
+      {answers.map((answer) => (
+        <div className={`rounded-xl border border-[var(--gaia-line)] px-3.5 py-3 ${compact ? "bg-[#fafcfb]" : "bg-white"}`} key={answer.fieldId}>
+          <dt className="text-[11px] font-bold uppercase tracking-[.04em] text-[var(--gaia-ink-500)]">
+            {answer.label}
+          </dt>
+          <dd className="mt-1.5 whitespace-pre-wrap text-sm font-medium leading-6 text-[var(--gaia-ink-900)]">
+            {answer.options.length
+              ? answer.options.join(", ")
+              : answer.value || "Sin respuesta"}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function WorkflowRouteMap({ workflow }: { workflow: Workflow }) {
+  const steps = (workflow.steps ?? []).filter((item) => item.active);
+  if (!steps.length)
+    return <Empty text="El recorrido gráfico no está disponible para esta solicitud." />;
+  const positioned = steps.map((step, index) => ({
+    step,
+    rawX: step.positionX ?? index * 220,
+    rawY: step.positionY ?? 0,
+  }));
+  const xValues = [...new Set(positioned.map((item) => item.rawX))].sort(
+    (a, b) => a - b,
+  );
+  const yValues = [...new Set(positioned.map((item) => item.rawY))].sort(
+    (a, b) => a - b,
+  );
+  const nodes = positioned.map((item) => ({
+    ...item,
+    left: 20 + xValues.indexOf(item.rawX) * 190,
+    top: 20 + yValues.indexOf(item.rawY) * 94,
+  }));
+  const width = Math.max(560, xValues.length * 190 + 20);
+  const height = Math.max(150, yValues.length * 94 + 30);
+  const byId = new Map(nodes.map((item) => [item.step.id, item]));
+  const statusOf = (stepId: string) => {
+    const rows = workflow.managements.filter((item) => item.stepId === stepId);
+    if (rows.some((item) => item.status === 299540194)) return "completed";
+    if (rows.some((item) => [299540191, 299540192, 299540193].includes(item.status))) return "current";
+    if (rows.some((item) => item.status === 299540195)) return "cancelled";
+    return "pending";
+  };
+  const labelOf = (step: WorkflowStep) =>
+    workflow.managements.find((item) => item.stepId === step.id)?.formTitle ||
+    friendlyStep(step.code);
+  return (
+    <div>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-semibold">Ruta de la solicitud</h3>
+          <p className="mt-1 text-xs text-[var(--gaia-ink-500)]">
+            Verde: completada · Azul: etapa actual · Gris: pendiente
+          </p>
+        </div>
+      </div>
+      <div className="overflow-x-auto rounded-2xl border border-[var(--gaia-line)] bg-[#fafcfb]">
+        <div className="relative" style={{ height, minWidth: width }}>
+          <svg aria-hidden="true" className="absolute inset-0" height={height} width={width}>
+            <defs>
+              <marker id="workflow-arrow" markerHeight="7" markerWidth="7" orient="auto" refX="6" refY="3.5">
+                <path d="M0,0 L7,3.5 L0,7 Z" fill="#91a49e" />
+              </marker>
+            </defs>
+            {(workflow.routes ?? []).filter((route) => route.active).map((route) => {
+              const source = byId.get(route.sourceStepId), target = byId.get(route.targetStepId);
+              if (!source || !target) return null;
+              const reached = statusOf(route.targetStepId) !== "pending";
+              return <line key={route.id} markerEnd="url(#workflow-arrow)" stroke={reached ? "#28766f" : "#c4cfcb"} strokeWidth={reached ? 2.5 : 1.5} x1={source.left + 150} x2={target.left - 7} y1={source.top + 30} y2={target.top + 30} />;
+            })}
+          </svg>
+          {nodes.map(({ step, left, top }) => {
+            const status = statusOf(step.id);
+            return <article className={`absolute w-[150px] rounded-xl border-2 px-3 py-2 shadow-sm ${status === "completed" ? "border-[#65a795] bg-[#e8f6f1]" : status === "current" ? "border-[var(--brand-primary)] bg-white" : "border-[#d6dedb] bg-[#f3f5f4]"}`} key={step.id} style={{ left, top }}>
+              <small className="block text-[9px] font-bold uppercase tracking-wider text-[var(--gaia-ink-500)]">{status === "completed" ? "Completada" : status === "current" ? "Actual" : status === "cancelled" ? "No recorrida" : "Pendiente"}</small>
+              <strong className="mt-1 block truncate text-xs" title={labelOf(step)}>{labelOf(step)}</strong>
+            </article>;
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ManagementCard({
   item,
-  attachments,
   busy,
   index,
   complete,
   take,
   taking = false,
   resume,
-  upload,
-  uploading = false,
 }: {
   item: WorkflowItem;
-  attachments: Attachment[];
+  attachments?: Attachment[];
   busy: boolean;
   index?: number;
   complete: (item: WorkflowItem, result: number) => Promise<void>;
   take: (item: WorkflowItem) => Promise<void>;
   taking?: boolean;
   resume?: (item: WorkflowItem) => Promise<void>;
-  upload: (item: WorkflowItem, file: File) => Promise<void>;
+  upload?: (item: WorkflowItem, file: File) => Promise<void>;
   uploading?: boolean;
 }) {
   const actionable = item.canTake || item.canManage,
     needsTake = item.canTake,
-    canComplete = item.canManage,
-    files = attachments.filter((file) => file.managementId === item.id);
+    canComplete = item.canManage;
   return (
     <article
       className={`relative rounded-2xl border p-4 shadow-sm ${actionable ? "border-[var(--brand-primary)] bg-[var(--gaia-accent-pale)]" : "border-[var(--gaia-line)] bg-white"}`}
@@ -2450,23 +2539,6 @@ function ManagementCard({
           <strong className="text-base">
             {item.formTitle || friendlyStep(item.stepCode)}
           </strong>
-          <small className="block text-[var(--gaia-ink-500)]">
-            {item.stepCode} · Ejecución {item.execution} ·{" "}
-            {workflowStatus(item.status)}
-          </small>
-          {(item.responsibleName || item.unitName) && (
-            <div className="mt-2 inline-flex flex-col rounded-xl border border-[#afd4c8] bg-[#e8f6f1] px-3 py-2">
-              <small className="text-[9px] font-bold uppercase tracking-wider text-[#317c70]">
-                Área que atiende
-              </small>
-              <strong className="text-xs text-[#174f49]">
-                {item.unitName || "Área sin identificar"}
-              </strong>
-              <small className="mt-0.5 text-[10px] text-[#317c70]">
-                {item.responsibleName || "Disponible para integrantes del área"}
-              </small>
-            </div>
-          )}
           {item.result && (
             <small className="mt-1 block font-semibold text-[var(--brand-primary)]">
               Resultado: {workflowResult(item.result)}
@@ -2543,127 +2615,7 @@ function ManagementCard({
           )
         )}
       </div>
-      <ManagementSla item={item} />
-      {item.answers.length > 0 && (
-        <div className="mt-4 rounded-xl border bg-white/80 p-3">
-          <strong className="text-[10px] uppercase tracking-wider text-[var(--gaia-ink-500)]">
-            Información registrada
-          </strong>
-          <dl className="mt-2 grid gap-3 sm:grid-cols-2">
-            {item.answers.map((answer) => (
-              <div key={answer.fieldId}>
-                <dt className="text-[10px] font-semibold text-[var(--gaia-ink-500)]">
-                  {answer.label}
-                </dt>
-                <dd className="text-sm">
-                  {answer.options.length
-                    ? answer.options.join(", ")
-                    : answer.value || "Sin respuesta"}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      )}
-      {item.observation && (
-        <div className="mt-3 rounded-xl bg-white/80 p-3 text-sm">
-          <strong className="text-[10px] uppercase tracking-wider text-[var(--gaia-ink-500)]">
-            Observación registrada
-          </strong>
-          <p className="mt-1 whitespace-pre-wrap">{item.observation}</p>
-        </div>
-      )}
-      {files.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {files.map((file) => (
-            <a
-              className="rounded-lg border bg-white px-3 py-2 text-xs text-[var(--brand-primary)]"
-              href={`${process.env.NEXT_PUBLIC_GAIA_API_URL ?? "https://localhost:7168"}/api/solicitudes/attachments/${file.id}/content`}
-              key={file.id}
-            >
-              {file.file.originalName || file.file.storedName}
-            </a>
-          ))}
-        </div>
-      )}
-      {canComplete && (
-        <>
-          <div className="mt-3 flex flex-wrap gap-2 text-[10px] text-[var(--gaia-ink-500)]">
-            {item.requiresDecision && (
-              <span className="rounded-full bg-white px-2 py-1">
-                Requiere decisión
-              </span>
-            )}
-            {item.requiresObservation && (
-              <span className="rounded-full bg-white px-2 py-1">
-                Requiere observación
-              </span>
-            )}
-            {item.requiresFile && (
-              <span className="rounded-full bg-white px-2 py-1">
-                Requiere archivo
-              </span>
-            )}
-          </div>
-          <label
-            aria-live="polite"
-            className={`mt-3 flex min-h-11 items-center justify-center gap-2 rounded-lg border border-dashed bg-white p-3 text-center text-xs font-semibold text-[var(--brand-primary)] transition ${uploading ? "cursor-wait border-solid bg-[var(--gaia-accent-pale)]" : "cursor-pointer hover:bg-[var(--surface-muted)]"}`}
-          >
-            {uploading ? (
-              <>
-                <LoaderCircle className="animate-spin" size={16} />
-                Cargando archivo…
-              </>
-            ) : (
-              "Adjuntar a esta gestión"
-            )}
-            <input
-              className="hidden"
-              disabled={busy}
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) void upload(item, file);
-              }}
-              type="file"
-            />
-          </label>
-        </>
-      )}
     </article>
-  );
-}
-
-function ManagementSla({ item }: { item: WorkflowItem }) {
-  if (!item.availableAt) return null;
-  const due = item.targetDueDate
-      ? new Date(`${item.targetDueDate}T23:59:59`)
-      : null,
-    completed = item.completedAt ? new Date(item.completedAt) : null,
-    comparison = completed ?? new Date(),
-    overdue = Boolean(due && comparison > due);
-  const label = !due
-    ? `Disponible desde ${formatWorkflowDate(item.availableAt)}`
-    : completed
-      ? overdue
-        ? `Finalizada fuera de la meta · vencía ${formatDateOnly(item.targetDueDate!)}`
-        : `Finalizada dentro de la meta · vencía ${formatDateOnly(item.targetDueDate!)}`
-      : overdue
-        ? `Meta vencida · debía atenderse antes del ${formatDateOnly(item.targetDueDate!)}`
-        : `Atender antes del ${formatDateOnly(item.targetDueDate!)}`;
-  return (
-    <div
-      className={`mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 text-xs ${overdue ? "border-[#e7b7b1] bg-[#fff3f1] text-[#9a384d]" : "border-[#cfe2da] bg-white/80 text-[#245f58]"}`}
-    >
-      <strong>{overdue ? "Atención requerida" : "Tiempo de atención"}</strong>
-      <span>{label}</span>
-      {item.targetDays !== null && (
-        <span className="w-full text-[10px] opacity-75">
-          Meta institucional: {item.targetDays}{" "}
-          {item.targetDays === 1 ? "día hábil" : "días hábiles"}; incluye el
-          calendario de días no laborables.
-        </span>
-      )}
-    </div>
   );
 }
 
@@ -2680,6 +2632,7 @@ function queueViewLabel(view: QueueView) {
     waiting: "Solicitudes esperando respuesta",
     tracking: "Solicitudes en gestión",
     resolved: "Solicitudes cerradas",
+    all: "Todas las solicitudes",
   }[view];
 }
 function queueViewDescription(view: QueueView) {
@@ -2688,6 +2641,7 @@ function queueViewDescription(view: QueueView) {
     waiting: "Solicitaste información o una corrección y aún no han respondido.",
     tracking: "Ya completaste tu intervención, pero el proceso continúa en otras etapas.",
     resolved: "Procesos finalizados en los que participaste efectivamente.",
+    all: "Consulta general de todas las solicitudes que puedes administrar.",
   }[view];
 }
 function queueEmptyMessage(view: QueueView) {
@@ -2696,6 +2650,7 @@ function queueEmptyMessage(view: QueueView) {
     waiting: "No estás esperando respuestas en este momento.",
     tracking: "No tienes solicitudes activas en seguimiento.",
     resolved: "Aún no tienes solicitudes cerradas con participación registrada.",
+    all: "No hay solicitudes para estos filtros.",
   }[view];
 }
 const queueHelpItems = [
@@ -2703,6 +2658,7 @@ const queueHelpItems = [
   { title: "Esperando respuesta", description: "Casos que devolviste o sobre los que pediste información y aún no han sido atendidos." },
   { title: "En gestión", description: "Ya terminaste tu etapa, pero otras personas o áreas continúan con el proceso." },
   { title: "Cerradas", description: "Solicitudes ya finalizadas en las que realizaste al menos una gestión efectiva." },
+  { title: "Todas", description: "Consulta general de todas las solicitudes disponibles para administración." },
 ];
 function Summary({ label, value }: { label: string; value: string }) {
   return (
@@ -2717,20 +2673,6 @@ function Empty({ text }: { text: string }) {
     <p className="mt-5 rounded-2xl border border-dashed p-8 text-center text-sm text-[var(--gaia-ink-500)]">
       {text}
     </p>
-  );
-}
-function workflowStatus(value: number) {
-  return (
-    (
-      {
-        299540190: "Bloqueada",
-        299540191: "Disponible",
-        299540192: "En curso",
-        299540193: "Espera al solicitante",
-        299540194: "Completada",
-        299540195: "Cancelada",
-      } as Record<number, string>
-    )[value] ?? "Estado"
   );
 }
 function workflowResult(value: number) {

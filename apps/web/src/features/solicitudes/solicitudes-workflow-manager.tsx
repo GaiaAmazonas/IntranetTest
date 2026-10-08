@@ -38,7 +38,7 @@ import {
   X,
 } from "lucide-react";
 import { apiRequest } from "@/lib/api-client";
-import { SolicitudesStageFormDesigner } from "./solicitudes-dynamic-form";
+import { SolicitudesStageFormDesigner, type StageForm } from "./solicitudes-dynamic-form";
 import { useFeedback } from "@/components/feedback";
 import { ConfirmDialog } from "@/components/form-dialog";
 import { OrganizationalUnitPicker } from "@/components/organizational-unit-picker";
@@ -180,6 +180,8 @@ export function SolicitudesWorkflowManager({
     [step, setStep] = useState<Step | typeof blankStep | null>(null),
     [assignmentStep, setAssignmentStep] = useState<Step | null>(null),
     [viewStep, setViewStep] = useState<Step | null>(null),
+    [viewStepForm, setViewStepForm] = useState<StageForm | null>(null),
+    [viewStepFormLoading, setViewStepFormLoading] = useState(false),
     [route, setRoute] = useState<Route | typeof blankRoute | null>(null),
     [formStep, setFormStep] = useState<Step | null>(null),
     [confirmPublish, setConfirmPublish] = useState(false),
@@ -194,6 +196,16 @@ export function SolicitudesWorkflowManager({
     );
     setItems(values);
     setSelected((current) => preferred || current || values[0]?.id || "");
+  }
+  function openPublishedStep(item: Step) {
+    setViewStepForm(null);
+    setViewStepFormLoading(true);
+    setViewStep(item);
+  }
+  function closePublishedStep() {
+    setViewStep(null);
+    setViewStepForm(null);
+    setViewStepFormLoading(false);
   }
   useEffect(() => {
     let live = true;
@@ -230,6 +242,15 @@ export function SolicitudesWorkflowManager({
       live = false;
     };
   }, [selected]);
+  useEffect(() => {
+    if (!viewStep) return;
+    let live = true;
+    apiRequest<StageForm | undefined>(`/api/solicitudes/administration/workflow-steps/${viewStep.id}/form`, { cache: "no-store" })
+      .then((value) => { if (live) setViewStepForm(value ?? null); })
+      .catch((reason) => { if (live) setError(message(reason)); })
+      .finally(() => { if (live) setViewStepFormLoading(false); });
+    return () => { live = false; };
+  }, [viewStep]);
   async function createDraft(e: FormEvent) {
     e.preventDefault();
     await run(async () => {
@@ -249,6 +270,12 @@ export function SolicitudesWorkflowManager({
       setCreatingWorkflow(false);
       await load(value.id);
     });
+  }
+  function startEditableVersion() {
+    const current = items.find((item) => item.id === definition?.id);
+    setDraftName(current?.name || `Flujo de ${serviceName}`);
+    setDraftDescription(current?.description || "");
+    setCreatingWorkflow(true);
   }
   async function saveWorkflow(e:FormEvent){e.preventDefault();if(!workflow)return;await run(async()=>{await apiRequest(`/api/solicitudes/administration/workflows/${workflow.id}`,{method:"PUT",body:JSON.stringify({name:workflow.name,description:workflow.description})});setWorkflow(null);await load(workflow.id);setDefinition(await apiRequest<Definition>(`/api/solicitudes/administration/workflows/${workflow.id}`));notify({tone:"success",title:"Flujo actualizado",description:"El nombre y la descripción quedaron guardados."});});}
   async function deleteWorkflow(){if(!deleteWorkflowTarget)return;const target=deleteWorkflowTarget;await run(async()=>{await apiRequest(`/api/solicitudes/administration/workflows/${target.id}`,{method:"DELETE"});setDeleteWorkflowTarget(null);setDefinition(null);setSelected("");await load();notify({tone:"success",title:"Flujo eliminado",description:"El borrador y sus etapas dejaron de aparecer en la configuración."});});}
@@ -448,7 +475,7 @@ export function SolicitudesWorkflowManager({
         </div>
         <div className="flex max-w-full flex-wrap items-center justify-end gap-2 lg:justify-self-end">
           {items.map((x) => (<div className={`flex items-stretch overflow-hidden rounded-xl border ${selected===x.id?"border-[var(--brand-primary)] bg-[var(--gaia-accent-pale)]":"border-[var(--gaia-line)] bg-white"}`} key={x.id}><button className="px-3 py-2 text-left text-xs" onClick={()=>setSelected(x.id)} type="button"><strong>{x.name} · v{x.version}</strong><span className="block text-[var(--gaia-ink-500)]">{status(x.status)} · {x.stepCount} pasos · {x.routeCount} rutas</span></button>{canEdit&&x.status===299540130&&<span className="flex items-center gap-1 border-l border-[var(--gaia-line)] px-1"><button aria-label={`Editar ${x.name}`} className="rounded-lg p-2 text-[var(--brand-primary)] hover:bg-white" onClick={()=>setWorkflow(x)} title="Editar flujo" type="button"><Pencil size={14}/></button><button aria-label={`Eliminar ${x.name}`} className="rounded-lg p-2 text-[#9a384d] hover:bg-[#fff0f0]" onClick={()=>setDeleteWorkflowTarget(x)} title="Eliminar flujo" type="button"><Trash2 size={14}/></button></span>}</div>))}
-          {canEdit && !items.some((x) => x.status === 299540130) && <Action disabled={busy} onClick={()=>setCreatingWorkflow(true)} type="button"><Plus size={14}/>{items.length?"Nueva versión":"Crear flujo"}</Action>}
+          {canEdit && !items.some((x) => x.status === 299540130) && <Action disabled={busy} onClick={items.length?startEditableVersion:()=>setCreatingWorkflow(true)} type="button"><Plus size={14}/>{items.length?"Crear versión editable":"Crear flujo"}</Action>}
         </div>
       </header>
       <div className="mt-5 grid gap-3 md:grid-cols-3">
@@ -522,7 +549,7 @@ export function SolicitudesWorkflowManager({
                 </Action>
               )}
             </div>
-            <WorkflowDiagram canAdminister={canEdit} canEdit={Boolean(canEdit&&draft)} definition={definition} expanded={designerExpanded} onArrange={saveStepPositions} onConnect={(sourceStepId,targetStepId)=>setRoute({...blankRoute,sourceStepId,targetStepId,code:`${name(definition.steps,sourceStepId)}_A_${name(definition.steps,targetStepId)}`.slice(0,80),order:(definition.routes.length+1)*10})} onMoveStep={saveStepPosition} onNodeAction={(action,item)=>{if(action==="form")setFormStep(item);else if(action==="edit")setStep(item);else if(action==="duplicate")void duplicateStep(item);else if(action==="delete")setDeleteStepTarget(item);else if(action==="view")setViewStep(item);else if(action==="assignment")setAssignmentStep(item)}} onSelectRoute={item=>setRoute(item)} onToggleExpanded={()=>setDesignerExpanded(value=>!value)} people={people} published={definition.status===299540131} units={units}/>
+            <WorkflowDiagram canAdminister={canEdit} canEdit={Boolean(canEdit&&draft)} definition={definition} expanded={designerExpanded} onArrange={saveStepPositions} onConnect={(sourceStepId,targetStepId)=>setRoute({...blankRoute,sourceStepId,targetStepId,code:`${name(definition.steps,sourceStepId)}_A_${name(definition.steps,targetStepId)}`.slice(0,80),order:(definition.routes.length+1)*10})} onMoveStep={saveStepPosition} onNodeAction={(action,item)=>{if(action==="form")setFormStep(item);else if(action==="edit")setStep(item);else if(action==="duplicate")void duplicateStep(item);else if(action==="delete")setDeleteStepTarget(item);else if(action==="view")openPublishedStep(item);else if(action==="assignment")setAssignmentStep(item)}} onSelectRoute={item=>setRoute(item)} onToggleExpanded={()=>setDesignerExpanded(value=>!value)} people={people} published={definition.status===299540131} units={units}/>
           </div>
           <aside className="h-fit rounded-2xl border border-[var(--gaia-line)] bg-[var(--gaia-canvas)] p-4">
             <div className="flex items-center gap-2">
@@ -559,6 +586,14 @@ export function SolicitudesWorkflowManager({
                 <Send size={14} />
                 {canRepublish ? "Volver a publicar" : "Revisar y publicar"}
               </Action>
+            )}
+            {canRepublish && !items.some((item) => item.status === 299540130) && (
+              <div className="mt-3 rounded-xl border border-[#c8ddd7] bg-white p-3 text-center">
+                <p className="text-xs leading-5 text-[var(--gaia-ink-500)]">
+                  ¿Necesitas cambiar etapas o conexiones? Crea una versión editable; se copiará este flujo completo y la versión publicada conservará su historial.
+                </p>
+                <button className="mt-3 inline-flex items-center gap-2 rounded-xl border border-[var(--brand-primary)] px-3 py-2 text-xs font-semibold text-[var(--brand-primary)]" disabled={busy} onClick={startEditableVersion} type="button"><Copy size={14}/>Crear versión editable</button>
+              </div>
             )}
             {draft && !ready && (
               <p className="mt-2 text-center text-xs text-[var(--gaia-ink-500)]">
@@ -773,7 +808,7 @@ export function SolicitudesWorkflowManager({
         </Dialog>
       )}
       {assignmentStep&&definition&&<Dialog busy={busy} close={()=>setAssignmentStep(null)} compact submit={savePublishedAssignment} title="Cambiar asignación de la etapa"><p className="mt-1 text-sm text-[var(--gaia-ink-500)]">Este cambio actualizará la etapa publicada y reasignará sus gestiones activas. Las gestiones que ya estaban tomadas volverán a quedar disponibles.</p><div className="mt-5 grid gap-5"><Input label="¿Quién atenderá esta etapa?"><select value={assignmentStep.assignmentStrategy} onChange={e=>setAssignmentStep({...assignmentStep,assignmentStrategy:Number(e.target.value),unitId:null,personId:null})}><option value={299540150}>Una unidad organizacional</option><option value={299540151}>Una persona específica</option><option value={299540152}>El responsable actual de la solicitud</option></select></Input>{assignmentStep.assignmentStrategy===299540150&&<Input label="Unidad responsable"><OrganizationalUnitPicker onChange={unitId=>setAssignmentStep({...assignmentStep,unitId})} required units={units} value={assignmentStep.unitId??""}/></Input>}{assignmentStep.assignmentStrategy===299540151&&<Input label="Persona responsable"><PersonPicker onChange={personId=>setAssignmentStep({...assignmentStep,personId})} people={people} required units={units} value={assignmentStep.personId??""}/></Input>}</div></Dialog>}
-      {viewStep&&<div className="fixed inset-0 z-[85] grid place-items-center bg-black/40 p-4"><section className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl"><header className="flex items-start justify-between"><div><small className="font-bold uppercase tracking-widest text-[var(--brand-primary)]">Configuración publicada</small><h2 className="mt-1 text-2xl font-semibold">{friendly(viewStep.code)}</h2></div><button aria-label="Cerrar" className="rounded-full border p-2" onClick={()=>setViewStep(null)}><X size={18}/></button></header><dl className="mt-5 grid gap-3 sm:grid-cols-2"><Fact label="Tipo" value={stepType(viewStep.type)}/><Fact label="Asignación" value={assignmentDetail(viewStep,units,people)}/><Fact label="Activación" value={viewStep.activationRule===299540161?"Espera todas las conexiones":"Se activa con cualquier conexión"}/><Fact label="Plazo" value={viewStep.targetDays?`${viewStep.targetDays} días hábiles`:"Sin plazo propio"}/><Fact label="Participación" value={[viewStep.initial&&"Inicial",viewStep.final&&"Final",viewStep.reopeningEntry&&"Reapertura"].filter(Boolean).join(" · ")||"Intermedia"}/><Fact label="Requisitos" value={[viewStep.requiresDecision&&"Decisión",viewStep.requiresObservation&&"Observación",viewStep.requiresFile&&"Archivo",viewStep.allowsRequesterReturn&&"Devolución"].filter(Boolean).join(" · ")||"Sin requisitos adicionales"}/></dl><button className="mt-6 w-full rounded-xl bg-[var(--brand-primary)] px-4 py-2 font-semibold text-white" onClick={()=>setViewStep(null)}>Cerrar</button></section></div>}
+      {viewStep&&<div className="fixed inset-0 z-[85] grid place-items-center bg-black/40 p-4"><section className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-3xl bg-white p-6 shadow-2xl"><header className="flex items-start justify-between"><div><small className="font-bold uppercase tracking-widest text-[var(--brand-primary)]">Configuración publicada</small><h2 className="mt-1 text-2xl font-semibold">{friendly(viewStep.code)}</h2></div><button aria-label="Cerrar" className="rounded-full border p-2" onClick={closePublishedStep}><X size={18}/></button></header><dl className="mt-5 grid gap-3 sm:grid-cols-2"><Fact label="Tipo" value={stepType(viewStep.type)}/><Fact label="Asignación" value={assignmentDetail(viewStep,units,people)}/><Fact label="Activación" value={viewStep.activationRule===299540161?"Espera todas las conexiones":"Se activa con cualquier conexión"}/><Fact label="Plazo" value={viewStep.targetDays?`${viewStep.targetDays} días hábiles`:"Sin plazo propio"}/><Fact label="Participación" value={[viewStep.initial&&"Inicial",viewStep.final&&"Final",viewStep.reopeningEntry&&"Reapertura"].filter(Boolean).join(" · ")||"Intermedia"}/><Fact label="Requisitos" value={[viewStep.requiresDecision&&"Decisión",viewStep.requiresObservation&&"Observación",viewStep.requiresFile&&"Archivo",viewStep.allowsRequesterReturn&&"Devolución"].filter(Boolean).join(" · ")||"Sin requisitos adicionales"}/></dl><div className="mt-5 rounded-2xl border border-[var(--gaia-line)] p-4"><div><h3 className="font-semibold">Formulario de la etapa</h3>{viewStepForm?.instructions&&<p className="mt-1 text-xs text-[var(--gaia-ink-500)]">{viewStepForm.instructions}</p>}</div>{viewStepFormLoading?<p className="mt-4 text-sm text-[var(--gaia-ink-500)]">Cargando campos configurados…</p>:viewStepForm?.fields.length?<ol className="mt-4 space-y-2">{[...viewStepForm.fields].sort((a,b)=>a.order-b.order).map((field,index)=><li className="rounded-xl bg-[var(--gaia-canvas)] p-3" key={field.id}><div className="flex items-start gap-3"><span className="grid size-7 shrink-0 place-items-center rounded-full bg-[var(--gaia-accent-soft)] text-xs font-bold text-[var(--brand-primary)]">{index+1}</span><div className="min-w-0"><strong className="block text-sm">{field.label}</strong><span className="mt-1 block text-xs text-[var(--gaia-ink-500)]">{stageFieldType(field.dataType,field.controlType)} · {field.required?"Obligatorio":"Opcional"} · {field.visible?"Visible":"Oculto"} · {field.width===12?"Fila completa":`${field.width}/12 de fila`}</span>{field.helpText&&<span className="mt-1 block text-xs text-[var(--gaia-ink-500)]">{field.helpText}</span>}{field.options.length>0&&<span className="mt-1 block text-xs text-[var(--gaia-ink-500)]">Opciones: {[...field.options].sort((a,b)=>a.order-b.order).map(option=>option.label).join(" · ")}</span>}</div></div></li>)}</ol>:<p className="mt-4 rounded-xl border border-dashed p-4 text-center text-sm text-[var(--gaia-ink-500)]">Esta etapa no tiene campos configurados.</p>}</div><button className="mt-6 w-full rounded-xl bg-[var(--brand-primary)] px-4 py-2 font-semibold text-white" onClick={closePublishedStep}>Cerrar</button></section></div>}
       {workflow&&<Dialog busy={busy} close={()=>setWorkflow(null)} compact submit={saveWorkflow} title="Editar flujo"><p className="mt-1 text-sm text-[var(--gaia-ink-500)]">Actualiza la identificación del flujo en borrador.</p><div className="mt-6 grid gap-5"><Input label="Nombre del flujo"><input maxLength={200} onChange={event=>setWorkflow({...workflow,name:event.target.value})} required value={workflow.name}/></Input><Input label="Descripción"><textarea maxLength={1000} onChange={event=>setWorkflow({...workflow,description:event.target.value})} placeholder="Describe brevemente el propósito de este flujo" rows={4} value={workflow.description??""}/></Input></div></Dialog>}
       {creatingWorkflow&&<Dialog busy={busy} close={()=>setCreatingWorkflow(false)} compact submit={createDraft} title={items.length?"Crear nueva versión":"Crear flujo"}><p className="mt-1 text-sm text-[var(--gaia-ink-500)]">Define cómo identificarás este recorrido de atención.</p><div className="mt-6 grid gap-5"><Input label="Nombre del flujo"><input autoFocus id={`workflow-name-${serviceId}`} maxLength={200} onChange={event=>setDraftName(event.target.value)} placeholder="Ej. Atención estándar" required value={draftName}/></Input><Input label="Descripción"><textarea maxLength={1000} onChange={event=>setDraftDescription(event.target.value)} placeholder="Describe brevemente el propósito de este flujo" rows={4} value={draftDescription}/></Input></div></Dialog>}
       <ConfirmDialog confirmLabel="Eliminar flujo" description={deleteWorkflowTarget?`Se eliminará el borrador «${deleteWorkflowTarget.name}», junto con sus etapas y conexiones. Esta acción no afecta versiones publicadas.`:""} destructive loading={busy} onCancel={()=>setDeleteWorkflowTarget(null)} onConfirm={()=>void deleteWorkflow()} open={Boolean(deleteWorkflowTarget)} title="¿Eliminar este flujo en borrador?"/>
@@ -912,7 +947,7 @@ function Dialog({
 }
 function Grid({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mt-4 grid gap-x-6 gap-y-4 md:grid-cols-2">{children}</div>
+    <div className="mt-4 grid items-start gap-x-6 gap-y-4 md:grid-cols-2">{children}</div>
   );
 }
 function Input({
@@ -927,12 +962,14 @@ function Input({
   children: React.ReactNode;
 }) {
   return (
-    <div className="text-xs font-semibold [&>input]:mt-2 [&>input]:h-11 [&>input]:w-full [&>input]:rounded-xl [&>input]:border [&>input]:border-[var(--gaia-line-strong)] [&>input]:px-3 [&>input]:outline-none focus-within:[&>input]:border-[var(--brand-primary)] [&>select]:mt-2 [&>select]:h-11 [&>select]:w-full [&>select]:rounded-xl [&>select]:border [&>select]:px-3 [&>textarea]:mt-2 [&>textarea]:w-full [&>textarea]:resize-y [&>textarea]:rounded-xl [&>textarea]:border [&>textarea]:border-[var(--gaia-line-strong)] [&>textarea]:px-3 [&>textarea]:py-3 [&>textarea]:font-normal [&>textarea]:outline-none focus-within:[&>textarea]:border-[var(--brand-primary)]">
+    <div className="flex h-full flex-col text-xs font-semibold">
       <div className="flex items-center gap-1.5">
         <span>{label}</span>
         {info}
       </div>
-      {children}
+      <div className="mt-2 [&>input]:h-11 [&>input]:w-full [&>input]:rounded-xl [&>input]:border [&>input]:border-[var(--gaia-line-strong)] [&>input]:px-3 [&>input]:outline-none focus-within:[&>input]:border-[var(--brand-primary)] [&>select]:h-11 [&>select]:w-full [&>select]:rounded-xl [&>select]:border [&>select]:px-3 [&>textarea]:w-full [&>textarea]:resize-y [&>textarea]:rounded-xl [&>textarea]:border [&>textarea]:border-[var(--gaia-line-strong)] [&>textarea]:px-3 [&>textarea]:py-3 [&>textarea]:font-normal [&>textarea]:outline-none focus-within:[&>textarea]:border-[var(--brand-primary)]">
+        {children}
+      </div>
       {help && (
         <small className="mt-1.5 block font-normal leading-4 text-[11px] text-[var(--gaia-ink-500)]">
           {help}
@@ -1108,7 +1145,9 @@ function automaticPositions(definition:Definition){const ordered=[...definition.
 function diagramStepWarnings(definition:Definition){const active=definition.steps.filter(item=>item.active),routes=definition.routes.filter(item=>item.active),reachable=new Set(active.filter(item=>item.initial).map(item=>item.id));let changed=true;while(changed){changed=false;for(const route of routes)if(reachable.has(route.sourceStepId)&&!reachable.has(route.targetStepId)){reachable.add(route.targetStepId);changed=true}}const warnings=new Map<string,string[]>();for(const step of active){const values:string[]=[];if(!step.final&&!routes.some(route=>route.sourceStepId===step.id))values.push("No tiene conexión de salida");if(!reachable.has(step.id))values.push("No es alcanzable desde una etapa inicial");if(step.assignmentStrategy===299540150&&!step.unitId)values.push("Falta la unidad responsable");if(step.assignmentStrategy===299540151&&!step.personId)values.push("Falta la persona responsable");if(values.length)warnings.set(step.id,values)}return warnings;}
 function diagramElements(definition:Definition,units:Unit[],people:Person[],canEdit:boolean,canAdminister:boolean,published:boolean,onAction:(action:NodeAction,step:Step)=>void){
   const ordered=[...definition.steps].sort((a,b)=>a.order-b.order),automatic=automaticPositions(definition),warnings=diagramStepWarnings(definition);
-  const nodes:DiagramNode[]=ordered.map((step,index)=>{const calculated=automatic.get(step.id)??{x:index*(diagramWidth+110),y:0};return{id:step.id,type:"workflowStep",position:{x:step.positionX??calculated.x,y:step.positionY??calculated.y},data:{step,index,assignment:assignmentDetail(step,units,people),canEdit,canAdminister,published,warnings:warnings.get(step.id)??[],onAction},draggable:canEdit};});
+  const positionOf=(step:Step)=>automatic.get(step.id)??{x:step.order*(diagramWidth+110),y:0};
+  const visualOrder=new Map(ordered.filter(step=>!step.initial&&!step.final).sort((a,b)=>{const aPosition={x:a.positionX??positionOf(a).x,y:a.positionY??positionOf(a).y},bPosition={x:b.positionX??positionOf(b).x,y:b.positionY??positionOf(b).y},horizontalDistance=aPosition.x-bPosition.x;return Math.abs(horizontalDistance)<diagramWidth/2?aPosition.y-bPosition.y||a.order-b.order:horizontalDistance;}).map((step,index)=>[step.id,index+1]));
+  const nodes:DiagramNode[]=ordered.map((step,index)=>{const calculated=positionOf(step);return{id:step.id,type:"workflowStep",position:{x:step.positionX??calculated.x,y:step.positionY??calculated.y},data:{step,index:visualOrder.get(step.id)??index,assignment:assignmentDetail(step,units,people),canEdit,canAdminister,published,warnings:warnings.get(step.id)??[],onAction},draggable:canEdit};});
   const parallel=new Map<string,number>();const edges:Edge[]=definition.routes.filter(item=>item.active).map(route=>{const key=`${route.sourceStepId}:${route.targetStepId}`,index=parallel.get(key)??0;parallel.set(key,index+1);return{id:route.id,source:route.sourceStepId,target:route.targetStepId,label:result(route.requiredResult),markerEnd:{type:MarkerType.ArrowClosed,color:"#386d65"},style:{stroke:"#386d65",strokeWidth:2},labelStyle:{fill:"#315e58",fontSize:10,fontWeight:700},labelBgStyle:{fill:"#f8fbfa",fillOpacity:.96},labelBgPadding:[6,4],labelBgBorderRadius:6,type:"default",pathOptions:{curvature:.22+(index*.14)},data:{route}}});return{nodes,edges};
 }
 function WorkflowDiagram({definition,canEdit,canAdminister,expanded,onArrange,onConnect,onMoveStep,onNodeAction,onSelectRoute,onToggleExpanded,people,published,units}:{definition:Definition;canEdit:boolean;canAdminister:boolean;expanded:boolean;onArrange:(positions:Array<{id:string;x:number;y:number}>)=>Promise<void>;onConnect:(source:string,target:string)=>void;onMoveStep:(stepId:string,position:{x:number;y:number})=>Promise<void>;onNodeAction:(action:NodeAction,step:Step)=>void;onSelectRoute:(route:Route)=>void;onToggleExpanded:()=>void;people:Person[];published:boolean;units:Unit[]}){
@@ -1287,6 +1326,18 @@ const stepType = (x: number) =>
       299540145: "Automático",
     }) as Record<number, string>
   )[x] ?? "Paso";
+const stageFieldType = (dataType: number, controlType: number) => {
+  if (dataType === 299540047) return "Archivo";
+  if (controlType === 299540058) return "Lista";
+  if (controlType === 299540059) return "Selección única";
+  if (controlType === 299540061) return "Casillas de selección";
+  if (controlType === 299540051) return "Texto largo";
+  if (dataType === 299540041 || dataType === 299540042) return "Número";
+  if (dataType === 299540043) return "Fecha";
+  if (dataType === 299540044) return "Fecha y hora";
+  if (dataType === 299540045) return "Sí / No";
+  return "Texto corto";
+};
 const result = (x: number) =>
   (
     ({

@@ -7,6 +7,8 @@ import {
   ArrowRight,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   Clock3,
   Download,
@@ -263,7 +265,7 @@ export function SolicitudesAdministration() {
     setSaving(true);
     setError("");
     try {
-      const result = await apiRequest<{ deleted: number }>(`/development/maintenance/solicitudes-test-data/services/${deleteService.id}`, { method: "DELETE" });
+      const result = await apiRequest<{ deleted: number }>(`/api/solicitudes/administration/services/${deleteService.id}/data`, { method: "DELETE" });
       notify({ tone: "success", title: "Servicio y datos eliminados", description: `Se eliminaron físicamente ${result.deleted} registros relacionados con ${deleteService.name}.` });
       setDeleteService(null);
       setSelectedId("");
@@ -1089,6 +1091,7 @@ function FormsWorkspace({
       forms.find((item) => item.status === 299540030)?.id ?? forms[0]?.id ?? "",
     ),
     [title, setTitle] = useState(`Formulario de ${service.name}`),
+    [versionsCollapsed, setVersionsCollapsed] = useState(false),
     [saving, setSaving] = useState(false),
     [error, setError] = useState("");
   useEffect(() => {
@@ -1127,10 +1130,15 @@ function FormsWorkspace({
   }
   const current = forms.find((item) => item.id === selected);
   return (
-    <div className="grid gap-5 lg:grid-cols-[250px_1fr]">
-      <aside className="rounded-2xl border bg-[var(--surface-card)] p-4">
-        <h2 className="font-semibold">Versiones</h2>
-        <div className="mt-3 space-y-2">
+    <div className={`grid gap-5 transition-[grid-template-columns] ${versionsCollapsed?"lg:grid-cols-[64px_minmax(0,1fr)]":"lg:grid-cols-[250px_minmax(0,1fr)]"}`}>
+      <aside className={`self-stretch rounded-2xl border bg-[var(--surface-card)] ${versionsCollapsed?"p-2":"p-4"}`}>
+        <div className={`flex items-center ${versionsCollapsed?"justify-center":"justify-between gap-2"}`}>
+          {!versionsCollapsed&&<h2 className="font-semibold">Versiones</h2>}
+          <button aria-expanded={!versionsCollapsed} aria-label={versionsCollapsed?"Expandir versiones":"Contraer versiones"} className="grid size-9 shrink-0 place-items-center rounded-lg border border-[var(--gaia-line)] text-[var(--brand-primary)] transition hover:border-[var(--brand-primary)] hover:bg-[var(--gaia-accent-pale)]" onClick={()=>setVersionsCollapsed(value=>!value)} title={versionsCollapsed?"Expandir versiones":"Contraer versiones"} type="button">
+            {versionsCollapsed?<ChevronRight size={17}/>:<ChevronLeft size={17}/>}
+          </button>
+        </div>
+        {!versionsCollapsed&&<div className="mt-3 space-y-2">
           {forms.map((form) => (
             <button
               className={`w-full rounded-xl border p-3 text-left ${selected === form.id ? "border-[var(--brand-primary)] bg-[var(--gaia-accent-pale)]" : "border-[var(--gaia-line)]"}`}
@@ -1148,8 +1156,9 @@ function FormsWorkspace({
               </small>
             </button>
           ))}
-        </div>
-        {canEdit && !forms.some((item) => item.status === 299540030) && (
+        </div>}
+        {versionsCollapsed&&<span className="mt-3 grid size-9 place-items-center rounded-full bg-[var(--gaia-accent-soft)] text-xs font-bold text-[var(--brand-primary)]" title={`${forms.length} versión${forms.length===1?"":"es"}`}>{forms.length}</span>}
+        {!versionsCollapsed&&canEdit && !forms.some((item) => item.status === 299540030) && (
           <form className="mt-4 border-t pt-4" onSubmit={create}>
             <input
               className="h-10 w-full rounded-lg border px-3 text-sm"
@@ -1173,39 +1182,17 @@ function FormsWorkspace({
           </p>
         )}
         {current ? (
-          <>
-            <div className="flex flex-wrap justify-between gap-3">
-              <div>
-                <h2 className="text-xl font-semibold">{current.title}</h2>
-                <p className="text-sm text-[var(--gaia-ink-500)]">
-                  Diseña lo que verá la persona al crear la solicitud.
-                </p>
-              </div>
-              <span className="h-fit rounded-full bg-[var(--gaia-accent-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--brand-primary)]">
-                {current.status === 299540030
-                  ? "Borrador guardado"
-                  : current.status === 299540031
-                    ? "Versión vigente"
-                    : "Versión retirada"}
-              </span>
-              {canEdit&&current.status===299540030&&<button aria-label={`Eliminar versión ${current.version}`} className="h-fit rounded-xl border border-[#c96b72] px-3 py-2 text-xs font-semibold text-[#9a384d]" disabled={saving} onClick={()=>void removeDraft()} type="button"><Trash2 className="mr-1 inline" size={14}/>Eliminar borrador</button>}
-            </div>
-            {current.status === 299540030 && (
-              <div className="mt-4 rounded-xl border border-[#c8ddd7] bg-[#f2f8f6] p-4 text-sm">
-                <strong>
-                  Este formulario aún no está visible para los usuarios.
-                </strong>
-                <p className="mt-1 text-[var(--gaia-ink-500)]">
-                  Se publicará junto con el flujo y el servicio desde el paso 2.
-                </p>
-              </div>
-            )}
-            <FormDesigner
-              canEdit={canEdit && current.status !== 299540032}
-              form={current}
-              changed={load}
-            />
-          </>
+          <FormDesigner
+            canEdit={canEdit && current.status !== 299540032}
+            changed={load}
+            form={current}
+            removeDraft={
+              canEdit && current.status === 299540030
+                ? () => void removeDraft()
+                : undefined
+            }
+            removingDraft={saving}
+          />
         ) : (
           <div className="grid min-h-64 place-items-center text-sm">
             Crea la primera versión.
@@ -1219,10 +1206,14 @@ function FormDesigner({
   form,
   canEdit,
   changed,
+  removeDraft,
+  removingDraft,
 }: {
   form: Form;
   canEdit: boolean;
   changed: () => Promise<void>;
+  removeDraft?: () => void;
+  removingDraft: boolean;
 }) {
   const [data, setData] = useState<Definition | null>(null),
     [field, setField] = useState<FormField | null | undefined>(undefined),
@@ -1354,25 +1345,62 @@ function FormDesigner({
     }
   }
   return (
-    <div className="mt-5">
-      <div className="flex flex-wrap justify-end gap-2">
-        <button
-          className="inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold"
-          onClick={() => setPreview(true)}
-        >
-          <Eye size={16} />
-          Previsualizar formulario
-        </button>
-        {canEdit && (
+    <div>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-semibold">{form.title}</h2>
+          <p className="text-sm text-[var(--gaia-ink-500)]">
+            Diseña lo que verá la persona al crear la solicitud.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <span className="inline-flex min-h-10 items-center rounded-full bg-[var(--gaia-accent-soft)] px-3 text-xs font-semibold text-[var(--brand-primary)]">
+            {form.status === 299540030
+              ? "Borrador guardado"
+              : form.status === 299540031
+                ? "Versión vigente"
+                : "Versión retirada"}
+          </span>
           <button
-            className="inline-flex items-center gap-2 rounded-xl bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white"
-            onClick={() => edit()}
+            className="inline-flex min-h-10 items-center gap-2 rounded-xl border px-4 text-sm font-semibold"
+            onClick={() => setPreview(true)}
+            type="button"
           >
-            <Plus size={16} />
-            Agregar campo
+            <Eye size={16} />
+            Previsualizar formulario
           </button>
-        )}
+          {canEdit && (
+            <button
+              className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[var(--brand-primary)] px-4 text-sm font-semibold text-white"
+              onClick={() => edit()}
+              type="button"
+            >
+              <Plus size={16} />
+              Agregar campo
+            </button>
+          )}
+          {removeDraft && (
+            <button
+              aria-label={`Eliminar versión ${form.version}`}
+              className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#c96b72] px-3 text-xs font-semibold text-[#9a384d]"
+              disabled={removingDraft}
+              onClick={removeDraft}
+              type="button"
+            >
+              <Trash2 size={14} />
+              Eliminar borrador
+            </button>
+          )}
+        </div>
       </div>
+      {form.status === 299540030 && (
+        <div className="mt-4 rounded-xl border border-[#c8ddd7] bg-[#f2f8f6] p-4 text-sm">
+          <strong>Este formulario aún no está visible para los usuarios.</strong>
+          <p className="mt-1 text-[var(--gaia-ink-500)]">
+            Se publicará junto con el flujo y el servicio desde el paso 2.
+          </p>
+        </div>
+      )}
       {error && (
         <p className="mt-3 rounded-lg bg-[#fff0f0] p-2 text-sm text-[#9a384d]">
           {error}
@@ -1399,7 +1427,14 @@ function FormDesigner({
           close={() => setField(undefined)}
         >
           <form onSubmit={save}>
-            <div className="grid gap-4 sm:grid-cols-2">
+            {field && isAttachmentField(field) ? (
+              <div className="mt-4 rounded-2xl border border-[var(--gaia-line)] bg-[var(--surface-muted)] p-4">
+                <strong className="text-sm">Archivos adjuntos</strong>
+                <p className="mt-1 text-xs leading-5 text-[var(--gaia-ink-500)]">
+                  Este campo reutiliza el cargador de archivos de la Intranet. Solo puedes definir si se muestra y si es obligatorio.
+                </p>
+              </div>
+            ) : <div className="grid gap-4 sm:grid-cols-2">
               <Input label="Nombre del campo" required>
                 <input
                   required
@@ -1411,14 +1446,16 @@ function FormDesigner({
               </Input>
               <Input label="Tipo de respuesta">
                 <select
-                  value={draft.controlType}
-                  onChange={(e) =>
+                  value={isChoiceControl(draft.controlType) ? 299540058 : draft.controlType}
+                  onChange={(e) => {
+                    const controlType = Number(e.target.value);
                     setDraft({
                       ...draft,
-                      controlType: Number(e.target.value),
-                      dataType: dataTypeFor(Number(e.target.value)),
-                    })
-                  }
+                      controlType,
+                      dataType: dataTypeFor(controlType),
+                      allowsMultiple: controlType === 299540058 ? draft.allowsMultiple : false,
+                    });
+                  }}
                 >
                   <option value={299540050}>Texto corto</option>
                   <option value={299540051}>Texto largo</option>
@@ -1437,26 +1474,40 @@ function FormDesigner({
                   }
                 />
               </Input>
-              <Input label="Orden">
-                <input
-                  min={0}
-                  type="number"
-                  value={draft.order}
-                  onChange={(e) =>
-                    setDraft({ ...draft, order: Number(e.target.value) })
-                  }
-                />
-              </Input>
-            </div>
-            <Input label="Ayuda para el usuario">
+              {isChoiceControl(draft.controlType) && (
+                <Input label="Presentación de las opciones">
+                  <select
+                    value={draft.controlType}
+                    onChange={(e) => {
+                      const controlType = Number(e.target.value);
+                      setDraft({
+                        ...draft,
+                        controlType,
+                        allowsMultiple:
+                          controlType === 299540059
+                            ? false
+                            : controlType === 299540061
+                              ? true
+                              : draft.allowsMultiple,
+                      });
+                    }}
+                  >
+                    <option value={299540058}>Lista</option>
+                    <option value={299540061}>Casillas de verificación</option>
+                    <option value={299540059}>Botones de opción (radio)</option>
+                  </select>
+                </Input>
+              )}
+            </div>}
+            {(!field || !isAttachmentField(field)) && <Input label="Ayuda para el usuario">
               <input
                 value={draft.helpText}
                 onChange={(e) =>
                   setDraft({ ...draft, helpText: e.target.value })
                 }
               />
-            </Input>
-            {draft.controlType === 299540058 && (
+            </Input>}
+            {(!field || !isAttachmentField(field)) && isChoiceControl(draft.controlType) && (
               <Input label="Opciones (una por línea)">
                 <textarea
                   required
@@ -1467,6 +1518,22 @@ function FormDesigner({
                   }
                 />
               </Input>
+            )}
+            {(!field || !isAttachmentField(field)) && isChoiceControl(draft.controlType) && (
+              <fieldset className="mt-4">
+                <legend className="text-xs font-semibold">Tipo de selección</legend>
+                <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                  <label className={`flex items-center gap-3 rounded-xl border p-3 text-sm ${!draft.allowsMultiple ? "border-[var(--brand-primary)] bg-[var(--gaia-accent-pale)]" : "border-[var(--gaia-line)]"}`}>
+                    <input checked={!draft.allowsMultiple} name="selection-mode" onChange={() => setDraft({ ...draft, allowsMultiple: false })} type="radio" />
+                    Selección única
+                  </label>
+                  <label className={`flex items-center gap-3 rounded-xl border p-3 text-sm ${draft.allowsMultiple ? "border-[var(--brand-primary)] bg-[var(--gaia-accent-pale)]" : "border-[var(--gaia-line)]"} ${draft.controlType === 299540059 ? "cursor-not-allowed opacity-50" : ""}`}>
+                    <input checked={draft.allowsMultiple} disabled={draft.controlType === 299540059} name="selection-mode" onChange={() => setDraft({ ...draft, allowsMultiple: true })} type="radio" />
+                    Selección múltiple
+                  </label>
+                </div>
+                {draft.controlType === 299540059 && <p className="mt-2 text-xs text-[var(--gaia-ink-500)]">Los botones de opción permiten seleccionar una sola respuesta.</p>}
+              </fieldset>
             )}
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <Toggle
@@ -1511,16 +1578,16 @@ function FieldCanvas({
 }) {
   return (
     <article
-      draggable={canEdit}
+      draggable={canEdit && !isAttachmentField(field)}
       onDragStart={startDrag}
       onDragOver={(event) => {
-        if (canEdit) event.preventDefault();
+        if (canEdit && !isAttachmentField(field)) event.preventDefault();
       }}
       onDrop={drop}
       className={`rounded-2xl border p-4 transition ${dragging ? "opacity-45 ring-2 ring-[var(--brand-primary)]" : ""} ${field.visible ? "bg-[var(--surface-page)]" : "border-dashed bg-[var(--surface-muted)] opacity-70"}`}
     >
       <div className="flex items-start gap-3">
-        {canEdit && (
+        {canEdit && !isAttachmentField(field) && (
           <span
             aria-label="Arrastra para reordenar"
             className="mt-1 cursor-grab text-[var(--gaia-ink-500)]"
@@ -1564,7 +1631,7 @@ function FieldCanvas({
             >
               <Pencil size={15} />
             </button>
-            <button
+            {!isAttachmentField(field) && <button
               aria-label={`Eliminar ${field.label}`}
               className="rounded-lg border border-[#e3b8b2] bg-white p-2 text-[#a33e35]"
               disabled={dragging}
@@ -1572,7 +1639,7 @@ function FieldCanvas({
               title="Eliminar campo"
             >
               <Trash2 size={15} />
-            </button>
+            </button>}
           </span>
         )}
       </div>
@@ -1803,14 +1870,18 @@ function Input({
   compact?: boolean;
 }) {
   return (
-    <label className={`${compact ? "" : "mt-4"} block text-xs font-semibold [&>input]:mt-2 [&>input]:min-h-11 [&>input]:w-full [&>input]:rounded-xl [&>input]:border [&>input]:px-3 [&>select]:mt-2 [&>select]:min-h-11 [&>select]:w-full [&>select]:rounded-xl [&>select]:border [&>select]:px-3 [&>textarea]:mt-2 [&>textarea]:w-full [&>textarea]:rounded-xl [&>textarea]:border [&>textarea]:p-3`}>
-      {label}
-      {required && (
-        <span className="ml-1 text-red-600" aria-hidden="true">
-          *
-        </span>
-      )}
-      {children}
+    <label className={`${compact ? "" : "mt-4"} flex h-full flex-col text-xs font-semibold`}>
+      <span>
+        {label}
+        {required && (
+          <span className="ml-1 text-red-600" aria-hidden="true">
+            *
+          </span>
+        )}
+      </span>
+      <span className="mt-2 block [&>input]:min-h-11 [&>input]:w-full [&>input]:rounded-xl [&>input]:border [&>input]:px-3 [&>select]:min-h-11 [&>select]:w-full [&>select]:rounded-xl [&>select]:border [&>select]:px-3 [&>textarea]:w-full [&>textarea]:rounded-xl [&>textarea]:border [&>textarea]:p-3">
+        {children}
+      </span>
     </label>
   );
 }
@@ -1872,9 +1943,15 @@ function dataTypeFor(control: number) {
       ? 299540043
       : control === 299540057
         ? 299540044
-        : control === 299540058
+        : isChoiceControl(control)
           ? 299540046
           : 299540040;
+}
+function isChoiceControl(control: number) {
+  return [299540058, 299540059, 299540061].includes(control);
+}
+function isAttachmentField(field: Pick<FormField, "code" | "dataType">) {
+  return field.code.toUpperCase() === "ADJUNTOS";
 }
 function message(reason: unknown) {
   return reason instanceof Error

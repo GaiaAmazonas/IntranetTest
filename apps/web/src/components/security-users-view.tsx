@@ -9,7 +9,7 @@ import { Badge, Button, EmptyState, IconButton } from "./ui";
 
 export type RoleAssignment = { id: string; roleId: string; roleCode: string; roleName: string; startDate: string; endDate?: string | null; isActive: boolean };
 export type SecurityUserDetail = { user: { id?: string | null; name: string; email: string; entraObjectId?: string | null; thirdPartyId?: string | null; documentNumber?: string | null; lastAccess?: string | null; isActive: boolean; provisioningStatus: "PROVISIONED" | "PENDING_FIRST_ACCESS" }; roles: RoleAssignment[] };
-export type SecurityRole = { id: string; code: string; name: string; description?: string | null; isSystem: boolean; isActive: boolean; assignedUsers: number; permissions: string[] };
+export type SecurityRole = { id: string; code: string; name: string; description?: string | null; isSystem: boolean; isActive: boolean; assignedUsers: number; permissions: string[]; isGlobalAdministrator: boolean; supportsGlobalAdministration: boolean };
 export type SecurityPreprovisionAudit = { activeThirdParties: number; withInstitutionalEmail: number; eligible: number; existingApplicationUsers: number; toPreprovision: number; duplicateEmails: number; multipleInstitutionalEmails: number; entraObjectIdAllowsNull: boolean; issues: { code: string; description: string; email?: string | null; thirdPartyId?: string | null }[] };
 
 type StatusFilter = "all" | "active" | "pending" | "inactive";

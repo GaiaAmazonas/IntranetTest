@@ -18,7 +18,7 @@ public sealed class SolicitudesFormDesignerRegressionTests
     public void DragAndDropPersistsEveryNormalizedOrder()
     {
         var source=ReadDesigner();
-        Assert.Contains("draggable={canEdit}",source);
+        Assert.Contains("draggable={canEdit && !isAttachmentField(field)}",source);
         Assert.Contains("onDrop={drop}",source);
         Assert.Contains("const normalized = ordered.map",source);
         Assert.Contains("order: index",source);
@@ -157,11 +157,12 @@ public sealed class SolicitudesFormDesignerRegressionTests
     {
         var source=Read("solicitudes-management-form.tsx");
         var answers=source.IndexOf("/form/responses",StringComparison.Ordinal);
-        var files=source.IndexOf("/attachments",StringComparison.Ordinal);
+        var files=source.IndexOf("await uploadFile",answers,StringComparison.Ordinal);
         var completion=source.IndexOf("await onCompleted",StringComparison.Ordinal);
         Assert.True(answers>=0&&files>answers&&completion>files);
-        Assert.Contains("data.form?",source);
-        Assert.Contains("Esta etapa no requiere un formulario adicional",source);
+        Assert.Contains("data.form &&",source);
+        Assert.DoesNotContain("Esta etapa no requiere un formulario adicional",source);
+        Assert.Contains("requiresFile && !hasRelatedFile && files.length === 0",source);
     }
 
     [Fact]

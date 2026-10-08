@@ -92,6 +92,7 @@ builder.Services.AddScoped<ISolicitudesConversationStore, DataverseSolicitudesCo
 builder.Services.AddScoped<ISolicitudesConversationApplication, SolicitudesConversationApplication>();
 builder.Services.AddScoped<ISolicitudesManagementStore, DataverseSolicitudesManagementStore>();
 builder.Services.AddScoped<ISolicitudesManagementApplication, SolicitudesManagementApplication>();
+builder.Services.AddScoped<ISolicitudesAdministrationAuthorization, DataverseSolicitudesAdministrationAuthorization>();
 builder.Services.AddScoped<ISolicitudesAttachmentApplication, SolicitudesAttachmentApplication>();
 
 builder.Services.AddScoped<ISolicitudesObservationApplication, SolicitudesObservationApplication>();

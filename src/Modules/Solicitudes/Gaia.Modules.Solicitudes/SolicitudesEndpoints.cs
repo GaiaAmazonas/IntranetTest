@@ -317,75 +317,84 @@ public static class SolicitudesEndpoints
         catch(Exception error){return Problem(error);}
     }
 
-    private static async Task<IResult> PublishWorkflow(Guid flowId,ClaimsPrincipal principal,ISecurityStore security,
+    private static async Task<IResult> PublishWorkflow(Guid flowId,ClaimsPrincipal principal,ISecurityStore security,ISolicitudesAdministrationAuthorization access,
         SolicitudesWorkflowApplication application,CancellationToken token)
     {
-        try{await application.PublishAsync(flowId,await Actor(security,principal,token),token);return Results.NoContent();}
+        try{await access.DemandWorkflowAsync(await access.ResolveAsync(principal,token),flowId,token);await application.PublishAsync(flowId,await Actor(security,principal,token),token);return Results.NoContent();}
         catch(Exception error){return Problem(error);}
     }
-    private static async Task<IResult> ListWorkflows(Guid serviceId,SolicitudesWorkflowApplication application,CancellationToken token)
-    {try{return Results.Ok(await application.ListAsync(serviceId,token));}catch(Exception error){return Problem(error);}}
-    private static async Task<IResult> ReadWorkflow(Guid flowId,SolicitudesWorkflowApplication application,CancellationToken token)
-    {try{var value=await application.ReadAsync(flowId,token);return value is null?Results.NotFound():Results.Ok(value);}catch(Exception error){return Problem(error);}}
-    private static async Task<IResult> CreateWorkflow(CreateSolicitudesWorkflowDraft request,SolicitudesWorkflowApplication application,CancellationToken token)
-    {try{var id=await application.CreateDraftAsync(request,token);return Results.Created($"/api/solicitudes/administration/workflows/{id:D}",new{id});}catch(Exception error){return Problem(error);}}
-    private static async Task<IResult> UpdateWorkflow(Guid flowId,UpdateSolicitudesWorkflowDraft request,SolicitudesWorkflowApplication application,CancellationToken token)
-    {try{await application.UpdateDraftAsync(flowId,request,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
-    private static async Task<IResult> DeleteWorkflow(Guid flowId,SolicitudesWorkflowApplication application,CancellationToken token)
-    {try{await application.DeleteDraftAsync(flowId,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
-    private static async Task<IResult> CreateWorkflowStep(Guid flowId,SaveSolicitudesWorkflowStep request,SolicitudesWorkflowApplication application,CancellationToken token)
-    {try{var id=await application.SaveStepAsync(flowId,null,request,token);return Results.Created($"/api/solicitudes/administration/workflows/{flowId:D}/steps/{id:D}",new{id});}catch(Exception error){return Problem(error);}}
-    private static async Task<IResult> UpdateWorkflowStep(Guid flowId,Guid stepId,SaveSolicitudesWorkflowStep request,SolicitudesWorkflowApplication application,CancellationToken token)
-    {try{await application.SaveStepAsync(flowId,stepId,request,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
-    private static async Task<IResult> UpdateWorkflowStepAssignment(Guid flowId,Guid stepId,UpdateSolicitudesWorkflowAssignment request,SolicitudesWorkflowApplication application,CancellationToken token)
-    {try{await application.UpdateStepAssignmentAsync(flowId,stepId,request,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
-    private static async Task<IResult> DuplicateWorkflowStep(Guid flowId,Guid stepId,SolicitudesWorkflowApplication application,CancellationToken token)
-    {try{var id=await application.DuplicateStepAsync(flowId,stepId,token);return Results.Created($"/api/solicitudes/administration/workflows/{flowId:D}/steps/{id:D}",new{id});}catch(Exception error){return Problem(error);}}
-    private static async Task<IResult> DeleteWorkflowStep(Guid flowId,Guid stepId,SolicitudesWorkflowApplication application,CancellationToken token)
-    {try{await application.DeleteStepAsync(flowId,stepId,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
-    private static async Task<IResult> UpdateWorkflowStepPosition(Guid flowId,Guid stepId,UpdateSolicitudesWorkflowStepPosition request,SolicitudesWorkflowApplication application,CancellationToken token)
-    {try{await application.UpdateStepPositionAsync(flowId,stepId,request,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
-    private static async Task<IResult> ReadStageForm(Guid stepId,SolicitudesWorkflowApplication application,CancellationToken token)
-    {try{var value=await application.ReadStageFormAsync(stepId,token);return value is null?Results.NoContent():Results.Ok(value);}catch(Exception error){return Problem(error);}}
-    private static async Task<IResult> SaveStageForm(Guid stepId,SaveSolicitudesStageForm request,SolicitudesWorkflowApplication application,CancellationToken token)
-    {try{var id=await application.SaveStageFormAsync(stepId,request,token);return Results.Ok(new{id});}catch(Exception error){return Problem(error);}}
-    private static async Task<IResult> CreateStageFormField(Guid stepId,SaveSolicitudesFormField request,SolicitudesWorkflowApplication application,CancellationToken token)
-    {try{var id=await application.SaveStageFormFieldAsync(stepId,null,request,token);return Results.Created($"/api/solicitudes/administration/workflow-steps/{stepId:D}/form/fields/{id:D}",new{id});}catch(Exception error){return Problem(error);}}
-    private static async Task<IResult> UpdateStageFormField(Guid stepId,Guid fieldId,SaveSolicitudesFormField request,SolicitudesWorkflowApplication application,CancellationToken token)
-    {try{await application.SaveStageFormFieldAsync(stepId,fieldId,request,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
-    private static async Task<IResult> DeleteStageFormField(Guid stepId,Guid fieldId,SolicitudesWorkflowApplication application,CancellationToken token)
-    {try{await application.DeleteStageFormFieldAsync(stepId,fieldId,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
-    private static async Task<IResult> CreateWorkflowRoute(Guid flowId,SaveSolicitudesWorkflowRoute request,SolicitudesWorkflowApplication application,CancellationToken token)
-    {try{var id=await application.SaveRouteAsync(flowId,null,request,token);return Results.Created($"/api/solicitudes/administration/workflows/{flowId:D}/routes/{id:D}",new{id});}catch(Exception error){return Problem(error);}}
-    private static async Task<IResult> UpdateWorkflowRoute(Guid flowId,Guid routeId,SaveSolicitudesWorkflowRoute request,SolicitudesWorkflowApplication application,CancellationToken token)
-    {try{await application.SaveRouteAsync(flowId,routeId,request,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
-    private static async Task<IResult> DeleteWorkflowRoute(Guid flowId,Guid routeId,SolicitudesWorkflowApplication application,CancellationToken token)
-    {try{await application.DeleteRouteAsync(flowId,routeId,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> ListWorkflows(Guid serviceId,ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,SolicitudesWorkflowApplication application,CancellationToken token)
+    {try{await access.DemandServiceAsync(await access.ResolveAsync(principal,token),serviceId,token);return Results.Ok(await application.ListAsync(serviceId,token));}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> ReadWorkflow(Guid flowId,ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,SolicitudesWorkflowApplication application,CancellationToken token)
+    {try{await access.DemandWorkflowAsync(await access.ResolveAsync(principal,token),flowId,token);var value=await application.ReadAsync(flowId,token);return value is null?Results.NotFound():Results.Ok(value);}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> CreateWorkflow(CreateSolicitudesWorkflowDraft request,ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,SolicitudesWorkflowApplication application,CancellationToken token)
+    {try{await access.DemandServiceAsync(await access.ResolveAsync(principal,token),request.ServiceId,token);var id=await application.CreateDraftAsync(request,token);return Results.Created($"/api/solicitudes/administration/workflows/{id:D}",new{id});}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> UpdateWorkflow(Guid flowId,UpdateSolicitudesWorkflowDraft request,ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,SolicitudesWorkflowApplication application,CancellationToken token)
+    {try{await access.DemandWorkflowAsync(await access.ResolveAsync(principal,token),flowId,token);await application.UpdateDraftAsync(flowId,request,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> DeleteWorkflow(Guid flowId,ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,SolicitudesWorkflowApplication application,CancellationToken token)
+    {try{await access.DemandWorkflowAsync(await access.ResolveAsync(principal,token),flowId,token);await application.DeleteDraftAsync(flowId,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> CreateWorkflowStep(Guid flowId,SaveSolicitudesWorkflowStep request,ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,SolicitudesWorkflowApplication application,CancellationToken token)
+    {try{await access.DemandWorkflowAsync(await access.ResolveAsync(principal,token),flowId,token);var id=await application.SaveStepAsync(flowId,null,request,token);return Results.Created($"/api/solicitudes/administration/workflows/{flowId:D}/steps/{id:D}",new{id});}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> UpdateWorkflowStep(Guid flowId,Guid stepId,SaveSolicitudesWorkflowStep request,ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,SolicitudesWorkflowApplication application,CancellationToken token)
+    {try{await access.DemandWorkflowAsync(await access.ResolveAsync(principal,token),flowId,token);await application.SaveStepAsync(flowId,stepId,request,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> UpdateWorkflowStepAssignment(Guid flowId,Guid stepId,UpdateSolicitudesWorkflowAssignment request,ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,SolicitudesWorkflowApplication application,CancellationToken token)
+    {try{var scope=await access.ResolveAsync(principal,token);await access.DemandWorkflowAsync(scope,flowId,token);if(request.UnitId.HasValue)await access.DemandUnitAsync(scope,request.UnitId.Value,token);await application.UpdateStepAssignmentAsync(flowId,stepId,request,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> DuplicateWorkflowStep(Guid flowId,Guid stepId,ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,SolicitudesWorkflowApplication application,CancellationToken token)
+    {try{await access.DemandWorkflowAsync(await access.ResolveAsync(principal,token),flowId,token);var id=await application.DuplicateStepAsync(flowId,stepId,token);return Results.Created($"/api/solicitudes/administration/workflows/{flowId:D}/steps/{id:D}",new{id});}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> DeleteWorkflowStep(Guid flowId,Guid stepId,ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,SolicitudesWorkflowApplication application,CancellationToken token)
+    {try{await access.DemandWorkflowAsync(await access.ResolveAsync(principal,token),flowId,token);await application.DeleteStepAsync(flowId,stepId,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> UpdateWorkflowStepPosition(Guid flowId,Guid stepId,UpdateSolicitudesWorkflowStepPosition request,ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,SolicitudesWorkflowApplication application,CancellationToken token)
+    {try{await access.DemandWorkflowAsync(await access.ResolveAsync(principal,token),flowId,token);await application.UpdateStepPositionAsync(flowId,stepId,request,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> ReadStageForm(Guid stepId,ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,SolicitudesWorkflowApplication application,CancellationToken token)
+    {try{await access.DemandStepAsync(await access.ResolveAsync(principal,token),stepId,token);var value=await application.ReadStageFormAsync(stepId,token);return value is null?Results.NoContent():Results.Ok(value);}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> SaveStageForm(Guid stepId,SaveSolicitudesStageForm request,ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,SolicitudesWorkflowApplication application,CancellationToken token)
+    {try{await access.DemandStepAsync(await access.ResolveAsync(principal,token),stepId,token);var id=await application.SaveStageFormAsync(stepId,request,token);return Results.Ok(new{id});}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> CreateStageFormField(Guid stepId,SaveSolicitudesFormField request,ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,SolicitudesWorkflowApplication application,CancellationToken token)
+    {try{await access.DemandStepAsync(await access.ResolveAsync(principal,token),stepId,token);var id=await application.SaveStageFormFieldAsync(stepId,null,request,token);return Results.Created($"/api/solicitudes/administration/workflow-steps/{stepId:D}/form/fields/{id:D}",new{id});}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> UpdateStageFormField(Guid stepId,Guid fieldId,SaveSolicitudesFormField request,ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,SolicitudesWorkflowApplication application,CancellationToken token)
+    {try{await access.DemandStepAsync(await access.ResolveAsync(principal,token),stepId,token);await application.SaveStageFormFieldAsync(stepId,fieldId,request,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> DeleteStageFormField(Guid stepId,Guid fieldId,ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,SolicitudesWorkflowApplication application,CancellationToken token)
+    {try{await access.DemandStepAsync(await access.ResolveAsync(principal,token),stepId,token);await application.DeleteStageFormFieldAsync(stepId,fieldId,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> CreateWorkflowRoute(Guid flowId,SaveSolicitudesWorkflowRoute request,ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,SolicitudesWorkflowApplication application,CancellationToken token)
+    {try{await access.DemandWorkflowAsync(await access.ResolveAsync(principal,token),flowId,token);var id=await application.SaveRouteAsync(flowId,null,request,token);return Results.Created($"/api/solicitudes/administration/workflows/{flowId:D}/routes/{id:D}",new{id});}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> UpdateWorkflowRoute(Guid flowId,Guid routeId,SaveSolicitudesWorkflowRoute request,ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,SolicitudesWorkflowApplication application,CancellationToken token)
+    {try{await access.DemandWorkflowAsync(await access.ResolveAsync(principal,token),flowId,token);await application.SaveRouteAsync(flowId,routeId,request,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> DeleteWorkflowRoute(Guid flowId,Guid routeId,ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,SolicitudesWorkflowApplication application,CancellationToken token)
+    {try{await access.DemandWorkflowAsync(await access.ResolveAsync(principal,token),flowId,token);await application.DeleteRouteAsync(flowId,routeId,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
 
-    private static async Task<IResult> Administration(ISolicitudesManagementApplication application,CancellationToken token)
-    {try{return Results.Ok(await application.ReadAdministrationAsync(token));}catch(Exception error){return Problem(error);}}
-    private static async Task<IResult> AdministrationExport(ISolicitudesManagementApplication application,CancellationToken token)
-    {try{return Results.Ok(await application.ReadExportAsync(token));}catch(Exception error){return Problem(error);}}
-    private static async Task<IResult> CreateService(SaveSolicitudesService request,ISolicitudesManagementApplication application,CancellationToken token)
-    {try{var id=await application.SaveServiceAsync(null,request,token);return Results.Created($"/api/solicitudes/administration/services/{id:D}",new{id});}catch(Exception error){return Problem(error);}}
-    private static async Task<IResult> UpdateService(Guid id,SaveSolicitudesService request,ISolicitudesManagementApplication application,CancellationToken token)
-    {try{await application.SaveServiceAsync(id,request,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
-    private static async Task<IResult> UnpublishService(Guid id,ISolicitudesManagementApplication application,CancellationToken token)
-    {try{await application.UnpublishServiceAsync(id,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
-    private static async Task<IResult> CreateForm(CreateSolicitudesFormDraft request,ISolicitudesManagementApplication application,CancellationToken token)
-    {try{var id=await application.CreateFormDraftAsync(request,token);return Results.Created($"/api/solicitudes/administration/forms/{id:D}",new{id});}catch(Exception error){return Problem(error);}}
-    private static async Task<IResult> DeleteFormDraft(Guid id,ISolicitudesManagementApplication application,CancellationToken token)
-    {try{await application.DeleteFormDraftAsync(id,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
-    private static async Task<IResult> PublishForm(Guid id,ClaimsPrincipal principal,ISecurityStore security,ISolicitudesManagementApplication application,CancellationToken token)
-    {try{await application.PublishFormAsync(id,await Actor(security,principal,token),token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
-    private static async Task<IResult> ReadAdminForm(Guid id,ISolicitudesManagementApplication application,CancellationToken token)
-    {try{return Results.Ok(await application.ReadFormAsync(id,token));}catch(Exception error){return Problem(error);}}
-    private static async Task<IResult> CreateField(Guid formId,SaveSolicitudesFormField request,ISolicitudesManagementApplication application,CancellationToken token)
-    {try{var id=await application.SaveFormFieldAsync(formId,null,request,token);return Results.Created($"/api/solicitudes/administration/forms/{formId:D}/fields/{id:D}",new{id});}catch(Exception error){return Problem(error);}}
-    private static async Task<IResult> UpdateField(Guid formId,Guid fieldId,SaveSolicitudesFormField request,ISolicitudesManagementApplication application,CancellationToken token)
-    {try{await application.SaveFormFieldAsync(formId,fieldId,request,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
-    private static async Task<IResult> DeleteField(Guid formId,Guid fieldId,ISolicitudesManagementApplication application,CancellationToken token)
-    {try{await application.DeleteFormFieldAsync(formId,fieldId,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> Administration(ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,ISolicitudesManagementApplication application,CancellationToken token)
+    {try{var scope=await access.ResolveAsync(principal,token);var snapshot=await application.ReadAdministrationAsync(token);return Results.Ok(Filter(snapshot,scope));}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> AdministrationExport(ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,ISolicitudesManagementApplication application,CancellationToken token)
+    {try{var scope=await access.ResolveAsync(principal,token);var rows=await application.ReadExportAsync(token);if(!scope.IsGlobalAdministrator){var snapshot=await application.ReadAdministrationAsync(token);var allowed=snapshot.Services.Where(x=>scope.UnitIds.Contains(x.UnitId)).Select(x=>x.Id).ToHashSet();rows=rows.Where(x=>allowed.Contains(x.ServiceId)).ToArray();}return Results.Ok(rows);}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> CreateService(SaveSolicitudesService request,ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,ISolicitudesManagementApplication application,CancellationToken token)
+    {try{var scope=await access.ResolveAsync(principal,token);await access.DemandUnitAsync(scope,request.UnitId,token);var id=await application.SaveServiceAsync(null,request,token);return Results.Created($"/api/solicitudes/administration/services/{id:D}",new{id});}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> UpdateService(Guid id,SaveSolicitudesService request,ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,ISolicitudesManagementApplication application,CancellationToken token)
+    {try{var scope=await access.ResolveAsync(principal,token);await access.DemandServiceAsync(scope,id,token);await access.DemandUnitAsync(scope,request.UnitId,token);await application.SaveServiceAsync(id,request,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> UnpublishService(Guid id,ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,ISolicitudesManagementApplication application,CancellationToken token)
+    {try{await access.DemandServiceAsync(await access.ResolveAsync(principal,token),id,token);await application.UnpublishServiceAsync(id,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> CreateForm(CreateSolicitudesFormDraft request,ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,ISolicitudesManagementApplication application,CancellationToken token)
+    {try{await access.DemandServiceAsync(await access.ResolveAsync(principal,token),request.ServiceId,token);var id=await application.CreateFormDraftAsync(request,token);return Results.Created($"/api/solicitudes/administration/forms/{id:D}",new{id});}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> DeleteFormDraft(Guid id,ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,ISolicitudesManagementApplication application,CancellationToken token)
+    {try{await access.DemandFormAsync(await access.ResolveAsync(principal,token),id,token);await application.DeleteFormDraftAsync(id,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> PublishForm(Guid id,ClaimsPrincipal principal,ISecurityStore security,ISolicitudesAdministrationAuthorization access,ISolicitudesManagementApplication application,CancellationToken token)
+    {try{await access.DemandFormAsync(await access.ResolveAsync(principal,token),id,token);await application.PublishFormAsync(id,await Actor(security,principal,token),token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> ReadAdminForm(Guid id,ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,ISolicitudesManagementApplication application,CancellationToken token)
+    {try{await access.DemandFormAsync(await access.ResolveAsync(principal,token),id,token);return Results.Ok(await application.ReadFormAsync(id,token));}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> CreateField(Guid formId,SaveSolicitudesFormField request,ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,ISolicitudesManagementApplication application,CancellationToken token)
+    {try{await access.DemandFormAsync(await access.ResolveAsync(principal,token),formId,token);var id=await application.SaveFormFieldAsync(formId,null,request,token);return Results.Created($"/api/solicitudes/administration/forms/{formId:D}/fields/{id:D}",new{id});}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> UpdateField(Guid formId,Guid fieldId,SaveSolicitudesFormField request,ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,ISolicitudesManagementApplication application,CancellationToken token)
+    {try{await access.DemandFormAsync(await access.ResolveAsync(principal,token),formId,token);await application.SaveFormFieldAsync(formId,fieldId,request,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
+    private static async Task<IResult> DeleteField(Guid formId,Guid fieldId,ClaimsPrincipal principal,ISolicitudesAdministrationAuthorization access,ISolicitudesManagementApplication application,CancellationToken token)
+    {try{await access.DemandFormAsync(await access.ResolveAsync(principal,token),formId,token);await application.DeleteFormFieldAsync(formId,fieldId,token);return Results.NoContent();}catch(Exception error){return Problem(error);}}
+
+    private static SolicitudesAdminSnapshot Filter(SolicitudesAdminSnapshot value,SolicitudesAdministrationScope scope)
+    {
+        if(scope.IsGlobalAdministrator)return value;
+        var services=value.Services.Where(x=>scope.UnitIds.Contains(x.UnitId)).ToArray();var serviceIds=services.Select(x=>x.Id).ToHashSet();
+        var units=value.Units.Where(x=>scope.UnitIds.Contains(x.Id)).ToArray();
+        var responsibles=value.Responsibles.Where(x=>x.UnitIds.Any(scope.UnitIds.Contains)).Select(x=>x with{UnitIds=x.UnitIds.Where(scope.UnitIds.Contains).ToArray()}).ToArray();
+        return new(services,value.Forms.Where(x=>serviceIds.Contains(x.ServiceId)).ToArray(),responsibles,units,value.Metrics.Where(x=>serviceIds.Contains(x.ServiceId)).ToArray());
+    }
 
     private static async Task<Guid> Actor(ISecurityStore security, ClaimsPrincipal principal, CancellationToken token) =>
         (await security.GetOrProvisionAsync(principal, token)).User.ThirdPartyId
