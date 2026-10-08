@@ -1,23 +1,25 @@
 export const pageSize = 10;
 export const queueSort = "submitted-desc";
-export type QueueFilters = { search: string; serviceId: string; stateId: string; overdue: string };
+export type QueueView = "mine"|"waiting"|"tracking"|"resolved";
+export type QueueFilters = { search: string; serviceId: string; stateId: string; overdue: string; view: QueueView };
 export type QueueQuery = QueueFilters & { page: number };
 export type QueueItem = {id:string;number:string;subject:string;service:string;status:string;statusColor:string|null;requester:string;responsible:string|null;unit:string|null;submittedAt:string|null;dueDate:string|null;isOverdue:boolean;canDelete?:boolean};
 export type QueuePage = {total:number;totalCount:number|null;page:number;pageSize:number;items:QueueItem[];hasNextPage:boolean;continuationToken:string|null};
 export type QueueSnapshot = {query:QueueQuery;data:QueuePage|null;loading:boolean;error:string};
 type Entry = {data:QueuePage;loadedAt:number};
 type FetchPage = (path:string, options:RequestInit)=>Promise<QueuePage>;
-export const emptyFilters:QueueFilters = {search:"",serviceId:"",stateId:"",overdue:""};
+export const emptyFilters:QueueFilters = {search:"",serviceId:"",stateId:"",overdue:"",view:"mine"};
 export function filterKey(filters:QueueFilters) {
-  return JSON.stringify({search:filters.search.trim(),service:filters.serviceId,status:filters.stateId,deadline:filters.overdue,sort:queueSort,pageSize});
+  return JSON.stringify({search:filters.search.trim(),service:filters.serviceId,status:filters.stateId,deadline:filters.overdue,view:filters.view,sort:queueSort,pageSize});
 }
 export function readQueueQuery(search:string):QueueQuery {
   const params = new URLSearchParams(search), page = Number(params.get("page") || 1);
-  return {search:(params.get("search")||"").slice(0,100),serviceId:params.get("serviceId")||"",stateId:params.get("stateId")||"",overdue:["true","false"].includes(params.get("overdue")||"")?params.get("overdue")!:"",page:Number.isSafeInteger(page)&&page>0?page:1};
+  const requestedView=params.get("view")||"mine",view:QueueView=(["mine","waiting","tracking","resolved"] as string[]).includes(requestedView)?requestedView as QueueView:"mine";
+  return {search:(params.get("search")||"").slice(0,100),serviceId:params.get("serviceId")||"",stateId:"",overdue:["true","false"].includes(params.get("overdue")||"")?params.get("overdue")!:"",view,page:Number.isSafeInteger(page)&&page>0?page:1};
 }
 export function queueSearch(query:QueueQuery) {
   const params = new URLSearchParams({page:String(query.page)});
-  for (const name of ["search","serviceId","stateId","overdue"] as const) if(query[name]) params.set(name,query[name]);
+  for (const name of ["search","serviceId","overdue","view"] as const) if(query[name]) params.set(name,query[name]);
   return params;
 }
 export function pagination(snapshot:QueueSnapshot) {

@@ -257,9 +257,9 @@ public static class SolicitudesEndpoints
     }
 
     private static async Task<IResult> ManagementQueue(string? search,Guid? serviceId,Guid? stateId,
-        Guid? responsibleId,bool? overdue,int? page,int? pageSize,string? sort,string? continuationToken,ClaimsPrincipal principal,ISecurityStore security,ISolicitudesManagementApplication application,CancellationToken token)
+        Guid? responsibleId,bool? overdue,int? page,int? pageSize,string? sort,string? continuationToken,string? view,ClaimsPrincipal principal,ISecurityStore security,ISolicitudesManagementApplication application,CancellationToken token)
     {
-        try{return Results.Ok(await application.ReadQueueAsync(await Actor(security,principal,token),new(search,serviceId,stateId,responsibleId,overdue,page??1,pageSize??25,sort??"submitted-desc",continuationToken),token));}
+        try{return Results.Ok(await application.ReadQueueAsync(await Actor(security,principal,token),new(search,serviceId,stateId,responsibleId,overdue,page??1,pageSize??25,sort??"submitted-desc",continuationToken,view??"all"),token));}
         catch(Exception error){return Problem(error);}
     }
 

@@ -228,12 +228,13 @@ internal sealed partial class DataverseSolicitudesWorkflowExecutionWriter(
         var stepRelation=management.Relationship("gaia_PasoFlujo","gaia_pasoflujo");
         var unitRelation=management.Relationship("gaia_UnidadResponsable","gaia_organizacion");
         var responsibleRelation=management.Relationship("gaia_Responsable","gaia_terceros");
+        var managedByRelation=management.Relationship("gaia_GestionadaPor","gaia_terceros");
         var status=management.Attribute("gaia_Estado");var execution=management.Attribute("gaia_NumeroEjecucion");var available=management.Attribute("gaia_FechaDisponibilidad");
         var actorUnits=await ActorUnits(client,actorId,token);
         var active=$"({status} eq {management.EncodedIntegerValue("gaia_Estado",SolicitudesWorkflowValues.ManagementAvailable)} or {status} eq {management.EncodedIntegerValue("gaia_Estado",SolicitudesWorkflowValues.ManagementInProgress)})";
         string access;
         if(queue=="mine")access=$"_{responsibleRelation.ReferencingAttribute}_value eq {actorId:D}";
-        else if(queue=="waiting")access=$"{status} eq {management.EncodedIntegerValue("gaia_Estado",SolicitudesWorkflowValues.ManagementWaiting)}";
+        else if(queue=="waiting")access=$"{status} eq {management.EncodedIntegerValue("gaia_Estado",SolicitudesWorkflowValues.ManagementWaiting)} and _{managedByRelation.ReferencingAttribute}_value eq {actorId:D}";
         else
         {
             if(queue=="unit"&&actorUnits.Count==0)return [];

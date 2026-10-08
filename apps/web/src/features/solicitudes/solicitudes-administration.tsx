@@ -818,13 +818,23 @@ function ServiceCatalog({
                     </td>
                     <td className="pr-4">
                       <div className="flex flex-wrap justify-center gap-2">
+                        <button
+                          className="inline-flex items-center rounded-lg bg-[var(--brand-primary)] px-3 py-2 text-xs font-semibold text-white"
+                          onClick={() => enter(service)}
+                          type="button"
+                        >
+                          Gestionar
+                          <ArrowRight className="ml-1 inline" size={13} />
+                        </button>
                         {canEdit && (
                           <button
-                            className="rounded-lg border border-[var(--gaia-line)] bg-white px-3 py-2 text-xs font-semibold"
+                            aria-label={`Editar ${service.name}`}
+                            className="grid size-9 place-items-center rounded-lg border border-[var(--gaia-line)] bg-white text-[var(--brand-primary)]"
                             onClick={() => edit(service)}
+                            title="Editar servicio"
+                            type="button"
                           >
-                            <Pencil className="mr-1 inline" size={13} />
-                            Editar
+                            <Pencil size={14} />
                           </button>
                         )}
                         {canEdit && (
@@ -833,17 +843,11 @@ function ServiceCatalog({
                             className="grid size-9 place-items-center rounded-lg border border-[#d8a5aa] bg-white text-[#9a384d]"
                             onClick={() => purge(service)}
                             title="Eliminar servicio y todos sus datos de prueba"
+                            type="button"
                           >
                             <Trash2 size={14} />
                           </button>
                         )}
-                        <button
-                          className="rounded-lg bg-[var(--brand-primary)] px-3 py-2 text-xs font-semibold text-white"
-                          onClick={() => enter(service)}
-                        >
-                          Gestionar
-                          <ArrowRight className="ml-1 inline" size={13} />
-                        </button>
                       </div>
                     </td>
                   </tr>

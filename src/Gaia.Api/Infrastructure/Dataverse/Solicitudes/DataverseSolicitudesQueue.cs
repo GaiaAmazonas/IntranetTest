@@ -16,7 +16,7 @@ internal sealed partial class DataverseSolicitudesManagementStore
         var state = await DataverseMetadataResolver.TableAsync(client, "gaia_estadosolicitud", token);
         var third = await DataverseMetadataResolver.TableAsync(client, "gaia_terceros", token);
         var unit = await DataverseMetadataResolver.TableAsync(client, "gaia_organizacion", token);
-        var accessibleRequests = await ReadAccessibleRequestIds(client, actorId, token);
+        var accessibleRequests = await ReadAccessibleRequestIds(client, actorId, filter.View, token);
         if (accessibleRequests.Count == 0) return new(0, filter.Page, filter.PageSize, [], false, 0);
         var path = BuildQueueQuery(filter, request, service, state, third, unit, DateOnly.FromDateTime(DateTime.UtcNow), accessibleRequests);
         var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{client.BaseAddress}|{filter.PageSize}|{path}")));
@@ -152,6 +152,8 @@ internal sealed partial class DataverseSolicitudesManagementStore
         var date = today.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
         if (filter.Overdue == true) clauses.Add($"({due} ne null and {due} lt {date} and ({final} eq false or {final} eq null))");
         if (filter.Overdue == false) clauses.Add($"({due} eq null or {due} ge {date} or {final} eq true)");
+        if (filter.View == "resolved") clauses.Add($"{final} eq true");
+        if (filter.View == "tracking") clauses.Add($"({final} eq false or {final} eq null)");
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
             var term = filter.Search.Trim().Replace("'", "''");
@@ -167,12 +169,26 @@ internal sealed partial class DataverseSolicitudesManagementStore
     private sealed record ActiveAssignment(string? Responsible, string? Unit);
     private sealed record QueueCursor(string Query, int Page, string Path, int? TotalCount);
 
-    private async Task<IReadOnlyCollection<Guid>> ReadAccessibleRequestIds(HttpClient client, Guid actorId, CancellationToken token)
+    private async Task<IReadOnlyCollection<Guid>> ReadAccessibleRequestIds(HttpClient client, Guid actorId, string view, CancellationToken token)
     {
         var management = await DataverseMetadataResolver.TableAsync(client, "gaia_gestionsolicitud", token);
         var request = management.Relationship("gaia_Solicitud", "gaia_solicitud");
         var responsible = management.Relationship("gaia_Responsable", "gaia_terceros");
+        var managedBy = management.Relationship("gaia_GestionadaPor", "gaia_terceros");
         var unit = management.Relationship("gaia_UnidadResponsable", "gaia_organizacion");
+        var step = management.Relationship("gaia_PasoFlujo", "gaia_pasoflujo");
+        var stepTable = await DataverseMetadataResolver.TableAsync(client, "gaia_pasoflujo", token);
+        var status = management.Attribute("gaia_Estado");
+        var active = $"({status} eq {management.EncodedIntegerValue("gaia_Estado",SolicitudesWorkflowValues.ManagementAvailable)} or {status} eq {management.EncodedIntegerValue("gaia_Estado",SolicitudesWorkflowValues.ManagementInProgress)})";
+        var waiting = $"{status} eq {management.EncodedIntegerValue("gaia_Estado",SolicitudesWorkflowValues.ManagementWaiting)}";
+        var completed = $"{status} eq {management.EncodedIntegerValue("gaia_Estado",SolicitudesWorkflowValues.ManagementCompleted)}";
+        async Task<HashSet<Guid>> RequestIds(string criteria)
+        {
+            var rows = await DataverseJson.ReadAllAsync(client,
+                $"{management.EntitySetName}?$select=_{request.ReferencingAttribute}_value&$filter={Uri.EscapeDataString($"statecode eq 0 and ({criteria})")}", token);
+            return rows.Select(row => OptionalGuid(row, $"_{request.ReferencingAttribute}_value"))
+                .Where(id => id.HasValue).Select(id => id!.Value).ToHashSet();
+        }
         var currentDate = DateOnly.FromDateTime(DateTime.UtcNow);
         var actorUnits = (await assignmentStore.ListAsync(token))
             .Where(item => item.IsActive && item.ThirdPartyId == actorId
@@ -180,12 +196,39 @@ internal sealed partial class DataverseSolicitudesManagementStore
                 && (!item.EndDate.HasValue || item.EndDate >= currentDate))
             .Select(item => item.OrganizationalUnitId).Distinct().ToArray();
         var units = string.Join(" or ", actorUnits.Select(id => $"_{unit.ReferencingAttribute}_value eq {id:D}"));
-        var access = actorUnits.Length == 0
+        var generalAccess = actorUnits.Length == 0
             ? $"_{responsible.ReferencingAttribute}_value eq {actorId:D}"
             : $"(_{responsible.ReferencingAttribute}_value eq {actorId:D} or (_{responsible.ReferencingAttribute}_value eq null and ({units})))";
+        var mineCriteria = $"{active} and ({generalAccess})";
+        var waitingCriteria = $"{waiting} and _{managedBy.ReferencingAttribute}_value eq {actorId:D}";
+        if (view == "mine") return await RequestIds(mineCriteria);
+        if (view == "waiting")
+        {
+            var values = await RequestIds(waitingCriteria);
+            values.ExceptWith(await RequestIds(mineCriteria));
+            return values;
+        }
+        if (view is "tracking" or "resolved")
+        {
+            var values = await RequestIds($"{completed} and _{managedBy.ReferencingAttribute}_value eq {actorId:D}");
+            if (view == "tracking")
+            {
+                values.ExceptWith(await RequestIds(mineCriteria));
+                values.ExceptWith(await RequestIds(waitingCriteria));
+            }
+            return values;
+        }
+        if (view == "unit" && actorUnits.Length == 0) return [];
+        var access = view switch
+        {
+            "unit" => $"{active} and _{responsible.ReferencingAttribute}_value eq null and ({units})",
+            "approvals" => $"{active} and ({generalAccess}) and {step.NavigationProperty}/{stepTable.Attribute("gaia_RequiereDecision")} eq true",
+            _ => generalAccess
+        };
         var rows = await DataverseJson.ReadAllAsync(client,
-            $"{management.EntitySetName}?$select=_{request.ReferencingAttribute}_value&$filter={Uri.EscapeDataString($"statecode eq 0 and ({access})")}", token);
+            $"{management.EntitySetName}?$select=_{request.ReferencingAttribute}_value&$expand={step.NavigationProperty}($select={stepTable.Attribute("gaia_RequiereDecision")})&$filter={Uri.EscapeDataString($"statecode eq 0 and ({access})")}", token);
         return rows.Select(row => OptionalGuid(row, $"_{request.ReferencingAttribute}_value"))
             .Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToArray();
     }
+
 }

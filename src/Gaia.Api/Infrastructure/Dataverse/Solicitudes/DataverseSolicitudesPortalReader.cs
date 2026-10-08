@@ -78,9 +78,8 @@ internal sealed class DataverseSolicitudesPortalReader(IDataverseDelegatedClient
         var subject = table.Attribute("gaia_Asunto"); var submitted = table.Attribute("gaia_FechaRadicacion");
         var due = table.Attribute("gaia_FechaLimiteActual"); var serviceLookup = table.Attribute("gaia_Servicio");
         var stateLookup = table.Attribute("gaia_EstadoActual"); var requester = table.Attribute("gaia_Solicitante");
-        var manager = table.Attribute("gaia_ResponsableInterno");
         var rows = await DataverseJson.ReadAllAsync(client,
-            $"{table.EntitySetName}?$select={table.PrimaryIdAttribute},{table.PrimaryNameAttribute},{subject},{submitted},{due},_{serviceLookup}_value,_{stateLookup}_value&$filter=statecode eq 0 and (_{requester}_value eq {actorId:D} or _{manager}_value eq {actorId:D})", token);
+            $"{table.EntitySetName}?$select={table.PrimaryIdAttribute},{table.PrimaryNameAttribute},{subject},{submitted},{due},_{serviceLookup}_value,_{stateLookup}_value&$filter=statecode eq 0 and _{requester}_value eq {actorId:D}", token);
         return rows.Select(row =>
         {
             var serviceId = OptionalGuid(row, $"_{serviceLookup}_value"); var stateId = OptionalGuid(row, $"_{stateLookup}_value");

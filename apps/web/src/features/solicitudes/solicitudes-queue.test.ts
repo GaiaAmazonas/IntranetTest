@@ -67,7 +67,7 @@ describe("Solicitudes queue session",()=>{
   expect(pagination(queue.snapshot)).toEqual({previous:false,next:false,last:1,label:"Mostrando 0–0 de 0"});
  });
  it("restores URL filters/page on reload but creates a new memory cache",async()=>{
-  const fetch=fetcher(),next={...query,search:"cuenta & acceso",stateId:"state",page:3};
+  const fetch=fetcher(),next={...query,search:"cuenta & acceso",serviceId:"service",overdue:"false",page:3};
   expect(readQueueQuery(queueSearch(next).toString())).toEqual(next);
   const queue=new SolicitudesQueue(fetch);await queue.show(next);queue.dispose();await new SolicitudesQueue(fetch).show(next);expect(fetch).toHaveBeenCalledTimes(2);
   expect(readQueueQuery("page=-1").page).toBe(1);

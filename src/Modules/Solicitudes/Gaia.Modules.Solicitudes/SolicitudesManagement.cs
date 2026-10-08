@@ -2,7 +2,7 @@ namespace Gaia.Modules.Solicitudes;
 
 public sealed record SolicitudesQueueFilter(string? Search=null,Guid? ServiceId=null,Guid? StateId=null,
     Guid? ResponsibleId=null,bool? Overdue=null,int Page=1,int PageSize=25,
-    string Sort="submitted-desc",string? ContinuationToken=null);
+    string Sort="submitted-desc",string? ContinuationToken=null,string View="all");
 public sealed record SolicitudesQueueItem(Guid Id,string Number,string Subject,string Service,string Status,
     string? StatusColor,string Requester,string? Responsible,string? Unit,DateTimeOffset? SubmittedAt,
     DateOnly? DueDate,bool IsOverdue,bool CanDelete=false);
@@ -82,6 +82,8 @@ public sealed class SolicitudesManagementApplication(ISolicitudesManagementStore
     {
         if(actorId==Guid.Empty)throw new ArgumentException("No fue posible identificar al usuario.");
         if (filter.Sort != "submitted-desc") throw new ArgumentException("Ordenamiento no válido.");
+        if (filter.View is not ("all" or "mine" or "unit" or "approvals" or "waiting" or "tracking" or "resolved"))
+            throw new ArgumentException("Bandeja no válida.");
         if (filter.ContinuationToken?.Length > 16000) throw new ArgumentException("Continuación no válida.");
         ArgumentNullException.ThrowIfNull(filter);if(filter.Page<1)throw new ArgumentException("La página debe ser mayor que cero.");if(filter.PageSize is <1 or >100)throw new ArgumentException("El tamaño de página debe estar entre 1 y 100.");if(filter.Search?.Length>100)throw new ArgumentException("La búsqueda no puede superar 100 caracteres.");return store.ReadQueueAsync(actorId,filter with{Search=filter.Search?.Trim()},token);
     }
