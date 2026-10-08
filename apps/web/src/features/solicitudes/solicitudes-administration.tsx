@@ -153,7 +153,9 @@ const emptyService: ServiceForm = {
   order: 0,
   responsibleId: "",
   unitId: "",
-  isActive: false,
+  // El estado técnico se mantiene activo; la disponibilidad para el usuario
+  // final se controla exclusivamente mediante publicar/despublicar.
+  isActive: true,
 };
 const emptyField: FieldDraft = {
   code: "",
@@ -395,15 +397,6 @@ export function SolicitudesAdministration() {
                   }
                 />
               </Input>
-            </div>
-            <div className="mt-3">
-              <Toggle
-                checked={serviceForm.isActive}
-                label="Servicio activo"
-                change={(isActive) =>
-                  setServiceForm({ ...serviceForm, isActive })
-                }
-              />
             </div>
             <Actions close={() => setServiceDialog(false)} saving={saving} />
           </form>

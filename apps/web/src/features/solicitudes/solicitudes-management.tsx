@@ -225,6 +225,7 @@ export function SolicitudesManagement() {
       item: WorkflowItem;
       result: number;
     } | null>(null),
+    [takingManagementId, setTakingManagementId] = useState<string | null>(null),
     [uploadingManagementId, setUploadingManagementId] = useState<string | null>(
       null,
     );
@@ -572,6 +573,7 @@ export function SolicitudesManagement() {
   }
   async function takeManagement(item: WorkflowItem) {
     if (!detail) return;
+    setTakingManagementId(item.id);
     setSaving(true);
     setError("");
     try {
@@ -600,6 +602,7 @@ export function SolicitudesManagement() {
         description,
       });
     } finally {
+      setTakingManagementId(null);
       setSaving(false);
     }
   }
@@ -938,6 +941,7 @@ export function SolicitudesManagement() {
             setTransitionId={setTransitionId}
             solution={solution}
             take={takeManagement}
+            takingManagementId={takingManagementId}
             transitionId={transitionId}
             upload={uploadManagementFile}
             uploadingManagementId={uploadingManagementId}
@@ -2006,6 +2010,7 @@ type WorkflowPanelProps = {
   resume: (item: WorkflowItem) => Promise<void>;
   upload: (item: WorkflowItem, file: File) => Promise<void>;
   uploadingManagementId: string | null;
+  takingManagementId: string | null;
   onClose: () => void;
   onComment: (event: FormEvent) => Promise<void>;
   onTransition: (event: FormEvent) => Promise<void>;
@@ -2029,6 +2034,7 @@ function WorkflowPanel(props: WorkflowPanelProps) {
     resume,
     upload,
     uploadingManagementId,
+    takingManagementId,
     onClose,
     onComment,
     setComment,
@@ -2052,9 +2058,11 @@ function WorkflowPanel(props: WorkflowPanelProps) {
         <header className="flex flex-wrap items-start justify-between gap-4 border-b border-[var(--gaia-line)] px-5 py-4 sm:px-7">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[.14em] text-[var(--brand-primary)]">
-              {detail.number} · {detail.service} · Flujo v{workflow.version}
+              {detail.number}
             </p>
-            <h2 className="mt-1 text-2xl font-semibold">{detail.subject}</h2>
+            <h2 className="mt-1 text-2xl font-semibold">
+              {detail.service} · Flujo v{workflow.version}
+            </h2>
             <div className="mt-2 flex flex-wrap gap-2">
               <span
                 className="rounded-full px-3 py-1 text-xs font-semibold"
@@ -2236,6 +2244,7 @@ function WorkflowPanel(props: WorkflowPanelProps) {
                     key={item.id}
                     resume={resume}
                     take={take}
+                    taking={takingManagementId === item.id}
                     upload={upload}
                     uploading={uploadingManagementId === item.id}
                   />
@@ -2659,6 +2668,7 @@ function ManagementCard({
   index,
   complete,
   take,
+  taking = false,
   resume,
   upload,
   uploading = false,
@@ -2669,6 +2679,7 @@ function ManagementCard({
   index?: number;
   complete: (item: WorkflowItem, result: number) => Promise<void>;
   take: (item: WorkflowItem) => Promise<void>;
+  taking?: boolean;
   resume?: (item: WorkflowItem) => Promise<void>;
   upload: (item: WorkflowItem, file: File) => Promise<void>;
   uploading?: boolean;
@@ -2736,8 +2747,8 @@ function ManagementCard({
                   disabled={busy}
                   onClick={() => void take(item)}
                 >
-                  {busy && <LoaderCircle className="animate-spin" size={14} />}{" "}
-                  {busy ? "Tomando gestión…" : "Tomar gestión"}
+                  {taking && <LoaderCircle className="animate-spin" size={14} />}{" "}
+                  {taking ? "Tomando gestión…" : "Tomar gestión"}
                 </button>
               )}
               {canComplete && (

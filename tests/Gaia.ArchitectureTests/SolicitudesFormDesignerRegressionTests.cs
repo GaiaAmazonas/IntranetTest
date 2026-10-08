@@ -91,6 +91,22 @@ public sealed class SolicitudesFormDesignerRegressionTests
     }
 
     [Fact]
+    public void ConnectionEditorIsCompactAndKeepsTechnicalFieldsAutomatic()
+    {
+        var source=Read("solicitudes-workflow-manager.tsx");
+        var editor=Between(source,"{route && definition && (","{formStep && (");
+        Assert.Contains("compact",editor);
+        Assert.Contains("label=\"Desde\"",editor);
+        Assert.Contains("label=\"Hacia\"",editor);
+        Assert.Contains("label=\"Continuar cuando\"",editor);
+        Assert.DoesNotContain("label=\"Código\"",editor);
+        Assert.DoesNotContain("label=\"Orden\"",editor);
+        Assert.DoesNotContain("label=\"Resultado requerido\"",editor);
+        Assert.Contains("source?.requiresDecision",source);
+        Assert.Contains("_A_${target?.code??\"ETAPA\"}_${resultCode}",source);
+    }
+
+    [Fact]
     public void ServiceConfigurationShowsOneProminentPublicationStatusWithoutTechnicalCode()
     {
         var source=ReadDesigner();

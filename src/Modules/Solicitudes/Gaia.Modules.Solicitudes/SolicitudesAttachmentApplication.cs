@@ -137,7 +137,12 @@ public sealed class SolicitudesAttachmentApplication(
         RequireAccess(policy);
         if (!policy.IsManager && attachment.Visibility != AttachmentVisibility.Requester)
             throw new UnauthorizedAccessException("No tiene acceso a este adjunto.");
-        return await storage.DownloadAsync(attachment.File.Id, cancellationToken);
+        var download = await storage.DownloadAsync(attachment.File.Id, cancellationToken);
+        var metadata = download.Metadata with
+        {
+            OriginalName = attachment.File.OriginalName ?? download.Metadata.OriginalName
+        };
+        return new FileDownload(metadata, download.Content);
     }
 
     public async Task DeactivateAsync(Guid attachmentId, Guid actorThirdPartyId, CancellationToken cancellationToken)

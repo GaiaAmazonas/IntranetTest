@@ -288,12 +288,18 @@ export function SolicitudesWorkflowManager({
     e.preventDefault();
     if (!definition || !route) return;
     const updating = "id" in route;
-    const duplicate=definition.routes.find(item=>item.active&&(!updating||item.id!==route.id)&&item.sourceStepId===route.sourceStepId&&item.targetStepId===route.targetStepId&&item.requiredResult===route.requiredResult);
+    const source=definition.steps.find(item=>item.id===route.sourceStepId),target=definition.steps.find(item=>item.id===route.targetStepId);
+    const requiredResult=source?.requiresDecision
+      ? [299540171,299540172].includes(route.requiredResult)?route.requiredResult:299540171
+      : 299540170;
+    const resultCode=requiredResult===299540171?"APROBADO":requiredResult===299540172?"RECHAZADO":"COMPLETADO";
+    const normalized={...route,requiredResult,code:`${source?.code??"ETAPA"}_A_${target?.code??"ETAPA"}_${resultCode}`.slice(0,80),order:updating?route.order:(definition.routes.length+1)*10};
+    const duplicate=definition.routes.find(item=>item.active&&(!updating||item.id!==route.id)&&item.sourceStepId===normalized.sourceStepId&&item.targetStepId===normalized.targetStepId&&item.requiredResult===normalized.requiredResult);
     if(duplicate){const detail="Ya existe una conexión con el mismo origen, destino y resultado.";setError(detail);notify({tone:"error",title:"Conexión duplicada",description:detail});return;}
     await run(async () => {
       await apiRequest(
         `/api/solicitudes/administration/workflows/${definition.id}/routes${updating ? `/${route.id}` : ""}`,
-        { method: updating ? "PUT" : "POST", body: JSON.stringify(route) },
+        { method: updating ? "PUT" : "POST", body: JSON.stringify(normalized) },
       );
       setRoute(null);
       setDefinition(
@@ -410,6 +416,8 @@ export function SolicitudesWorkflowManager({
     }
   }
   const draft = definition?.status === 299540130,
+    routeSource = route && definition ? definition.steps.find(item=>item.id===route.sourceStepId) : null,
+    routeNeedsDecision = Boolean(routeSource?.requiresDecision),
     canRepublish = Boolean(canEdit && !service.visible && definition?.status === 299540131),
     checks = definition ? publicationChecks(definition) : [],
     allChecks = [
@@ -773,53 +781,22 @@ export function SolicitudesWorkflowManager({
       <ConfirmDialog confirmLabel="Eliminar conexión definitivamente" description={deleteRouteTarget?`Se eliminará definitivamente la conexión «${friendly(name(definition?.steps??[],deleteRouteTarget.sourceStepId))} → ${friendly(name(definition?.steps??[],deleteRouteTarget.targetStepId))}». Esta acción no se puede deshacer.`:""} destructive loading={busy} onCancel={()=>setDeleteRouteTarget(null)} onConfirm={()=>{if(deleteRouteTarget)void deleteRoute(deleteRouteTarget)}} open={Boolean(deleteRouteTarget)} title="¿Eliminar definitivamente esta conexión?"/>
       {route && definition && (
         <Dialog
-          title={"id" in route ? "Editar ruta" : "Nueva ruta"}
+          title={"id" in route ? "Editar conexión" : "Nueva conexión"}
           close={() => setRoute(null)}
           submit={saveRoute}
           busy={busy}
+          compact
         >
           {"id" in route&&draft&&<button className="mb-4 inline-flex items-center gap-2 rounded-xl border border-[#dba6a1] px-3 py-2 text-xs font-semibold text-[#9a384d] hover:bg-[#fff0f0]" onClick={()=>{setDeleteRouteTarget(route);setRoute(null)}} type="button"><Trash2 size={14}/>Eliminar conexión</button>}
           <Grid>
-            <Input label="Código">
-              <input
-                required
-                value={route.code}
-                onChange={(e) =>
-                  setRoute({
-                    ...route,
-                    code: e.target.value.toUpperCase().replace(/\s+/g, "_"),
-                  })
-                }
-              />
-            </Input>
-            <Input label="Resultado requerido">
-              <select
-                value={route.requiredResult}
-                onChange={(e) =>
-                  setRoute({ ...route, requiredResult: Number(e.target.value) })
-                }
-              >
-                {[
-                  [299540170, "Completado"],
-                  [299540171, "Aprobado"],
-                  [299540172, "Rechazado"],
-                  [299540173, "Devuelto"],
-                  [299540174, "Requiere aprobación"],
-                  [299540175, "No aplica"],
-                ].map((x) => (
-                  <option key={x[0]} value={x[0]}>
-                    {x[1]}
-                  </option>
-                ))}
-              </select>
-            </Input>
             <Input label="Desde">
               <select
                 required
                 value={route.sourceStepId}
-                onChange={(e) =>
-                  setRoute({ ...route, sourceStepId: e.target.value })
-                }
+                onChange={(e) => {
+                  const source=definition.steps.find(item=>item.id===e.target.value);
+                  setRoute({ ...route, sourceStepId: e.target.value, requiredResult: source?.requiresDecision ? 299540171 : 299540170 });
+                }}
               >
                 <option value="">Seleccionar</option>
                 {definition.steps.map((x) => (
@@ -845,16 +822,12 @@ export function SolicitudesWorkflowManager({
                 ))}
               </select>
             </Input>
-            <Input label="Orden">
-              <input
-                min={0}
-                type="number"
-                value={route.order}
-                onChange={(e) =>
-                  setRoute({ ...route, order: Number(e.target.value) })
-                }
-              />
-            </Input>
+            {routeNeedsDecision && <Input help="La conexión se activará únicamente con esta decisión de la etapa anterior." label="Continuar cuando">
+              <select value={[299540171,299540172].includes(route.requiredResult)?route.requiredResult:299540171} onChange={(e)=>setRoute({...route,requiredResult:Number(e.target.value)})}>
+                <option value={299540171}>Se apruebe</option>
+                <option value={299540172}>Se rechace</option>
+              </select>
+            </Input>}
           </Grid>
         </Dialog>
       )}
