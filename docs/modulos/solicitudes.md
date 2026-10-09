@@ -75,6 +75,8 @@ La operación usa una sola vista general adaptada por permisos:
 
 Las bandejas consideran terminal una solicitud cuando el estado está marcado como final o su código es `CERRADA`/`RESUELTA`; así una inconsistencia histórica del indicador `gaia_EsFinal` no devuelve solicitudes cerradas a “En gestión”. En el expediente, los formularios de etapas finalizadas se presentan por fecha real de finalización, con fecha de disponibilidad y número de ejecución únicamente como desempates estables.
 
+La bandeja operativa no expone acciones para eliminar o retirar solicitudes, sin importar su estado. La vista **Cerradas** agrega una columna **Constancia** que obtiene el detalle y el recorrido de la solicitud en segundo plano y descarga directamente el PDF institucional, sin abrir previamente el expediente. El cambio de responsable general solo aparece en **Mis pendientes**, **Esperando respuesta** y **En gestión**; se oculta en **Cerradas** y **Todas**. Esta acción actualiza la responsabilidad general de la solicitud, mientras que la reasignación de una etapa activa se realiza desde el expediente mediante **Reasignar etapa**.
+
 La bandeja pagina y filtra en Dataverse mediante `@odata.nextLink`; no usa `$skip`. Búsqueda, servicio, estado, plazo y orden forman la consulta. Las gestiones vencidas y fechas próximas tienen prioridad.
 
 El rol puede tener `gaia_administracionglobal`; esta propiedad amplía alcance organizacional solo junto con el permiso funcional correspondiente. No se deduce del nombre del rol. Los roles departamentales permanecen restringidos a sus unidades.
@@ -89,7 +91,11 @@ Una persona autorizada ve:
 4. próximos destinos explicados sin códigos técnicos;
 5. conversación, notas internas, historial y adjuntos.
 
+El recorrido gráfico de la solicitud reutiliza la misma representación de solo lectura en AdminCore e Intranet. Ocupa el ancho disponible del expediente, conserva las ramas según la posición publicada y diferencia mediante texto y color las etapas completadas, actuales y pendientes; en pantallas estrechas ofrece desplazamiento horizontal controlado. En la Intranet, el modal se abre inmediatamente con un estado de carga mientras detalle, recorrido y archivos se consultan en paralelo; después muestra las gestiones finalizadas en orden cronológico con la decisión, fecha, área, responsable y observación disponibles en el contrato autorizado. Los archivos mantienen la misma jerarquía visual de AdminCore e identifican si pertenecen a la solicitud o a una gestión.
+
 Etapas anteriores son de solo lectura. Solo la gestión activa autorizada se modifica. El historial distingue información interna de visible para el solicitante.
+
+La constancia PDF de una solicitud cerrada es un documento institucional: usa el logotipo y la identidad visual de Gaia, presenta el resumen de la solicitud, el resultado de cierre, las gestiones de etapa en orden cronológico y la conversación visible para el solicitante. Cada gestión identifica etapa, decisión, fecha, unidad, responsable, observación y respuestas de su formulario cuando el contrato autorizado las entrega. Las notas internas se excluyen porque la constancia puede compartirse fuera del equipo de gestión; el documento pagina automáticamente y repite encabezado y pie institucional. En **Mis solicitudes** de la Intranet, las filas cerradas o resueltas muestran junto a **Ver** un acceso directo a esta constancia; el detalle y el recorrido se consultan en segundo plano sin abrir el modal.
 
 ## SLA y reasignación
 

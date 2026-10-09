@@ -7,11 +7,11 @@ import {
   type FormEvent,
 } from "react";
 import { AppHeader } from "@/components/app-header";
-import { ConfirmDialog } from "@/components/form-dialog";
 import { useFeedback } from "@/components/feedback";
 import { useSecurity } from "@/components/security-context";
 import { apiRequest } from "@/lib/api-client";
 import { orderCompletedManagements } from "./solicitudes-workflow-order";
+import { WorkflowRouteMap } from "./solicitudes-workflow-route-map";
 import {
   AlertTriangle,
   ArrowRightCircle,
@@ -24,7 +24,6 @@ import {
   Paperclip,
   RefreshCw,
   Search,
-  Trash2,
   UserRoundCog,
   X,
 } from "lucide-react";
@@ -54,7 +53,6 @@ type Item = {
   submittedAt: string | null;
   dueDate: string | null;
   isOverdue: boolean;
-  canDelete?: boolean;
 };
 import {
   SolicitudesQueue,
@@ -206,7 +204,6 @@ export function SolicitudesManagement() {
     [unitId, setUnitId] = useState(""),
     [reason, setReason] = useState(""),
     [saving, setSaving] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<Item | null>(null);
   const [detail, setDetail] = useState<Detail | null>(null),
     [workflow, setWorkflow] = useState<Workflow | null>(null),
     [attachments, setAttachments] = useState<Attachment[]>([]),
@@ -217,7 +214,8 @@ export function SolicitudesManagement() {
     [rating, setRating] = useState(""),
     [auditOpen, setAuditOpen] = useState(false),
     [stageAssignmentOpen, setStageAssignmentOpen] = useState(false),
-    [openingRequestId, setOpeningRequestId] = useState<string | null>(null);
+    [openingRequestId, setOpeningRequestId] = useState<string | null>(null),
+    [downloadingRequestId, setDownloadingRequestId] = useState<string | null>(null);
   const [queueCountsLoading, setQueueCountsLoading] = useState(true),
     [queueCountsRevision, setQueueCountsRevision] = useState(0),
     [queueHelpOpen, setQueueHelpOpen] = useState(false),
@@ -353,36 +351,22 @@ export function SolicitudesManagement() {
       setSaving(false);
     }
   }
-  async function deleteResolved() {
-    if (!deleteTarget || saving) return;
-    setSaving(true);
+  async function downloadClosure(item: Item) {
+    if (downloadingRequestId) return;
+    setDownloadingRequestId(item.id);
     setError("");
     try {
-      await apiRequest(
-        `/api/solicitudes/management/requests/${deleteTarget.id}`,
-        { method: "DELETE" },
-      );
-      const number = deleteTarget.number;
-      setDeleteTarget(null);
-      if (detail?.id === deleteTarget.id) {
-        setDetail(null);
-        setWorkflow(null);
-      }
-      await load();
-      notify({
-        tone: "success",
-        title: "Solicitud eliminada",
-        description: `${number} fue retirada de las bandejas. Su trazabilidad se conserva en Dataverse.`,
-      });
+      const [request, workflowData] = await Promise.all([
+        apiRequest<Detail>(`/api/solicitudes/requests/${item.id}`, { cache: "no-store" }),
+        apiRequest<Workflow>(`/api/solicitudes/requests/${item.id}/workflow`, { cache: "no-store" }),
+      ]);
+      await downloadClosurePdf({ ...request, managements: workflowData.managements });
     } catch (value) {
-      const description =
-        value instanceof Error
-          ? value.message
-          : "No fue posible eliminar la solicitud.";
+      const description = value instanceof Error ? value.message : "No fue posible generar la constancia.";
       setError(description);
-      notify({ tone: "error", title: "No se pudo eliminar", description });
+      notify({ tone: "error", title: "No se pudo descargar el PDF", description });
     } finally {
-      setSaving(false);
+      setDownloadingRequestId(null);
     }
   }
   async function manage(id: string) {
@@ -917,11 +901,12 @@ export function SolicitudesManagement() {
             <table className="w-full min-w-[900px] table-fixed text-left text-xs">
               <thead className="bg-[#edf3ef] text-[10px] uppercase tracking-wider text-[var(--gaia-ink-500)]">
                 <tr>
-                  <th className="w-[29%] px-5 py-3">Solicitud</th>
-                  <th className="w-[17%] px-3 py-3">Servicio</th>
-                  <th className="w-[23%] px-3 py-3">Atención actual</th>
-                  <th className="w-[15%] px-3 py-3 text-center">Estado y plazo</th>
-                  <th className="w-[16%] px-5 py-3 text-right">Acciones</th>
+                  <th className={`${view === "resolved" ? "w-[25%]" : "w-[29%]"} px-5 py-3`}>Solicitud</th>
+                  <th className={`${view === "resolved" ? "w-[16%]" : "w-[17%]"} px-3 py-3`}>Servicio</th>
+                  <th className={`${view === "resolved" ? "w-[20%]" : "w-[23%]"} px-3 py-3`}>Atención actual</th>
+                  <th className={`${view === "resolved" ? "w-[14%]" : "w-[15%]"} px-3 py-3 text-center`}>Estado y plazo</th>
+                  {view === "resolved" && <th className="w-[12%] px-3 py-3 text-center">Constancia</th>}
+                  <th className={`${view === "resolved" ? "w-[13%]" : "w-[16%]"} px-5 py-3 text-right`}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -974,6 +959,20 @@ export function SolicitudesManagement() {
                         {item.dueDate ? formatDateOnly(item.dueDate) : "Sin fecha límite"}
                       </span>
                     </td>
+                    {view === "resolved" && (
+                      <td className="px-3 py-4 text-center">
+                        <button
+                          aria-label={`Descargar constancia PDF de ${item.number}`}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--brand-primary)] bg-white px-3 py-2 font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--gaia-accent-pale)] disabled:cursor-wait disabled:opacity-60"
+                          disabled={Boolean(downloadingRequestId)}
+                          onClick={() => void downloadClosure(item)}
+                          type="button"
+                        >
+                          {downloadingRequestId === item.id ? <LoaderCircle className="animate-spin" size={14} /> : <FileDown size={14} />}
+                          PDF
+                        </button>
+                      </td>
+                    )}
                     <td className="px-5 py-4 text-right">
                       <div className="flex flex-wrap justify-end gap-1.5">
                         <button
@@ -984,31 +983,19 @@ export function SolicitudesManagement() {
                           <ArrowRightCircle size={14} />
                           Gestionar
                         </button>
-                        {security.can("HD.SOLICITUDES.REASIGNAR") && (
+                        {(["mine", "waiting", "tracking"] as QueueView[]).includes(view) && security.can("HD.SOLICITUDES.REASIGNAR") && (
                           <button
-                            aria-label={`Reasignar ${item.number}`}
+                            aria-label={`Cambiar responsable general de ${item.number}`}
                             className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--gaia-line)] px-2.5 py-2 font-semibold text-[var(--brand-primary)]"
                             onClick={() => {
                               setSelected(item);
                               setResponsibleId("");
                               setUnitId("");
                             }}
-                            title="Reasignar solicitud"
+                            title="Cambiar responsable general de la solicitud"
                             type="button"
                           >
                             <UserRoundCog size={14} />
-                          </button>
-                        )}
-                        {view === "resolved" && item.canDelete && security.can("HD.SOLICITUDES.REASIGNAR") && (
-                          <button
-                            aria-label={`Retirar ${item.number} de la bandeja`}
-                            className="inline-flex items-center rounded-lg border border-[#d9a7af] px-2.5 py-2 text-[#96394b] transition hover:bg-[#fff0f0]"
-                            disabled={saving}
-                            onClick={() => setDeleteTarget(item)}
-                            title="Retirar solicitud resuelta de la bandeja"
-                            type="button"
-                          >
-                            <Trash2 size={14} />
                           </button>
                         )}
                       </div>
@@ -1075,20 +1062,6 @@ export function SolicitudesManagement() {
           </nav>
         </section>
       </div>
-      <ConfirmDialog
-        confirmLabel="Sí, eliminar solicitud"
-        description={
-          deleteTarget
-            ? `${deleteTarget.number} está resuelta y será retirada de las bandejas operativas. Se conservarán sus gestiones, archivos e historial para auditoría.`
-            : ""
-        }
-        destructive
-        loading={saving}
-        onCancel={() => setDeleteTarget(null)}
-        onConfirm={() => void deleteResolved()}
-        open={Boolean(deleteTarget)}
-        title="¿Eliminar esta solicitud resuelta?"
-      />
       {detail && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/35 p-4">
           <section className="max-h-[92vh] w-full max-w-4xl overflow-auto rounded-3xl bg-[var(--surface-card)] p-6 shadow-2xl">
@@ -1295,10 +1268,10 @@ export function SolicitudesManagement() {
             onSubmit={reassign}
           >
             <h2 className="text-xl font-semibold">
-              Reasignar {selected.number}
+              Cambiar responsable general de {selected.number}
             </h2>
             <p className="mt-1 text-xs text-[var(--gaia-ink-500)]">
-              El cambio quedará registrado en el historial funcional.
+              Esta acción cambia el responsable general y la unidad de la solicitud. No modifica la asignación de una etapa activa; para ello usa “Reasignar etapa” dentro de Gestionar. El cambio quedará registrado en el historial funcional.
             </p>
             <label className="mt-5 block text-xs font-semibold">
               Responsable
@@ -1815,7 +1788,7 @@ function WorkflowPanel(props: WorkflowPanelProps) {
         </header>
 
         <div className="flex-1 overflow-auto">
-          <main className="mx-auto max-w-[980px] space-y-5 px-4 py-5 sm:px-7 sm:py-7">
+          <main className="mx-auto w-full max-w-[1240px] space-y-5 px-4 py-5 sm:px-7 sm:py-7">
             <section className="overflow-hidden rounded-2xl border border-[var(--gaia-line)] bg-white">
               <div className="p-5 sm:p-6">
                 <p className="text-[10px] font-bold uppercase tracking-[.14em] text-[var(--brand-primary)]">
@@ -2430,77 +2403,6 @@ function AnswerList({ answers, compact = false }: { answers: WorkflowAnswer[]; c
         </div>
       ))}
     </dl>
-  );
-}
-
-function WorkflowRouteMap({ workflow }: { workflow: Workflow }) {
-  const steps = (workflow.steps ?? []).filter((item) => item.active);
-  if (!steps.length)
-    return <Empty text="El recorrido gráfico no está disponible para esta solicitud." />;
-  const positioned = steps.map((step, index) => ({
-    step,
-    rawX: step.positionX ?? index * 220,
-    rawY: step.positionY ?? 0,
-  }));
-  const xValues = [...new Set(positioned.map((item) => item.rawX))].sort(
-    (a, b) => a - b,
-  );
-  const yValues = [...new Set(positioned.map((item) => item.rawY))].sort(
-    (a, b) => a - b,
-  );
-  const nodes = positioned.map((item) => ({
-    ...item,
-    left: 20 + xValues.indexOf(item.rawX) * 190,
-    top: 20 + yValues.indexOf(item.rawY) * 94,
-  }));
-  const width = Math.max(560, xValues.length * 190 + 20);
-  const height = Math.max(150, yValues.length * 94 + 30);
-  const byId = new Map(nodes.map((item) => [item.step.id, item]));
-  const statusOf = (stepId: string) => {
-    const rows = workflow.managements.filter((item) => item.stepId === stepId);
-    if (rows.some((item) => item.status === 299540194)) return "completed";
-    if (rows.some((item) => [299540191, 299540192, 299540193].includes(item.status))) return "current";
-    if (rows.some((item) => item.status === 299540195)) return "cancelled";
-    return "pending";
-  };
-  const labelOf = (step: WorkflowStep) =>
-    workflow.managements.find((item) => item.stepId === step.id)?.formTitle ||
-    friendlyStep(step.code);
-  return (
-    <div>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h3 className="text-sm font-semibold">Ruta de la solicitud</h3>
-          <p className="mt-1 text-xs text-[var(--gaia-ink-500)]">
-            Verde: completada · Azul: etapa actual · Gris: pendiente
-          </p>
-        </div>
-      </div>
-      <div className="overflow-x-auto rounded-2xl border border-[var(--gaia-line)] bg-[#fafcfb]">
-        <div className="relative" style={{ height, minWidth: width }}>
-          <svg aria-hidden="true" className="absolute inset-0" height={height} width={width}>
-            <defs>
-              <marker id="workflow-arrow" markerHeight="7" markerWidth="7" orient="auto" refX="6" refY="3.5">
-                <path d="M0,0 L7,3.5 L0,7 Z" fill="#91a49e" />
-              </marker>
-            </defs>
-            {(workflow.routes ?? []).filter((route) => route.active).map((route) => {
-              const source = byId.get(route.sourceStepId), target = byId.get(route.targetStepId);
-              if (!source || !target) return null;
-              const reached = statusOf(route.targetStepId) !== "pending";
-              return <line key={route.id} markerEnd="url(#workflow-arrow)" stroke={reached ? "#28766f" : "#c4cfcb"} strokeWidth={reached ? 2.5 : 1.5} x1={source.left + 150} x2={target.left - 7} y1={source.top + 30} y2={target.top + 30} />;
-            })}
-          </svg>
-          {nodes.map(({ step, left, top }) => {
-            const status = statusOf(step.id);
-            return <article className={`absolute w-[150px] rounded-xl border-2 px-3 py-2 shadow-sm ${status === "completed" ? "border-[#65a795] bg-[#e8f6f1]" : status === "current" ? "border-[var(--brand-primary)] bg-white" : "border-[#d6dedb] bg-[#f3f5f4]"}`} key={step.id} style={{ left, top }}>
-              <small className="block text-[9px] font-bold uppercase tracking-wider text-[var(--gaia-ink-500)]">{status === "completed" ? "Completada" : status === "current" ? "Actual" : status === "cancelled" ? "No recorrida" : "Pendiente"}</small>
-              <strong className="mt-1 block truncate text-xs" title={labelOf(step)}>{labelOf(step)}</strong>
-            </article>;
-          })}
-        </div>
-      </div>
-    </div>
   );
 }
 
