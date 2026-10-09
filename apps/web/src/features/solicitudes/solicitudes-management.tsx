@@ -11,6 +11,7 @@ import { ConfirmDialog } from "@/components/form-dialog";
 import { useFeedback } from "@/components/feedback";
 import { useSecurity } from "@/components/security-context";
 import { apiRequest } from "@/lib/api-client";
+import { orderCompletedManagements } from "./solicitudes-workflow-order";
 import {
   AlertTriangle,
   ArrowRightCircle,
@@ -1739,7 +1740,8 @@ function WorkflowPanel(props: WorkflowPanelProps) {
   );
   const hasAvailable = current.some((item) => item.canTake),
     hasInProgress = current.some((item) => item.canManage);
-  const completedForms = previous.filter((item) => item.answers.length > 0);
+  const chronologicalPrevious = orderCompletedManagements(previous);
+  const completedForms = chronologicalPrevious.filter((item) => item.answers.length > 0);
   const conversationEntries = [
     ...detail.comments.map((item) => ({
       id: `comment-${item.id}`,
@@ -2013,7 +2015,7 @@ function WorkflowPanel(props: WorkflowPanelProps) {
                         Registro cronológico de las etapas que ya finalizaron.
                       </p>
                     </div>
-                    {[...previous].reverse().map((item, index) => (
+                    {[...chronologicalPrevious].reverse().map((item, index) => (
                       <article className="relative rounded-xl border border-[var(--gaia-line)] p-4 pl-14" key={item.id}>
                         <span className="absolute left-4 top-4 grid size-7 place-items-center rounded-full bg-[var(--surface-muted)] text-xs font-bold text-[var(--brand-primary)]">
                           {previous.length - index}

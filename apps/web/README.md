@@ -1,37 +1,43 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Frontend Gaia
 
-## Getting Started
+Frontend compartido de Intranet y AdminCore, construido con Next.js 16, React 19, TypeScript y Tailwind CSS 4.
 
-First, run the development server:
+La arquitectura completa está en [`../../docs/README.md`](../../docs/README.md) y el sistema de diseño en [`../../docs/05-frontend-diseno.md`](../../docs/05-frontend-diseno.md).
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Configuración
+
+Crear `.env.local` a partir del ejemplo cuando sea necesario:
+
+```dotenv
+NEXT_PUBLIC_GAIA_API_URL=https://localhost:7168
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Las variables `NEXT_PUBLIC_*` llegan al navegador y no pueden contener secretos.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Desarrollo
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```powershell
+pnpm install --frozen-lockfile
+pnpm dev
+```
 
-## Learn More
+La aplicación escucha en `http://localhost:3000`. La API debe estar disponible en la URL configurada y aceptar ese origen.
 
-To learn more about Next.js, take a look at the following resources:
+## Verificación
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```powershell
+pnpm exec tsc --noEmit
+pnpm test
+pnpm exec eslint . --max-warnings 0
+pnpm build
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+El proyecto usa exportación estática (`output: "export"`) y genera `out/`. No se deben implementar reglas empresariales en rutas API de Next o Server Actions; el backend es Gaia.Api.
 
-## Deploy on Vercel
+## Convenciones
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-> **Nota:** este archivo proviene de la plantilla de Next.js y no define la arquitectura de Gaia. La guía vigente está en `../../Md/00_GOBIERNO_DOCUMENTAL_Y_ARQUITECTURA.md`.
+- Reutilizar `src/components`, `src/lib/api-client.ts` y tokens de `src/app/globals.css`.
+- Actualizar `src/lib/route-access.ts` cuando se añada una ruta protegida.
+- Tratar el control de ruta del cliente como experiencia, no como autorización definitiva.
+- Mantener estados de carga, vacío, error, `401` y `403`.
+- No mostrar GUID, nombres lógicos ni códigos técnicos como instrucciones de usuario.

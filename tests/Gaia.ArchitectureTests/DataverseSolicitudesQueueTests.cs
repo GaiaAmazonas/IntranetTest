@@ -25,6 +25,18 @@ public sealed class DataverseSolicitudesQueueTests
     }
 
     [Theory]
+    [InlineData("resolved", "gaia_esfinal eq true", "gaia_codigo eq 'CERRADA'", "gaia_codigo eq 'RESUELTA'")]
+    [InlineData("tracking", "gaia_esfinal eq false or gaia_EstadoActual/gaia_esfinal eq null", "gaia_codigo ne 'CERRADA'", "gaia_codigo ne 'RESUELTA'")]
+    public void TerminalViewsHonorStateCodesEvenWhenFinalFlagIsInconsistent(string view,params string[] expected)
+    {
+        var query=DataverseSolicitudesManagementStore.BuildQueueQuery(
+            new(null,null,null,null,null,1,10,View:view),Request(),Service(),State(),Third(),Unit(),new DateOnly(2026,10,9));
+
+        var decoded=Uri.UnescapeDataString(query);
+        foreach(var value in expected)Assert.Contains(value,decoded);
+    }
+
+    [Theory]
     [InlineData("{\"@odata.count\":37,\"value\":[]}",37)]
     [InlineData("{\"value\":[]}",null)]
     [InlineData("{\"@odata.count\":5000,\"@Microsoft.Dynamics.CRM.totalrecordcountlimitexceeded\":true,\"value\":[]}",null)]

@@ -1,43 +1,27 @@
 # Gaia Enterprise Platform
 
-Plataforma empresarial modular con AdminCore e intranet. El repositorio conserva el código fuente, historial, migraciones, pruebas, recursos visuales y archivos de configuración de ejemplo necesarios para reconstruir el entorno en otro computador.
+Gaia es una plataforma empresarial modular con Intranet y AdminCore. El frontend se construye con Next.js/React y la API con ASP.NET Core; Microsoft Entra ID provee identidad, Dataverse almacena información empresarial y SharePoint conserva archivos mediante Microsoft Graph.
 
-Los Excel, datos personales, credenciales y configuraciones reales de una organización permanecen fuera de Git.
+## Documentación
 
-## Arquitectura actual
+La fuente oficial y navegable es [docs/README.md](docs/README.md). Allí se encuentran arquitectura, seguridad, módulos, API y datos, frontend, instalación, desarrollo, ADR y la clasificación de documentación histórica.
 
-Antes de modificar el proyecto, leer [Gobierno documental y arquitectura canónica](Md/00_GOBIERNO_DOCUMENTAL_Y_ARQUITECTURA.md). Para continuar el desarrollo en una nueva conversación, seguir después con [Contexto para un nuevo chat](Md/CONTEXTO_PARA_NUEVO_CHAT.md). Estos documentos establecen qué fuentes son vigentes y cuáles son solamente antecedentes.
+Antes de modificar código, leer también [AGENTS.md](AGENTS.md).
 
-- Frontend: Next.js 16, React 19, TypeScript y Tailwind CSS.
-- API: ASP.NET Core sobre .NET 10.
-- Autenticación: Microsoft Entra ID mediante OpenID Connect.
-- Datos empresariales activos: Microsoft Dataverse Web API v9.2.
-- Persistencia empresarial: Microsoft Dataverse mediante Web API OData.
-- Arquitectura: monolito modular con puertos y adaptadores.
-- Pruebas: xUnit, Vitest, TypeScript y ESLint.
+## Estructura
 
-## Contenido protegido por Git
-
-- `apps/web`: frontend AdminCore e intranet.
-- `src/Gaia.Api`: API y adaptadores de Dataverse.
-- `src/Modules`: contratos, reglas y endpoints de los módulos de dominio.
+- `apps/web`: frontend de Intranet y AdminCore.
+- `src/Gaia.Api`: API, composición y adaptadores.
+- `src/Modules`: contratos y reglas de dominio.
+- `src/BuildingBlocks`: capacidades transversales.
 - `tests`: pruebas automatizadas.
-- `Md`: documentación funcional y arquitectónica.
-- `apps/web/public`: recursos visuales utilizados por la aplicación.
-- migraciones EF Core, lockfiles y versiones de herramientas.
+- `docs`: documentación oficial única, incluidos módulos y ADR.
 
-## Requisitos para un computador nuevo
+## Inicio rápido
 
-- Git.
-- .NET SDK `10.0.301` o una revisión compatible indicada en `global.json`.
-- Node.js 24 y pnpm.
-- Visual Studio Code es opcional.
-
-## Recuperación desde GitHub
+Requisitos: Git, .NET SDK definido en `global.json`, Node.js compatible y pnpm.
 
 ```powershell
-git clone https://github.com/hackmunar/GestionProyecto.git
-Set-Location GestionProyecto
 dotnet tool restore
 dotnet restore Gaia.Platform.slnx
 Set-Location apps\web
@@ -45,26 +29,7 @@ pnpm install --frozen-lockfile
 Set-Location ..\..
 ```
 
-## Configuración local segura
-
-Copie `src/Gaia.Api/appsettings.Development.example.json` como `src/Gaia.Api/appsettings.Development.json`. Este último está ignorado por Git.
-
-Registre el secreto de Entra ID sin escribirlo en archivos versionados:
-
-```powershell
-dotnet user-secrets set "MicrosoftEntra:ClientSecret" "VALOR_REAL" --project src\Gaia.Api\Gaia.Api.csproj
-```
-
-Complete localmente:
-
-- Tenant ID, Client ID y secreto de Entra ID.
-- URL, API y scope del entorno Dataverse.
-- correo del administrador inicial.
-- URL pública del frontend.
-
-Para el frontend copie `apps/web/.env.example` como `apps/web/.env.local` si necesita cambiar la URL de la API.
-
-## Ejecución
+Configure los archivos locales a partir de los `.example`; no versione secretos. Consulte [Instalación, configuración y operación](docs/06-instalacion-operacion.md) para Entra, Dataverse, SharePoint y ejecución.
 
 Terminal 1:
 
@@ -95,17 +60,6 @@ pnpm exec eslint . --max-warnings 0
 pnpm build
 ```
 
-La compilación estricta debe finalizar con `0 Advertencia(s)` y `0 Errores`. Antes de compilar la API, cierre cualquier `dotnet run` o `dotnet watch` del mismo proyecto para evitar bloqueos de DLL. Solo una instancia puede escuchar en `https://localhost:7168`, y solo una instancia de Next puede usar `http://localhost:3000`; `address already in use` o `EADDRINUSE` indican que el servicio ya está ejecutándose, no un error de código.
-
-## Edición independiente futura
-
-El repositorio no depende de PostgreSQL. Los módulos operativos utilizan Dataverse; las funcionalidades todavía pendientes deben implementarse mediante sus adaptadores Dataverse conservando los contratos públicos.
-
 ## Seguridad
 
-Nunca confirme en Git:
-
-- secretos de cliente, contraseñas o tokens;
-- `appsettings.Development.json`, `.env.local` o archivos equivalentes;
-- Excel o exportaciones con información institucional/personal;
-- logs, carpetas `bin`, `obj`, `.next` o `node_modules`.
+No confirme secretos, tokens, configuraciones reales, datos personales, exportaciones institucionales, logs, `bin`, `obj`, `.next` ni `node_modules`.

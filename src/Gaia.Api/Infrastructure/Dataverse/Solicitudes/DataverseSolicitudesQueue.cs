@@ -149,16 +149,19 @@ internal sealed partial class DataverseSolicitudesManagementStore
         var submitted = request.Attribute("gaia_FechaRadicacion");
         var due = request.Attribute("gaia_FechaLimiteActual");
         var final = $"{stateNav}/{state.Attribute("gaia_EsFinal")}";
+        var stateCode = $"{stateNav}/{state.Attribute("gaia_Codigo")}";
+        var terminal = $"({final} eq true or {stateCode} eq 'CERRADA' or {stateCode} eq 'RESUELTA')";
+        var nonTerminal = $"(({final} eq false or {final} eq null) and ({stateCode} eq null or ({stateCode} ne 'CERRADA' and {stateCode} ne 'RESUELTA')))";
         var clauses = new List<string> { "statecode eq 0" };
         if (accessibleRequests is { Count: > 0 })
             clauses.Add($"({string.Join(" or ", accessibleRequests.Select(id => $"{request.PrimaryIdAttribute} eq {id:D}"))})");
         foreach (var (schema, id) in new[] { ("gaia_Servicio", filter.ServiceId), ("gaia_EstadoActual", filter.StateId), ("gaia_ResponsableInterno", filter.ResponsibleId) })
             if (id.HasValue) clauses.Add($"_{request.Attribute(schema)}_value eq {id.Value:D}");
         var date = today.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
-        if (filter.Overdue == true) clauses.Add($"({due} ne null and {due} lt {date} and ({final} eq false or {final} eq null))");
-        if (filter.Overdue == false) clauses.Add($"({due} eq null or {due} ge {date} or {final} eq true)");
-        if (filter.View == "resolved") clauses.Add($"{final} eq true");
-        if (filter.View == "tracking") clauses.Add($"({final} eq false or {final} eq null)");
+        if (filter.Overdue == true) clauses.Add($"({due} ne null and {due} lt {date} and {nonTerminal})");
+        if (filter.Overdue == false) clauses.Add($"({due} eq null or {due} ge {date} or {terminal})");
+        if (filter.View == "resolved") clauses.Add(terminal);
+        if (filter.View == "tracking") clauses.Add(nonTerminal);
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
             var term = filter.Search.Trim().Replace("'", "''");
