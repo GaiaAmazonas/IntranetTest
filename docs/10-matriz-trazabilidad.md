@@ -77,6 +77,7 @@
 | FILE-01 | Almacenamiento SharePoint · Implementada | Consumida por módulos | `IFileStorage`, `SharePointFileStorage`, Graph transport | `gaia_configuracionsharepoint`, Graph/SharePoint | permiso del módulo + identidad técnica | `FileStorageFoundationTests`, `SharePointFileStorageTests`, `SharePointRepositoryConfigurationTests` |
 | FILE-02 | Diagnóstico y prueba controlada · Implementada | operación técnica | `/api/infrastructure/files/diagnostics`, `write-probe` | configuración/credencial autorizada | AdminCore + `TI.MODULOS.ADMINISTRAR` | `FileStorageDiagnosticAuthorizationTests` |
 | FILE-03 | Migración de repositorio · Base implementada | sin UI masiva general | `IFileStorageMigration` | copia, ETag, longitud y SHA-256 | operación técnica autorizada | `FileStorageMigrationTests`; lote por módulo pendiente |
+| NOTIF-01 | Outbox transversal de correo · Base implementada; flujo ambiental pendiente | sin UI operativa | `IEmailNotificationOutbox`, `DataverseEmailNotificationQueue` | `gaia_plantillacorreo`, `gaia_correosaliente`, `gaia_adjuntocorreo`; entrega Power Automate | escritura API/flujo y mantenimiento restringido | `EmailNotificationRulesTests`; [Notificaciones por correo](11-notificaciones-correo.md) |
 | INV-01 | Gestión de inventario · Pendiente | `/inventario` | `/api/inventory/{**path}` devuelve `503` | modelo físico/adaptador no implementado | `INV.VER`, futuros permisos de operación | [Inventario](modulos/inventario.md) |
 
 ## Trazabilidad de documentos

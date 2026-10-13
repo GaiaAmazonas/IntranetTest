@@ -102,6 +102,12 @@ La configuración de SharePoint puede obtenerse desde la tabla de configuración
 
 La información necesaria antes del login —por ejemplo, una configuración pública de acceso— no puede depender de un token delegado inexistente. Debe publicarse mediante el mecanismo de instantánea/configuración pública previsto, con datos no sensibles.
 
+## Correo institucional y Power Automate
+
+La API no conserva credenciales de buzones ni envía directamente desde la identidad del usuario. Registra correos listos en el outbox de Dataverse y Power Automate los entrega mediante referencias de conexión administradas. El perfil `GAIA_INSTITUCIONAL` es un alias lógico, no una dirección ni un secreto. La identidad del flujo debe disponer únicamente de lectura/escritura sobre las tablas de correo, acceso limitado a los documentos referenciados en SharePoint y permiso para enviar desde el buzón institucional acordado.
+
+Los destinatarios, cuerpos y metadatos de documentos son datos operativos: no deben aparecer en historial detallado del flujo, telemetría o mensajes de error. Consulte [Notificaciones institucionales por correo](11-notificaciones-correo.md).
+
 ## Encabezados, CORS y errores
 
 La API compone CORS para el origen configurado, encabezados de seguridad, trazabilidad y un mapeo controlado de excepciones. La configuración debe conservar:

@@ -18,7 +18,8 @@ public interface ISolicitudesRequestApplication
         CancellationToken cancellationToken);
 }
 
-public sealed class SolicitudesRequestApplication(ISolicitudesRequestStore store, ISolicitudesFormReader forms, TimeProvider timeProvider)
+public sealed class SolicitudesRequestApplication(ISolicitudesRequestStore store, ISolicitudesFormReader forms, TimeProvider timeProvider,
+    ISolicitudesNotificationPublisher? notifications = null)
     : ISolicitudesRequestApplication
 {
     public async Task<CreatedSolicitudesRequest> CreateAsync(CreateSolicitudesRequest request, Guid requesterThirdPartyId,
@@ -33,8 +34,11 @@ public sealed class SolicitudesRequestApplication(ISolicitudesRequestStore store
             throw new ArgumentException("La descripción debe tener entre 10 y 4000 caracteres.");
         var form=await forms.ReadForServiceAsync(request.ServiceId,cancellationToken);
         ValidateAnswers(form,request.Answers??[],request.HasAttachments);
-        return await store.CreateAsync(request with { Subject = request.Subject.Trim(), Description = request.Description.Trim() },
+        var created = await store.CreateAsync(request with { Subject = request.Subject.Trim(), Description = request.Description.Trim() },
             requesterThirdPartyId, timeProvider.GetUtcNow(), cancellationToken);
+        if (notifications is not null)
+            await notifications.RequestSubmittedAsync(created, requesterThirdPartyId, cancellationToken);
+        return created;
     }
 
     private static void ValidateAnswers(SolicitudesServiceForm? form,IReadOnlyList<SolicitudesFieldAnswer> answers,bool hasAttachments)

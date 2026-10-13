@@ -131,6 +131,12 @@ Cambiar `siteId/driveId` no mueve archivos existentes. La migración copia desde
 
 El campo de adjuntos configurable en el diseñador controla el mismo mecanismo existente de archivos. No crea un segundo sistema. El formulario publicado decide visibilidad y obligatoriedad; la carga continúa usando los endpoints y asociación de la solicitud. La gestión en AdminCore consulta los mismos adjuntos autorizados.
 
+## Notificaciones por correo
+
+Los módulos publican correos mediante `IEmailNotificationOutbox`; no llaman Outlook, Graph ni Power Automate directamente. La implementación Dataverse resuelve una plantilla vigente, conserva una instantánea renderizada, crea el correo como Borrador, registra referencias de SharePoint y solo después cambia a Pendiente. `gaia_idoperacion` hace idempotente el alta. Consulte [Notificaciones institucionales por correo](11-notificaciones-correo.md).
+
+Power Automate es responsable únicamente de reclamar, entregar y registrar el resultado. Una falla de notificación no deshace una radicación o reasignación ya confirmada; debe quedar observable y conciliable.
+
 ## Estados y consistencia
 
 Los estados visibles pueden normalizar vocabulario interno. La traducción debe ser determinista y compartida, nunca un cálculo independiente por pantalla. En flujos:

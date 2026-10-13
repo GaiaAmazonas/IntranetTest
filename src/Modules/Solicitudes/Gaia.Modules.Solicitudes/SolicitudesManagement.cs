@@ -89,7 +89,8 @@ public interface ISolicitudesManagementApplication
     Task DeleteFormFieldAsync(Guid formId,Guid fieldId,CancellationToken token);
 }
 
-public sealed class SolicitudesManagementApplication(ISolicitudesManagementStore store,TimeProvider timeProvider):ISolicitudesManagementApplication
+public sealed class SolicitudesManagementApplication(ISolicitudesManagementStore store,TimeProvider timeProvider,
+    ISolicitudesNotificationPublisher? notifications=null):ISolicitudesManagementApplication
 {
     public Task<SolicitudesQueuePage> ReadQueueAsync(Guid actorId,SolicitudesQueueFilter filter,CancellationToken token)
     {
@@ -101,9 +102,11 @@ public sealed class SolicitudesManagementApplication(ISolicitudesManagementStore
         ArgumentNullException.ThrowIfNull(filter);if(filter.Page<1)throw new ArgumentException("La página debe ser mayor que cero.");if(filter.PageSize is <1 or >100)throw new ArgumentException("El tamaño de página debe estar entre 1 y 100.");if(filter.Search?.Length>100)throw new ArgumentException("La búsqueda no puede superar 100 caracteres.");return store.ReadQueueAsync(actorId,filter with{Search=filter.Search?.Trim()},token);
     }
     public Task<SolicitudesManagementCatalog> ReadCatalogAsync(CancellationToken token)=>store.ReadCatalogAsync(token);
-    public Task ReassignAsync(Guid requestId,Guid actorId,ReassignSolicitudesRequest request,CancellationToken token)
+    public async Task ReassignAsync(Guid requestId,Guid actorId,ReassignSolicitudesRequest request,CancellationToken token)
     {
-        ArgumentNullException.ThrowIfNull(request);if(requestId==Guid.Empty||request.ResponsibleId==Guid.Empty)throw new ArgumentException("Selecciona una solicitud y un responsable válidos.");var reason=request.Reason?.Trim();if(string.IsNullOrWhiteSpace(reason)||reason.Length is <5 or >500)throw new ArgumentException("El motivo debe tener entre 5 y 500 caracteres.");return store.ReassignAsync(requestId,actorId,request with{Reason=reason},timeProvider.GetUtcNow(),token);
+        ArgumentNullException.ThrowIfNull(request);if(requestId==Guid.Empty||request.ResponsibleId==Guid.Empty)throw new ArgumentException("Selecciona una solicitud y un responsable válidos.");var reason=request.Reason?.Trim();if(string.IsNullOrWhiteSpace(reason)||reason.Length is <5 or >500)throw new ArgumentException("El motivo debe tener entre 5 y 500 caracteres.");
+        await store.ReassignAsync(requestId,actorId,request with{Reason=reason},timeProvider.GetUtcNow(),token);
+        if(notifications is not null)await notifications.RequestReassignedAsync(requestId,request.ResponsibleId,token);
     }
     public Task DeleteResolvedAsync(Guid requestId,Guid actorId,CancellationToken token)
     {

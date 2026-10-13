@@ -23,6 +23,7 @@ No es necesario leer todos los capítulos para cada tarea. Empiece siempre por e
 8. [Modelo funcional, reglas y migración de datos](09-modelo-funcional-datos.md)
 9. [Matriz de trazabilidad técnica y funcional](10-matriz-trazabilidad.md)
 10. [Auditoría documental, hallazgos y riesgos](08-auditoria-documental.md)
+11. [Notificaciones institucionales por correo](11-notificaciones-correo.md)
 
 ### Por perfil
 
@@ -46,6 +47,7 @@ No es necesario leer todos los capítulos para cada tarea. Empiece siempre por e
 | Nueva tabla/columna Dataverse | API/datos, Modelo funcional, Seguridad y módulo |
 | Nuevo permiso o ruta | Seguridad, Frontend/diseño, Matriz y módulo |
 | Archivo o integración SharePoint | Seguridad/integraciones, API/archivos, Operación y módulo |
+| Notificación por correo | Notificaciones por correo, Seguridad, API/datos, módulo consumidor y Matriz |
 | Despliegue o configuración | Instalación/operación, Seguridad y ADR aplicables |
 | Cambio arquitectónico | Arquitectura, Desarrollo, Auditoría y ADR nuevo o reemplazado |
 

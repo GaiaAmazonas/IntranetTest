@@ -210,7 +210,8 @@ public interface ISolicitudesWorkflowStore
     Task<IReadOnlyList<SolicitudesWorkflowQueueItem>> ReadWorkQueueAsync(Guid actorId,string queue,CancellationToken token);
 }
 
-public sealed class SolicitudesWorkflowApplication(ISolicitudesWorkflowStore store,TimeProvider timeProvider)
+public sealed class SolicitudesWorkflowApplication(ISolicitudesWorkflowStore store,TimeProvider timeProvider,
+    ISolicitudesNotificationPublisher? notifications=null)
 {
     public async Task PublishAsync(Guid flowId,Guid actorId,CancellationToken token)
     {
@@ -224,16 +225,22 @@ public sealed class SolicitudesWorkflowApplication(ISolicitudesWorkflowStore sto
         if(actorId==Guid.Empty||command.ManagementId==Guid.Empty)throw new ArgumentException("Gestión y actor son obligatorios.");
         await store.CompleteAsync(actorId,command with{Observation=command.Observation?.Trim(),OperationId=command.OperationId.Trim()},timeProvider.GetUtcNow(),token);
     }
-    public Task ReassignAsync(Guid managementId,Guid actorId,ReassignSolicitudesManagement command,CancellationToken token)
+    public async Task ReassignAsync(Guid managementId,Guid actorId,ReassignSolicitudesManagement command,CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(command);
         if(managementId==Guid.Empty||actorId==Guid.Empty)throw new ArgumentException("Gestión y actor son obligatorios.");
         var reason=command.Reason?.Trim();
         if(string.IsNullOrWhiteSpace(reason)||reason.Length is <5 or >500)throw new ArgumentException("El motivo debe tener entre 5 y 500 caracteres.");
-        return store.ReassignAsync(managementId,actorId,command with{Reason=reason},timeProvider.GetUtcNow(),token);
+        await store.ReassignAsync(managementId,actorId,command with{Reason=reason},timeProvider.GetUtcNow(),token);
+        if(notifications is not null&&command.ResponsibleId.HasValue)
+            await notifications.ManagementReassignedAsync(managementId,command.ResponsibleId.Value,token);
     }
-    public Task TakeAsync(Guid managementId,Guid actorId,CancellationToken token)
-    {if(managementId==Guid.Empty||actorId==Guid.Empty)throw new ArgumentException("Gestión y actor son obligatorios.");return store.TakeAsync(managementId,actorId,timeProvider.GetUtcNow(),token);}
+    public async Task TakeAsync(Guid managementId,Guid actorId,CancellationToken token)
+    {
+        if(managementId==Guid.Empty||actorId==Guid.Empty)throw new ArgumentException("Gestión y actor son obligatorios.");
+        await store.TakeAsync(managementId,actorId,timeProvider.GetUtcNow(),token);
+        if(notifications is not null)await notifications.ManagementReassignedAsync(managementId,actorId,token);
+    }
     public Task ResumeFromRequesterAsync(Guid managementId,Guid actorId,string comment,bool hasFile,CancellationToken token)
     {
         var normalized=comment?.Trim();

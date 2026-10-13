@@ -123,6 +123,10 @@ Reasignar una etapa requiere permiso, motivo y pertenencia vigente a la unidad d
 
 El portal no concede administración. Toda toma, respuesta, transición, archivo y reasignación se reautoriza en API.
 
+## Notificaciones
+
+La radicación, la asignación general y la reasignación de una etapa publican intenciones idempotentes en la bandeja transversal de correo de Dataverse. Solo se notifica a personas con correo institucional activo. Las bandejas de unidad sin responsable individual no generan envíos masivos hasta definir una regla funcional de destinatario. Plantillas requeridas: `SOLICITUD_RADICADA`, `SOLICITUD_ASIGNADA` y `SOLICITUD_ETAPA_ASIGNADA`. La entrega corresponde a Power Automate y se describe en [Notificaciones institucionales por correo](../11-notificaciones-correo.md).
+
 ## Integridad y producción
 
 El motor usa IDs de operación, claves alternativas, ETag y ChangeSets para evitar duplicados y confirmar de forma atómica activaciones, devoluciones y cierre. Antes de producción siguen siendo obligatorias pruebas reales de concurrencia/colisión en un Dataverse aislado, verificación visual autenticada y recorridos con identidades de varias unidades.

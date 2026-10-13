@@ -5,6 +5,8 @@ using Gaia.Api.Infrastructure.Dataverse.Security;
 using Gaia.Api.Infrastructure.Dataverse.Communications;
 using Gaia.Api.Infrastructure.Dataverse.Solicitudes;
 using Gaia.Api.Infrastructure.Dataverse.Training;
+using Gaia.Api.Infrastructure.Dataverse.Notifications;
+using Gaia.BuildingBlocks.Notifications;
 using Gaia.Modules.Communications;
 using Gaia.Modules.Identity;
 using Gaia.Modules.Inventory;
@@ -87,6 +89,8 @@ builder.Services.AddScoped<ISolicitudesWorkflowStore>(provider=>provider.GetRequ
 builder.Services.AddScoped<SolicitudesWorkflowApplication>();
 builder.Services.AddScoped<ISolicitudesRequestStore, DataverseSolicitudesRequestStore>();
 builder.Services.AddScoped<ISolicitudesFormReader, DataverseSolicitudesFormReader>();
+builder.Services.AddScoped<IEmailNotificationOutbox, DataverseEmailNotificationQueue>();
+builder.Services.AddScoped<ISolicitudesNotificationPublisher, DataverseSolicitudesNotificationPublisher>();
 builder.Services.AddScoped<ISolicitudesRequestApplication, SolicitudesRequestApplication>();
 builder.Services.AddScoped<ISolicitudesConversationStore, DataverseSolicitudesConversationStore>();
 builder.Services.AddScoped<ISolicitudesConversationApplication, SolicitudesConversationApplication>();
