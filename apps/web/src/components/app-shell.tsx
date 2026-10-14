@@ -7,7 +7,7 @@ import { Building2, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Gradu
 import { useEffect, useMemo, useRef, useState, type ComponentType, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { Avatar, IconButton } from "./ui";
 import { ConfirmDialog } from "./form-dialog";
-import { startLogin } from "@/lib/api-client";
+import { startLogin, startLogout } from "@/lib/api-client";
 import { useSecurity } from "./security-context";
 
 const apiUrl = process.env.NEXT_PUBLIC_GAIA_API_URL ?? "https://localhost:7168";
@@ -119,7 +119,7 @@ export function AppShell({ title, user: suppliedUser }: { title: string; user?: 
   const isActive = (href: string, exact?: boolean) => exact ? normalizedRoute(pathname) === normalizedRoute(href) : routeMatches(pathname,href);
   const pendingNavigation = navigatingTo === pathname ? null : navigatingTo;
   const displayedUser = security.user ? { displayName: security.user.name, email: security.user.email } : user;
-  function logout() { setLoggingOut(true); location.href = `${apiUrl}/api/auth/logout?returnUrl=${encodeURIComponent(`${location.origin}/?logout=success`)}`; }
+  function logout() { setLoggingOut(true); void startLogout().catch(() => setLoggingOut(false)); }
   function selectAccent(theme: AccentTheme) { setAccentTheme(theme); document.documentElement.dataset.gaiaAccent = theme; localStorage.setItem("gaia-accent-theme", theme); }
   function beginNavigation(href: string, event: ReactMouseEvent<HTMLAnchorElement>) { if (navigatingTo === href) { event.preventDefault(); return; } setNavigatingTo(href); setMobileOpen(false); }
 

@@ -75,7 +75,7 @@ internal sealed class SharePointStorageConfiguration
             AllowedExtensions = extensions, AllowedMimeTypes = mimeTypes,
             RealTestsEnabled = testsEnabled, RealTestsEnvironment = testsEnvironment,
             UseSystemAssignedManagedIdentity = section.GetValue("UseSystemAssignedManagedIdentity", false),
-            RequireContentScan = section.GetValue("RequireContentScan", false),
+            RequireContentScan = section.GetValue("RequireContentScan", !environmentName.Equals("Development", StringComparison.OrdinalIgnoreCase)),
             UploadChunkBytes = chunk, TransferAllowedHosts = hosts
         };
     }

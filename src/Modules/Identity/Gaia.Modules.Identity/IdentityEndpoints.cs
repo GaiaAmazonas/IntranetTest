@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.AspNetCore.Antiforgery;
 
 namespace Gaia.Modules.Identity;
 
@@ -16,7 +17,8 @@ internal static class IdentityEndpoints
         var auth = endpoints.MapGroup("/api/auth").WithTags("Identity");
 
         auth.MapGet("/login", Login).AllowAnonymous();
-        auth.MapGet("/logout", Logout).RequireAuthorization();
+        auth.MapPost("/logout", Logout).RequireAuthorization();
+        auth.MapGet("/csrf", Csrf).RequireAuthorization();
         auth.MapGet("/me", GetCurrentUser).RequireAuthorization();
 
     }
@@ -39,6 +41,12 @@ internal static class IdentityEndpoints
                 CookieAuthenticationDefaults.AuthenticationScheme,
                 OpenIdConnectDefaults.AuthenticationScheme
             ]);
+
+    private static IResult Csrf(HttpContext context, IAntiforgery antiforgery)
+    {
+        var tokens = antiforgery.GetAndStoreTokens(context);
+        return Results.Ok(new { token = tokens.RequestToken });
+    }
 
     private static IResult GetCurrentUser(ClaimsPrincipal principal)
     {

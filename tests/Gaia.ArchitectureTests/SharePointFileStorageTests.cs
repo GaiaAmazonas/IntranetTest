@@ -29,14 +29,14 @@ public sealed class SharePointFileStorageTests
             Assert.Equal(HttpMethod.Put, request.Method);
             Assert.Equal("application/pdf", request.Content!.Headers.ContentType!.MediaType);
             Assert.Contains("conflictBehavior=fail", request.RequestUri!.Query, StringComparison.Ordinal);
-            Assert.Equal("hello", await request.Content.ReadAsStringAsync());
+            Assert.Equal("%PDF-", await request.Content.ReadAsStringAsync());
             var name = request.RequestUri.AbsolutePath.Split(":/")[1].Split(':')[0];
             Assert.DoesNotContain("report", name, StringComparison.Ordinal);
             return Item(name, 5);
         });
         using var transport = Transport(handler);
         var store = Store(transport);
-        await using var content = new MemoryStream(Encoding.UTF8.GetBytes("hello"));
+        await using var content = new MemoryStream(PdfBytes(5));
         var result = await store.UploadAsync(Upload("correlation", "report.pdf", 5), content, default);
         Assert.Equal(FileId, result.Id);
         Assert.Equal("report.pdf", result.OriginalName);
@@ -53,7 +53,7 @@ public sealed class SharePointFileStorageTests
     {
         using var handler = new FakeGraph();
         using var transport = Transport(handler);
-        await using var source = new MemoryStream(new byte[10]);
+        await using var source = new MemoryStream(PdfBytes(10));
         var error = await Assert.ThrowsAsync<FileStorageException>(() => Store(transport).UploadAsync(
             Upload("id", "report.pdf", 9), source, default));
         Assert.Equal(FileStorageError.InvalidLength, error.Code);
@@ -71,9 +71,9 @@ public sealed class SharePointFileStorageTests
         using var handler = new FakeGraph();
         using var transport = Transport(handler);
         var store = new SharePointFileStorage(Options(), transport, [new RejectScanner()], NullLogger<SharePointFileStorage>.Instance);
-        await using var source = new MemoryStream(new byte[2]);
+        await using var source = new MemoryStream(PdfBytes(5));
         var error = await Assert.ThrowsAsync<FileStorageException>(() => store.UploadAsync(
-            Upload("id", "report.pdf", 2), source, default));
+            Upload("id", "report.pdf", 5), source, default));
         Assert.Equal(FileStorageError.ScanRejected, error.Code);
         Assert.Empty(handler.Requests);
     }
@@ -107,7 +107,7 @@ public sealed class SharePointFileStorageTests
             return Item(name!, 327690);
         });
         using var transport = Transport(handler);
-        await using var source = new MemoryStream(new byte[327690]);
+        await using var source = new MemoryStream(PdfBytes(327690));
         var result = await Store(transport).UploadAsync(Upload("id", "a.pdf", source.Length), source, default);
         Assert.Equal(327690, result.Length);
         Assert.All(handler.Requests.Where(request => request.Host != "graph.microsoft.com"), request => Assert.Null(request.Authorization));
@@ -122,7 +122,7 @@ public sealed class SharePointFileStorageTests
         handler.Add(_ => new HttpResponseMessage(HttpStatusCode.Forbidden));
         handler.Add(request => { Assert.Equal(HttpMethod.Delete, request.Method); return new HttpResponseMessage(HttpStatusCode.NoContent); });
         using var transport = Transport(handler);
-        await using var source = new MemoryStream(new byte[101]);
+        await using var source = new MemoryStream(PdfBytes(101));
         var error = await Assert.ThrowsAsync<FileStorageException>(() => Store(transport).UploadAsync(
             Upload("id", "a.pdf", 101), source, default));
         Assert.Equal(FileStorageError.FileUnauthorized, error.Code);
@@ -360,6 +360,13 @@ public sealed class SharePointFileStorageTests
     private static SharePointFileStorage Store(GraphFileTransport transport, SharePointStorageConfiguration? options = null) => new(options ?? Options(), transport, [], NullLogger<SharePointFileStorage>.Instance);
     private static FileUpload Upload(string correlation, string name, long length) =>
         new(new("Documents", correlation), name, "application/pdf", length, Guid.NewGuid(), DateTimeOffset.UtcNow);
+    private static byte[] PdfBytes(int length)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(length, 5);
+        var bytes = new byte[length];
+        "%PDF-"u8.CopyTo(bytes);
+        return bytes;
+    }
     private static void RepositoryReplies(FakeGraph handler)
     { handler.Add(_ => Json(new { id = Site })); handler.Add(_ => Json(new { value = new[] { new { id = Drive } } })); }
     private static void FolderReplies(FakeGraph handler)

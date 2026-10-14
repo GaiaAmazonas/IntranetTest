@@ -22,6 +22,7 @@
 | SEC-03 | Roles y permisos · Implementada | `/seguridad/roles` | familia `/api/security/roles`; `SecurityEndpoints` | `gaia_rol`, `gaia_permiso`, `gaia_rolpermiso` | `TI.ROLES.*` | `security-admin-rules.test.ts`, `SecurityModuleRulesTests` |
 | SEC-04 | Árbol de módulos · Implementada | `/seguridad/modulos` | familia `/api/security/modules`; `SecurityEndpoints` | `gaia_modulo` | `TI.MODULOS.*` | `SecurityModuleRulesTests`, `route-access.test.ts` |
 | SEC-05 | Administración global organizacional · Implementada | Roles y permisos | actualización de propiedad de rol; autorización en adaptadores | `gaia_rol.gaia_administracionglobal` y asignaciones vigentes | permiso funcional + propiedad global | `SecurityAuthorizationTests`; [Seguridad](02-seguridad-e-integraciones.md) |
+| SEC-06 | Línea base de endurecimiento · Implementada en código; controles ambientales pendientes | todas las superficies | fallback autenticado, CSRF, rate limiting, HSTS/cabeceras, CI/SCA/CodeQL | cookies, Data Protection y configuración de host/origen | sesión + permisos funcionales | `Test-SecurityBaseline.ps1`; [Remediación de seguridad](12-seguridad-remediacion.md) |
 
 ## Organización, personas e Intranet
 

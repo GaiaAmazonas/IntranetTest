@@ -44,5 +44,5 @@ public static class SecurityModuleExtensions
         authorization.AddPolicy(AssignmentAuthorizationPolicies.Update,policy=>policy.AddRequirements(new AdminCorePermissionRequirement(AdminCorePermissions.IntranetAdminCoreVer),new AnyAdminCorePermissionRequirement([AdminCorePermissions.OrgAsignacionesActualizar,AdminCorePermissions.ThVinculacionesActualizar])));
         return services;
     }
-    public static IEndpointRouteBuilder MapSecurityEndpoints(this IEndpointRouteBuilder endpoints){SecurityEndpoints.Map(endpoints);return endpoints;}
+    public static IEndpointRouteBuilder MapSecurityEndpoints(this IEndpointRouteBuilder endpoints,bool bootstrapEnabled=false){SecurityEndpoints.Map(endpoints,bootstrapEnabled);return endpoints;}
 }

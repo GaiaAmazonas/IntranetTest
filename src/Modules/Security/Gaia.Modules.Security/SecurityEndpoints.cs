@@ -6,12 +6,12 @@ using Microsoft.AspNetCore.Routing;
 namespace Gaia.Modules.Security;
 internal static class SecurityEndpoints
 {
- public static void Map(IEndpointRouteBuilder endpoints)
+ public static void Map(IEndpointRouteBuilder endpoints,bool bootstrapEnabled)
  {
   var group=endpoints.MapGroup("/api/security").WithTags("Security").RequireAuthorization();
   group.MapGet("/me",(ClaimsPrincipal user,ISecurityStore store,CancellationToken ct)=>store.GetOrProvisionAsync(user,ct));
   group.MapGet("/metadata-audit",(ISecurityStore store,CancellationToken ct)=>store.AuditMetadataAsync(ct)).RequireAuthorization(AdminCorePermissions.TiModulosAdministrar);
-  group.MapPost("/bootstrap",BootstrapAsync).RequireAuthorization("SecurityBootstrap");
+  if(bootstrapEnabled)group.MapPost("/bootstrap",BootstrapAsync).RequireAuthorization("SecurityBootstrap");
   group.MapGet("/users",(ISecurityStore store,CancellationToken ct)=>store.ListUsersAsync(ct)).RequireAuthorization(AdminCorePermissions.TiUsuariosVer);
   group.MapGet("/users/preprovision-audit",(ISecurityStore store,CancellationToken ct)=>store.AuditPreprovisionAsync(ct)).RequireAuthorization(AdminCorePermissions.TiUsuariosAdministrar);
   group.MapPost("/users/preprovision",PreprovisionAsync).RequireAuthorization(AdminCorePermissions.TiUsuariosAdministrar);

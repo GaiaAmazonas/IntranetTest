@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { hasPermission } from "@/lib/security-permissions";
+import { startLogout } from "@/lib/api-client";
 
 const apiUrl = process.env.NEXT_PUBLIC_GAIA_API_URL ?? "https://localhost:7168";
 const inactivityTimeoutMs = 40 * 60 * 1000;
@@ -94,7 +95,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const logoutForInactivity = () => {
       if (inactivityLogoutStarted.current) return;
       inactivityLogoutStarted.current = true;
-      window.location.assign(`${apiUrl}/api/auth/logout?returnUrl=${encodeURIComponent(`${window.location.origin}/?logout=inactivity`)}`);
+      void startLogout(`${window.location.origin}/?logout=inactivity`);
     };
     const schedule = () => {
       if (timer) window.clearTimeout(timer);

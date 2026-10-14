@@ -73,6 +73,23 @@ public sealed class FileStorageFoundationTests
     }
 
     [Fact]
+    public void FileSignatureMustMatchDeclaredType()
+    {
+        using var fake = new MemoryStream("not-a-pdf"u8.ToArray());
+        var error = Assert.Throws<FileStorageException>(() =>
+            FileUploadRules.ValidateContentSignature(Upload("file.pdf", "application/pdf", fake.Length), fake));
+        Assert.Equal(FileStorageError.TypeNotAllowed, error.Code);
+    }
+
+    [Fact]
+    public void ValidFileSignaturePreservesStreamPosition()
+    {
+        using var pdf = new MemoryStream("%PDF-1.7"u8.ToArray());
+        FileUploadRules.ValidateContentSignature(Upload("file.pdf", "application/pdf", pdf.Length), pdf);
+        Assert.Equal(0, pdf.Position);
+    }
+
+    [Fact]
     public void IntegrationIsDisabledWithoutConfiguration() => Assert.False(
         SharePointStorageConfiguration.From(new ConfigurationBuilder().Build(), "Production").Enabled);
 

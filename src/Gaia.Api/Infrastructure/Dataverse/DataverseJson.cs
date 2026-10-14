@@ -36,12 +36,12 @@ internal static class DataverseJson
         string? next = path;
         while (next is not null)
         {
+            ValidateTarget(client, next);
             using var response = await client.GetAsync(next, cancellationToken);
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
-                throw new InvalidOperationException(
-                    $"Dataverse rechazó la lectura ({(int)response.StatusCode}): {ReadError(content)}");
+                throw new InvalidOperationException($"Dataverse rechazó la lectura ({(int)response.StatusCode}).");
             }
             using var document = JsonDocument.Parse(content);
             result.AddRange(document.RootElement.GetProperty("value").EnumerateArray().Select(item => item.Clone()));
@@ -57,12 +57,12 @@ internal static class DataverseJson
         string path,
         CancellationToken cancellationToken)
     {
+        ValidateTarget(client, path);
         using var response = await client.GetAsync(path, cancellationToken);
         var content = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            throw new InvalidOperationException(
-                $"Dataverse rechazó la lectura ({(int)response.StatusCode}): {ReadError(content)}");
+            throw new InvalidOperationException($"Dataverse rechazó la lectura ({(int)response.StatusCode}).");
         }
 
         using var document = JsonDocument.Parse(content);
@@ -81,17 +81,13 @@ internal static class DataverseJson
         return new Page(items, total, nextLink);
     }
 
-    private static string ReadError(string content)
+    private static void ValidateTarget(HttpClient client, string target)
     {
-        try
-        {
-            using var document = JsonDocument.Parse(content);
-            return document.RootElement.GetProperty("error").GetProperty("message").GetString()
-                ?? "Error sin descripción.";
-        }
-        catch (JsonException)
-        {
-            return "Respuesta no válida de Dataverse.";
-        }
+        if (!Uri.TryCreate(target, UriKind.Absolute, out var absolute)) return;
+        var expected = client.BaseAddress ?? throw new InvalidOperationException("Dataverse no tiene un origen configurado.");
+        if (!string.Equals(absolute.Scheme, expected.Scheme, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(absolute.Host, expected.Host, StringComparison.OrdinalIgnoreCase)
+            || absolute.Port != expected.Port)
+            throw new InvalidOperationException("Dataverse devolvió una URL de paginación no confiable.");
     }
 }

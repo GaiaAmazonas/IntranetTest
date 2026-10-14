@@ -15,7 +15,7 @@ import {
   LayoutDashboard,
 } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { startLogin } from "@/lib/api-client";
+import { startLogin, startLogout } from "@/lib/api-client";
 import { AccessState } from "@/components/route-access-gate";
 import { useSecurity } from "@/components/security-context";
 import { PersonAvatar } from "@/components/person-avatar";
@@ -26,7 +26,6 @@ import {
 import { applicationsFromModules } from "./intranet-applications";
 import { IntranetFooter } from "./intranet-footer";
 
-const apiUrl = process.env.NEXT_PUBLIC_GAIA_API_URL ?? "https://localhost:7168";
 export function IntranetShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? "";
   const security = useSecurity();
@@ -56,9 +55,7 @@ export function IntranetShell({ children }: { children: React.ReactNode }) {
 
   function logout() {
     setLoggingOut(true);
-    location.href = `${apiUrl}/api/auth/logout?returnUrl=${encodeURIComponent(
-      `${location.origin}/?logout=success`,
-    )}`;
+    void startLogout().catch(() => setLoggingOut(false));
   }
 
   if (security.loading) {

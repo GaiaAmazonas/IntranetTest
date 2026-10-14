@@ -15,8 +15,8 @@
 appsettings.Development.json
 secrets.json
 *.user
-src/Gaia.Api/App_Data/public-login/
-src/Gaia.Api/App_Data/solicitudes-files/
+src/Gaia.Api/App_Data/**
+!src/Gaia.Api/App_Data/.gitkeep
 
 # .NET
 bin/

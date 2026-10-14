@@ -25,6 +25,18 @@ public sealed class DataverseJsonTests
     }
 
     [Fact]
+    public async Task ReadAllRejectsPaginationToAnotherOrigin()
+    {
+        var handler = new StubHandler("""{"value":[],"@odata.nextLink":"https://attacker.test/steal"}""");
+        var client = new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") };
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            DataverseJson.ReadAllAsync(client, "gaia_terceros", default));
+
+        Assert.Contains("no confiable", error.Message);
+    }
+
+    [Fact]
     public void OptionalInt32ReturnsNullForDataverseNull()
     {
         using var document = JsonDocument.Parse("""{"gaia_ordenvisual":null}""");

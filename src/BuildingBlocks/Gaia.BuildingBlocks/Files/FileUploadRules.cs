@@ -23,6 +23,32 @@ public static class FileUploadRules
         return $"{upload.FileId:N}{extension}";
     }
 
+    public static void ValidateContentSignature(FileUpload upload, Stream content)
+    {
+        ArgumentNullException.ThrowIfNull(upload);
+        ArgumentNullException.ThrowIfNull(content);
+        if (!content.CanRead || !content.CanSeek) throw new FileStorageException(FileStorageError.TypeNotAllowed);
+        var original = content.Position;
+        Span<byte> header = stackalloc byte[12];
+        var read = content.Read(header);
+        content.Position = original;
+        var extension = Path.GetExtension(upload.OriginalName).ToLowerInvariant();
+        var valid = extension switch
+        {
+            ".pdf" => StartsWith(header[..read], "%PDF-"u8),
+            ".png" => StartsWith(header[..read], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+            ".jpg" or ".jpeg" => StartsWith(header[..read], [0xff, 0xd8, 0xff]),
+            ".docx" or ".xlsx" or ".pptx" => StartsWith(header[..read], [0x50, 0x4b, 0x03, 0x04]),
+            ".mp4" or ".mov" => read >= 8 && header[4..8].SequenceEqual("ftyp"u8),
+            ".webm" => StartsWith(header[..read], [0x1a, 0x45, 0xdf, 0xa3]),
+            _ => false
+        };
+        if (!valid) throw new FileStorageException(FileStorageError.TypeNotAllowed);
+    }
+
+    private static bool StartsWith(ReadOnlySpan<byte> value, ReadOnlySpan<byte> signature) =>
+        value.Length >= signature.Length && value[..signature.Length].SequenceEqual(signature);
+
     public static void ValidateScope(LogicalFileScope scope)
     {
         ArgumentNullException.ThrowIfNull(scope);

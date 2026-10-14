@@ -8,7 +8,6 @@ internal sealed class DataversePersonnelImporter(IDataverseDelegatedClientFactor
     ICollaboratorEmailStore emailStore, ICollaboratorPhoneStore phoneStore) : IAdministrativePersonnelImporter
 {
     private const string JobTable = "gaia_cargo";
-    internal const string OmittedDocument = "CI 43.532.683 / PASAPORTE FY598210";
 
     public async Task<PersonnelImportValidation> ValidateAsync(Stream workbook, CancellationToken token)
     {
@@ -96,8 +95,7 @@ internal sealed class DataversePersonnelImporter(IDataverseDelegatedClientFactor
         foreach (var row in directory.Rows)
         {
             var document = Document(row.Get("Número de documento"));
-            var reason = document.Equals(OmittedDocument, StringComparison.OrdinalIgnoreCase) ? "Registro excluido por decisión funcional: contiene dos identificaciones y será revisado manualmente."
-                : ValidateCollaboratorRow(row, constraints);
+            var reason = ValidateCollaboratorRow(row, constraints);
             if (reason is null) continue; excluded.Add(document);
             var name = string.Join(' ', new[] { row.Get("Primer nombre"), row.Get("Segundo nombre"), row.Get("Primer apellido"), row.Get("Segundo apellido") }.Where(x => x.Length > 0));
             issues.Add(new(row.Number, directory.Name, "COLLABORATOR_OMITTED", $"{name} | Documento: {document} | {reason}", "warning"));
@@ -178,7 +176,7 @@ internal sealed class DataversePersonnelImporter(IDataverseDelegatedClientFactor
     }
     private static void ValidateContacts(SheetData sheet,string[] columns,int? max,string code,HashSet<string> excluded,List<AdministrativeImportIssue> issues){if(!max.HasValue)return;foreach(var row in sheet.Rows.Where(x=>!excluded.Contains(Document(x.Get("Número de documento")))))foreach(var column in columns){var value=PersonnelWorkbookReader.Optional(row.Get(column));if(value?.Length>max)issues.Add(new(row.Number,sheet.Name,code,$"{column} excede la longitud máxima de {max}."));}}
     private static void ValidateLength(WorkbookRow row,string sheet,string value,int? max,string code,List<AdministrativeImportIssue> issues,bool warning){if(max.HasValue&&value.Length>max)issues.Add(new(row.Number,sheet,code,$"El valor excede la longitud máxima de {max}.",warning?"warning":"error"));}
-    private static HashSet<string> ExcludedDocuments(PersonnelWorkbook source,IReadOnlyList<AdministrativeImportIssue> issues){var result=new HashSet<string>(StringComparer.OrdinalIgnoreCase);foreach(var row in source.Required("Directorio personal").Rows)if(row.Get("Número de documento").Equals(OmittedDocument,StringComparison.OrdinalIgnoreCase))result.Add(Document(row.Get("Número de documento")));foreach(var issue in issues.Where(x=>x.Code=="COLLABORATOR_OMITTED")){var row=source.Required("Directorio personal").Rows.FirstOrDefault(x=>x.Number==issue.Row);if(row is not null)result.Add(Document(row.Get("Número de documento")));}return result;}
+    private static HashSet<string> ExcludedDocuments(PersonnelWorkbook source,IReadOnlyList<AdministrativeImportIssue> issues){var result=new HashSet<string>(StringComparer.OrdinalIgnoreCase);foreach(var issue in issues.Where(x=>x.Code=="COLLABORATOR_OMITTED")){var row=source.Required("Directorio personal").Rows.FirstOrDefault(x=>x.Number==issue.Row);if(row is not null)result.Add(Document(row.Get("Número de documento")));}return result;}
     private static async Task<HashSet<string>> ReadJobs(HttpClient client,DataverseTableMetadata metadata,CancellationToken token)=>(await DataverseJson.ReadAllAsync(client,$"{metadata.EntitySetName}?$select={metadata.PrimaryNameAttribute}",token)).Select(x=>PersonnelWorkbookReader.Key(x.GetProperty(metadata.PrimaryNameAttribute).GetString())).ToHashSet();
     private static void RequireHeaders(SheetData sheet,string[] headers,List<AdministrativeImportIssue> issues){var set=sheet.Headers.Select(PersonnelWorkbookReader.Key).ToHashSet();foreach(var header in headers.Where(x=>!set.Contains(PersonnelWorkbookReader.Key(x))))issues.Add(new(1,sheet.Name,"MISSING_HEADER",header));}
     private static void AddDuplicates(IEnumerable<string> values,string sheet,string code,List<AdministrativeImportIssue> issues){foreach(var item in values.Where(x=>x.Length>0).GroupBy(x=>x,StringComparer.OrdinalIgnoreCase).Where(x=>x.Count()>1))issues.Add(new(0,sheet,code,item.Key));}

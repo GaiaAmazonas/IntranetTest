@@ -12,19 +12,19 @@ internal static class DataverseEndpoints
     {
 
         endpoints.MapGet("/api/dataverse/status", GetStatusAsync)
-            .RequireAuthorization()
+            .RequireAuthorization(AdminCorePermissions.TiModulosAdministrar)
             .WithName("GetDataverseStatus")
             .WithTags("Dataverse");
         endpoints.MapGet("/api/dataverse/metadata/{logicalName}", GetTableMetadataAsync)
-            .RequireAuthorization()
+            .RequireAuthorization(AdminCorePermissions.TiModulosAdministrar)
             .WithName("GetDataverseTableMetadata")
             .WithTags("Dataverse");
         endpoints.MapGet("/api/dataverse/organization/unit-types", GetOrganizationUnitTypesAsync)
-            .RequireAuthorization()
+            .RequireAuthorization(AdminCorePermissions.OrgCatalogosVer)
             .WithName("GetDataverseOrganizationUnitTypes")
             .WithTags("Dataverse");
         endpoints.MapGet("/api/dataverse/organization/records", GetOrganizationRecordsAsync)
-            .RequireAuthorization()
+            .RequireAuthorization(AdminCorePermissions.OrgUnidadesVer)
             .WithName("GetDataverseOrganizationRecords")
             .WithTags("Dataverse");
         endpoints.MapGet("/api/dataverse/organization/import/validate", ValidateOrganizationImportAsync)
@@ -331,15 +331,9 @@ internal static class DataverseEndpoints
                     detail: ExtractDataverseError(content));
             }
 
-            using var document = JsonDocument.Parse(content);
-            var root = document.RootElement;
             return Results.Ok(new
             {
-                connected = true,
-                environment = configuration["Dataverse:EnvironmentUrl"],
-                userId = ReadString(root, "UserId"),
-                businessUnitId = ReadString(root, "BusinessUnitId"),
-                organizationId = ReadString(root, "OrganizationId")
+                connected = true
             });
         }
         catch (MicrosoftIdentityWebChallengeUserException exception)
@@ -364,7 +358,7 @@ internal static class DataverseEndpoints
             if (document.RootElement.TryGetProperty("error", out var error)
                 && error.TryGetProperty("message", out var message))
             {
-                return message.GetString() ?? "Dataverse devolvió un error sin descripción.";
+                return "Dataverse rechazó la operación solicitada.";
             }
         }
         catch (JsonException)

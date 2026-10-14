@@ -83,14 +83,11 @@ function Get-DeviceCodeToken([string]$TenantId, [string]$ClientId, [string]$Scop
     $announced = $false
     while ([DateTimeOffset]::UtcNow -lt $deadline) {
         try {
-            $tokenJson = & curl.exe -sS -X POST "https://login.microsoftonline.com/$TenantId/oauth2/v2.0/token" `
-                --data-urlencode 'grant_type=urn:ietf:params:oauth:grant-type:device_code' `
-                --data-urlencode "client_id=$ClientId" `
-                --data-urlencode "client_secret=$script:oauthClientSecret" `
-                --data-urlencode "device_code=$($device.device_code)"
-            if ($LASTEXITCODE -ne 0) { throw 'No fue posible canjear el código de dispositivo.' }
-            $token = $tokenJson | ConvertFrom-Json
-            if ($token.error) { throw ($tokenJson -join [Environment]::NewLine) }
+            $token = Invoke-OAuthForm -Uri "https://login.microsoftonline.com/$TenantId/oauth2/v2.0/token" -Values @{
+                grant_type = 'urn:ietf:params:oauth:grant-type:device_code'
+                client_id = $ClientId
+                device_code = [string]$device.device_code
+            }
             if ($token.access_token) { return [string]$token.access_token }
         }
         catch {
@@ -125,8 +122,6 @@ function Get-AllIds($Metadata, [string]$Token) {
 $secrets = Get-UserSecrets
 $tenantId = Get-RequiredValue $secrets 'MicrosoftEntra:TenantId'
 $clientId = Get-RequiredValue $secrets 'MicrosoftEntra:ClientId'
-$clientSecret = Get-RequiredValue $secrets 'MicrosoftEntra:ClientSecret'
-$script:oauthClientSecret = $clientSecret
 $script:webApi = (Get-RequiredValue $secrets 'Dataverse:WebApiEndpoint').TrimEnd('/')
 $environmentUrl = (Get-RequiredValue $secrets 'Dataverse:EnvironmentUrl').TrimEnd('/')
 $delegatedScope = Get-RequiredValue $secrets 'Dataverse:Scope'
@@ -143,6 +138,7 @@ $accessToken = if ($AuthenticationMethod -eq 'DeviceCode') {
     Get-DeviceCodeToken -TenantId $tenantId -ClientId $clientId -Scope $delegatedScope
 }
 else {
+    $clientSecret = Get-RequiredValue $secrets 'MicrosoftEntra:ClientSecret'
     $tokenResponse = Invoke-OAuthForm -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" -Values @{
         client_id = $clientId
         client_secret = $clientSecret

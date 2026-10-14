@@ -24,6 +24,7 @@ No es necesario leer todos los capítulos para cada tarea. Empiece siempre por e
 9. [Matriz de trazabilidad técnica y funcional](10-matriz-trazabilidad.md)
 10. [Auditoría documental, hallazgos y riesgos](08-auditoria-documental.md)
 11. [Notificaciones institucionales por correo](11-notificaciones-correo.md)
+12. [Línea base y remediación de seguridad](12-seguridad-remediacion.md)
 
 ### Por perfil
 

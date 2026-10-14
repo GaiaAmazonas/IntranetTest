@@ -68,12 +68,13 @@ public sealed class PersonnelWorkbookImportTests
     [Fact]
     public void KnownCompositeDocumentIsOmittedWithoutBlockingRemainingWorkbook()
     {
-        using var workbook = BuildWorkbook(documentNumber: DataversePersonnelImporter.OmittedDocument, includeSecondValidPerson: true);
+        var invalidDocument = new string('9', 31);
+        using var workbook = BuildWorkbook(documentNumber: invalidDocument, includeSecondValidPerson: true);
         var result = DataversePersonnelImporter.Analyze(PersonnelWorkbookReader.Read(workbook), ["CÉDULA DE CIUDADANÍA"], ["MASCULINO", "FEMENINO"]);
 
         Assert.True(result.Valid);
         Assert.Equal(1, result.Collaborators);
-        Assert.Contains(result.Issues, x => x.Code == "COLLABORATOR_OMITTED" && x.Detail.Contains(DataversePersonnelImporter.OmittedDocument));
+        Assert.Contains(result.Issues, x => x.Code == "COLLABORATOR_OMITTED" && x.Detail.Contains(invalidDocument));
         Assert.Equal(1, result.InstitutionalEmails);
         Assert.Equal(1, result.PersonalPhones);
     }

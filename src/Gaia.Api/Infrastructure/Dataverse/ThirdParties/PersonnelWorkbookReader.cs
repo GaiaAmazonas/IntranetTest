@@ -3,6 +3,7 @@ using System.IO.Compression;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using System.Xml;
 
 namespace Gaia.Api.Infrastructure.Dataverse.ThirdParties;
 
@@ -19,12 +20,20 @@ internal sealed record WorkbookRow(int Number, IReadOnlyDictionary<string, strin
 
 internal static partial class PersonnelWorkbookReader
 {
+    private const int MaximumEntries = 200;
+    private const long MaximumExpandedBytes = 64 * 1024 * 1024;
+    private const int MaximumSheets = 50;
+    private const int MaximumRowsPerSheet = 100_000;
+    private const int MaximumColumns = 512;
+    private const int MaximumCellCharacters = 32_767;
     private static readonly string[] RequiredSheets = ["Base Personal activo 2026", "Directorio personal", "Listado de cargos",
         "Cargos por persona", "Correos", "Teléfonos"];
     internal static PersonnelWorkbook Read(Stream input, IReadOnlyCollection<string>? requiredSheets = null)
     {
         using var memory = new MemoryStream(); input.CopyTo(memory); memory.Position = 0;
         using var archive = new ZipArchive(memory, ZipArchiveMode.Read, leaveOpen: false);
+        if (archive.Entries.Count > MaximumEntries || archive.Entries.Sum(entry => entry.Length) > MaximumExpandedBytes)
+            throw new InvalidDataException("El Excel excede los límites de complejidad permitidos.");
         var shared = ReadSharedStrings(archive); var relationships = ReadRelationships(archive);
         var workbook = LoadXml(archive, "xl/workbook.xml");
         XNamespace main = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -32,6 +41,7 @@ internal static partial class PersonnelWorkbookReader
         var sheets = new Dictionary<string, SheetData>(StringComparer.OrdinalIgnoreCase);
         foreach (var element in workbook.Descendants(main + "sheet"))
         {
+            if (sheets.Count >= MaximumSheets) throw new InvalidDataException("El Excel contiene demasiadas hojas.");
             var name = (string?)element.Attribute("name") ?? "";
             if (!relationships.TryGetValue((string?)element.Attribute(rel + "id") ?? "", out var target)) continue;
             var path = target.StartsWith('/') ? target.TrimStart('/') : "xl/" + target.Replace("../", "", StringComparison.Ordinal);
@@ -44,14 +54,16 @@ internal static partial class PersonnelWorkbookReader
     private static SheetData ReadSheet(ZipArchive archive, string path, string name, IReadOnlyList<string> shared)
     {
         XNamespace ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-        var rows = LoadXml(archive, path).Descendants(ns + "row").Select(row => new
+        var rows = LoadXml(archive, path).Descendants(ns + "row").Take(MaximumRowsPerSheet + 1).Select(row => new
         {
             Number = (int?)row.Attribute("r") ?? 0,
             Cells = row.Elements(ns + "c").ToDictionary(cell => Column((string?)cell.Attribute("r") ?? "A1"), cell => CellValue(cell, ns, shared))
         }).ToArray();
+        if (rows.Length > MaximumRowsPerSheet) throw new InvalidDataException($"La hoja '{name}' excede el máximo de filas permitido.");
         if (rows.Length == 0) return new(name, [], []);
         var header = rows.OrderByDescending(x => x.Cells.Values.Count(v => !string.IsNullOrWhiteSpace(v))).ThenBy(x => x.Number).First();
         var max = header.Cells.Keys.DefaultIfEmpty(-1).Max();
+        if (max >= MaximumColumns) throw new InvalidDataException($"La hoja '{name}' excede el máximo de columnas permitido.");
         var headers = Enumerable.Range(0, max + 1).Select(i => Normalize(header.Cells.GetValueOrDefault(i))).ToArray();
         var data = rows.Where(x => x.Number > header.Number && x.Cells.Values.Any(v => !string.IsNullOrWhiteSpace(v))).Select(x =>
             new WorkbookRow(x.Number, headers.Select((h, i) => (h, Value: Normalize(x.Cells.GetValueOrDefault(i))))
@@ -69,7 +81,7 @@ internal static partial class PersonnelWorkbookReader
     {
         var entry = archive.GetEntry("xl/sharedStrings.xml"); if (entry is null) return [];
         XNamespace ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-        using var stream = entry.Open(); var document = XDocument.Load(stream);
+        using var stream = entry.Open(); var document = LoadXml(stream);
         return document.Descendants(ns + "si").Select(x => string.Concat(x.Descendants(ns + "t").Select(t => t.Value))).ToArray();
     }
     private static Dictionary<string, string> ReadRelationships(ZipArchive archive)
@@ -79,10 +91,32 @@ internal static partial class PersonnelWorkbookReader
             .ToDictionary(x => (string)x.Attribute("Id")!, x => (string)x.Attribute("Target")!);
     }
     private static XDocument LoadXml(ZipArchive archive, string path)
-    { using var stream = archive.GetEntry(path)?.Open() ?? throw new InvalidDataException($"El Excel no contiene {path}."); return XDocument.Load(stream); }
+    {
+        if (path.Contains("..", StringComparison.Ordinal) || path.StartsWith('/') || path.StartsWith('\\'))
+            throw new InvalidDataException("El Excel contiene una ruta interna no válida.");
+        using var stream = archive.GetEntry(path)?.Open() ?? throw new InvalidDataException($"El Excel no contiene {path}.");
+        return LoadXml(stream);
+    }
+    private static XDocument LoadXml(Stream stream)
+    {
+        var settings = new XmlReaderSettings
+        {
+            DtdProcessing = DtdProcessing.Prohibit,
+            XmlResolver = null,
+            MaxCharactersInDocument = MaximumExpandedBytes,
+            MaxCharactersFromEntities = 0
+        };
+        using var reader = XmlReader.Create(stream, settings);
+        return XDocument.Load(reader, LoadOptions.None);
+    }
     private static int Column(string reference)
     { var letters = CellLetters().Match(reference).Value; var result = 0; foreach (var c in letters) result = result * 26 + c - 'A' + 1; return result - 1; }
-    internal static string Normalize(string? value) => MultipleSpaces().Replace(value?.Trim() ?? "", " ");
+    internal static string Normalize(string? value)
+    {
+        var normalized = MultipleSpaces().Replace(value?.Trim() ?? "", " ");
+        if (normalized.Length > MaximumCellCharacters) throw new InvalidDataException("El Excel contiene una celda demasiado extensa.");
+        return normalized;
+    }
     internal static string Key(string? value) => RemoveDiacritics(Normalize(value)).ToUpperInvariant();
     internal static string? Optional(string? value)
     { var cleaned = Normalize(value); return cleaned.Length == 0 || Key(cleaned) is "NO SE TIENE" or "NO TIENE" or "N/A" or "NA" ? null : cleaned; }

@@ -16,6 +16,11 @@ using Gaia.Modules.Security;
 using Gaia.Modules.ThirdParties;
 using Gaia.Modules.Training;
 using Gaia.Api.Infrastructure.Files;
+using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Authorization;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.DataProtection;
+using System.Security.Cryptography.X509Certificates;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,6 +36,44 @@ var dataverseConfiguration = DataverseConfiguration.From(builder.Configuration);
 
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
+if (!builder.Environment.IsDevelopment())
+{
+    var keysPath = builder.Configuration["DataProtection:KeysPath"];
+    var certificateThumbprint = builder.Configuration["DataProtection:CertificateThumbprint"];
+    if (string.IsNullOrWhiteSpace(keysPath) || string.IsNullOrWhiteSpace(certificateThumbprint))
+        throw new InvalidOperationException("DataProtection:KeysPath and CertificateThumbprint are required outside Development.");
+    using var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
+    store.Open(OpenFlags.ReadOnly);
+    var certificate = store.Certificates.Find(X509FindType.FindByThumbprint, certificateThumbprint, validOnly: true)
+        .OfType<X509Certificate2>().SingleOrDefault()
+        ?? throw new InvalidOperationException("The Data Protection certificate is unavailable or invalid.");
+    builder.Services.AddDataProtection()
+        .SetApplicationName("Gaia.Platform")
+        .PersistKeysToFileSystem(new DirectoryInfo(keysPath))
+        .ProtectKeysWithCertificate(certificate);
+}
+builder.Services.AddAntiforgery(options =>
+{
+    options.Cookie.Name = "__Host-Gaia.Csrf";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SameSite = builder.Environment.IsDevelopment() ? SameSiteMode.None : SameSiteMode.Strict;
+    options.HeaderName = "X-CSRF-TOKEN";
+});
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.User.FindFirst("oid")?.Value ?? context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 240,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+});
 builder.Services.AddSingleton(dataverseConfiguration);
 builder.Services.AddTransient<DataverseDiagnosticsHandler>();
 builder.Services.AddHttpClient("Dataverse", client =>
@@ -112,9 +155,12 @@ builder.Services.AddOrganizationModule(builder.Configuration);
 builder.Services.AddThirdPartiesModule(builder.Configuration);
 builder.Services.AddInventoryModule(builder.Configuration);
 builder.Services.AddSecurityModule();
-builder.Services.AddAuthorizationBuilder().AddPolicy("SecurityBootstrap", policy =>
+builder.Services.AddAuthorizationBuilder()
+    .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build())
+    .AddPolicy("SecurityBootstrap", policy =>
     policy.RequireAssertion(context =>
     {
+        if (!builder.Configuration.GetValue("Authorization:BootstrapEnabled", false)) return false;
         var email = context.User.FindFirst("preferred_username")?.Value
             ?? context.User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
         var administrators = builder.Configuration.GetSection("Authorization:BootstrapAdministrators").Get<string[]>() ?? [];
@@ -125,6 +171,8 @@ var configuredWebUrl = builder.Configuration["WebApplication:BaseUrl"]
 if (!Uri.TryCreate(configuredWebUrl, UriKind.Absolute, out var configuredWebUri)
     || configuredWebUri.Scheme is not ("http" or "https"))
     throw new InvalidOperationException("WebApplication:BaseUrl must be an absolute HTTP or HTTPS URL.");
+if (!builder.Environment.IsDevelopment() && configuredWebUri.Scheme != Uri.UriSchemeHttps)
+    throw new InvalidOperationException("WebApplication:BaseUrl must use HTTPS outside Development.");
 var allowedWebOrigins = builder.Environment.IsDevelopment()
     ? new[] { configuredWebUri.GetLeftPart(UriPartial.Authority), "https://localhost:3000", "http://localhost:3000" }.Distinct().ToArray()
     : new[] { configuredWebUri.GetLeftPart(UriPartial.Authority) };
@@ -135,12 +183,18 @@ builder.Services.AddCors(options => options.AddPolicy("WebClient", policy => pol
     .AllowCredentials()));
 
 var app = builder.Build();
-if (!app.Environment.IsDevelopment()) app.UseExceptionHandler();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler();
+    app.UseHsts();
+}
 app.Use(async (context, next) =>
 {
     context.Response.Headers["X-Content-Type-Options"] = "nosniff";
     context.Response.Headers["X-Frame-Options"] = "DENY";
     context.Response.Headers["Referrer-Policy"] = "no-referrer";
+    context.Response.Headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
+    context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=(), usb=()";
     await next();
 });
 var logApiCompleted = LoggerMessage.Define<string, string, int, long>(LogLevel.Information,
@@ -148,9 +202,17 @@ var logApiCompleted = LoggerMessage.Define<string, string, int, long>(LogLevel.I
 app.Use(async (context, next) =>
 {
     var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-    await next();
-    logApiCompleted(app.Logger, context.Request.Method, context.Request.Path,
-        context.Response.StatusCode, stopwatch.ElapsedMilliseconds, null);
+    var correlationId = context.Request.Headers["X-Correlation-ID"].FirstOrDefault();
+    if (string.IsNullOrWhiteSpace(correlationId) || correlationId.Length > 128)
+        correlationId = System.Diagnostics.Activity.Current?.TraceId.ToString() ?? Guid.NewGuid().ToString("N");
+    context.TraceIdentifier = correlationId;
+    context.Response.Headers["X-Correlation-ID"] = correlationId;
+    try { await next(); }
+    finally
+    {
+        logApiCompleted(app.Logger, context.Request.Method, context.Request.Path,
+            context.Response.StatusCode, stopwatch.ElapsedMilliseconds, null);
+    }
 });
 var logReauthentication = LoggerMessage.Define(Microsoft.Extensions.Logging.LogLevel.Information, new EventId(4101, "DataverseReauthenticationRequired"),
     "El usuario debe renovar la autorización delegada de Dataverse.");
@@ -212,13 +274,47 @@ app.UseHttpsRedirection();
 app.UseCors("WebClient");
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
+app.Use(async (context, next) =>
+{
+    var unsafeMethod = !HttpMethods.IsGet(context.Request.Method)
+        && !HttpMethods.IsHead(context.Request.Method)
+        && !HttpMethods.IsOptions(context.Request.Method)
+        && !HttpMethods.IsTrace(context.Request.Method);
+    if (!unsafeMethod || !context.Request.Path.StartsWithSegments("/api") || context.User.Identity?.IsAuthenticated != true)
+    {
+        await next();
+        return;
+    }
+
+    var origin = context.Request.Headers.Origin.FirstOrDefault();
+    var referer = context.Request.Headers.Referer.FirstOrDefault();
+    var trustedSource = allowedWebOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase)
+        || (Uri.TryCreate(referer, UriKind.Absolute, out var refererUri)
+            && allowedWebOrigins.Contains(refererUri.GetLeftPart(UriPartial.Authority), StringComparer.OrdinalIgnoreCase));
+    if (!trustedSource)
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        await context.Response.WriteAsJsonAsync(new { title = "Origen no permitido", status = 403, code = "csrf_origin_rejected" });
+        return;
+    }
+
+    try { await context.RequestServices.GetRequiredService<IAntiforgery>().ValidateRequestAsync(context); }
+    catch (AntiforgeryValidationException)
+    {
+        context.Response.StatusCode = StatusCodes.Status400BadRequest;
+        await context.Response.WriteAsJsonAsync(new { title = "Solicitud no válida", status = 400, code = "csrf_validation_failed" });
+        return;
+    }
+    await next();
+});
 
 app.MapGet("/health", () => Results.Ok(new
 {
     status = "healthy",
-    service = "gaia-api",
-    version = typeof(Program).Assembly.GetName().Version?.ToString()
+    service = "gaia-api"
 }))
+.AllowAnonymous()
 .WithName("GetHealth")
 .WithTags("Platform");
 
@@ -228,9 +324,12 @@ app.MapFileStorageDiagnostics();
 app.MapOrganizationEndpoints();
 app.MapThirdPartiesEndpoints();
 app.MapInventoryEndpoints();
-app.MapSecurityEndpoints();
+app.MapSecurityEndpoints(builder.Configuration.GetValue("Authorization:BootstrapEnabled", false));
 app.MapSolicitudesEndpoints();
-app.MapDevelopmentSolicitudesDataReset();
+if(app.Environment.IsDevelopment())
+{
+    app.MapDevelopmentSolicitudesDataReset();
+}
 if(app.Environment.IsDevelopment())
 {
     app.MapDevelopmentSolicitudesScenarioSeed();

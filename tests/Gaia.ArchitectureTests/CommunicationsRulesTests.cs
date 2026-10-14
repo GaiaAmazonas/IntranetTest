@@ -8,4 +8,7 @@ public sealed class CommunicationsRulesTests
  [Theory][InlineData(1,"design",true)][InlineData(2,"publish",true)][InlineData(3,"close",true)][InlineData(3,"reject",false)]public void BannerTransitionsAreControlled(int state,string action,bool expected)=>Assert.Equal(expected,CommunicationsRules.BannerTransition(state,action));
  [Fact] public void EventDestinationRequiresEvent()=>Assert.Throws<ArgumentException>(()=>CommunicationsRules.Validate(new BannerWriteRequest("Pieza",null,null,"Título",null,DateTimeOffset.UtcNow,null,1,1,null,Guid.NewGuid())));
  [Fact] public void ExternalDestinationRequiresAbsoluteUrl()=>Assert.Throws<ArgumentException>(()=>CommunicationsRules.Validate(new BannerWriteRequest("Pieza",null,null,"Título",null,DateTimeOffset.UtcNow,null,1,2,"relativo",Guid.NewGuid())));
+ [Theory][InlineData("javascript:alert(1)")][InlineData("http://example.org")][InlineData("https://user@example.org")]
+ public void ExternalDestinationRejectsUnsafeSchemes(string url)=>Assert.Throws<ArgumentException>(()=>CommunicationsRules.Validate(new BannerWriteRequest("Pieza",null,null,"Título",null,DateTimeOffset.UtcNow,null,1,2,url,Guid.NewGuid())));
+ [Fact] public void EventRejectsUnsafeUrl()=>Assert.Throws<ArgumentException>(()=>CommunicationsRules.Validate(new EventWriteRequest("Encuentro",Guid.NewGuid(),null,null,DateTimeOffset.UtcNow,DateTimeOffset.UtcNow.AddHours(1),false,1,null,"javascript:alert(1)",Guid.NewGuid())));
 }

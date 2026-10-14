@@ -114,6 +114,8 @@ Antes de entregar:
 - [ ] Las pruebas relevantes pasaron.
 - [ ] La documentación oficial fue actualizada.
 
+Además, todo pull request debe superar los jobs `backend`, `frontend` y `codeql` de `.github/workflows/ci.yml`. Está prohibido aprobar excepciones permanentes: una excepción temporal registra propietario, mitigación y vencimiento conforme a `SECURITY.md`. La rama `main` se configura en GitHub con revisión obligatoria de CODEOWNERS, conversaciones resueltas y los tres checks anteriores como requeridos.
+
 ## Decisiones arquitectónicas
 
 Una decisión merece ADR cuando cambia tecnología estructural, persistencia, modelo de identidad, límites de módulos, estrategia de archivos o forma de despliegue. Un ADR contiene contexto, decisión, consecuencias y estado. No se reescribe para ocultar historia; se marca reemplazado por otro ADR.

@@ -25,6 +25,7 @@ internal sealed class SharePointFileStorage(SharePointStorageConfiguration optio
         RequireEnabled();
         var storedName = FileUploadRules.ValidateAndCreateStoredName(upload, options.MaximumFileBytes, options.AllowedExtensions, options.AllowedMimeTypes);
         await using var spool = await FileTransferStreams.PrepareAsync(content, upload.Length, cancellationToken);
+        FileUploadRules.ValidateContentSignature(upload, spool);
         var sha256 = Convert.ToHexString(await SHA256.HashDataAsync(spool, cancellationToken)).ToLowerInvariant();
         spool.Position = 0;
         var scanner = scanners.SingleOrDefault();
