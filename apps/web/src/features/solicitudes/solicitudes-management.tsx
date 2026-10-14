@@ -360,7 +360,7 @@ export function SolicitudesManagement() {
         apiRequest<Detail>(`/api/solicitudes/requests/${item.id}`, { cache: "no-store" }),
         apiRequest<Workflow>(`/api/solicitudes/requests/${item.id}/workflow`, { cache: "no-store" }),
       ]);
-      await downloadClosurePdf({ ...request, managements: workflowData.managements });
+      await downloadClosurePdf({ ...request, managements: workflowData.managements, workflow: workflowData });
     } catch (value) {
       const description = value instanceof Error ? value.message : "No fue posible generar la constancia.";
       setError(description);
@@ -1768,6 +1768,7 @@ function WorkflowPanel(props: WorkflowPanelProps) {
                   downloadClosurePdf({
                     ...detail,
                     managements: workflow.managements,
+                    workflow,
                   })
                 }
                 type="button"

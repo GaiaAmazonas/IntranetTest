@@ -14,6 +14,21 @@ public sealed class SolicitudesRequestApplicationTests
         Assert.Equal("Necesito recuperar mi acceso", store.Request.Description);
     }
 
+    [Fact]
+    public async Task ValidRequestPublishesSubmittedNotification()
+    {
+        var store = new Store();
+        var notifications = new Notifications();
+        var requesterId = Guid.NewGuid();
+        var service = new SolicitudesRequestApplication(store, store, TimeProvider.System, notifications);
+
+        var created = await service.CreateAsync(
+            new(Guid.NewGuid(), "Acceso al sistema", "Necesito recuperar mi acceso"), requesterId, default);
+
+        Assert.Equal(created, notifications.SubmittedRequest);
+        Assert.Equal(requesterId, notifications.SubmittedRequesterId);
+    }
+
     [Theory]
     [InlineData("", "Descripción suficientemente larga")]
     [InlineData("Bien", "Descripción suficientemente larga")]
@@ -46,5 +61,19 @@ public sealed class SolicitudesRequestApplicationTests
             return Task.FromResult(new CreatedSolicitudesRequest(Guid.NewGuid(), "HD-0000001", now, DateOnly.FromDateTime(now.Date.AddDays(1))));
         }
         public Task<SolicitudesServiceForm?> ReadForServiceAsync(Guid serviceId,CancellationToken cancellationToken)=>Task.FromResult(Form);
+    }
+
+    private sealed class Notifications : ISolicitudesNotificationPublisher
+    {
+        public CreatedSolicitudesRequest? SubmittedRequest { get; private set; }
+        public Guid? SubmittedRequesterId { get; private set; }
+        public Task RequestSubmittedAsync(CreatedSolicitudesRequest request, Guid requesterId, CancellationToken token)
+        {
+            SubmittedRequest = request;
+            SubmittedRequesterId = requesterId;
+            return Task.CompletedTask;
+        }
+        public Task RequestReassignedAsync(Guid requestId, Guid responsibleId, CancellationToken token) => Task.CompletedTask;
+        public Task ManagementReassignedAsync(Guid managementId, Guid responsibleId, CancellationToken token) => Task.CompletedTask;
     }
 }

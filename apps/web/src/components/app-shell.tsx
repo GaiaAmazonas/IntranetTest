@@ -4,7 +4,7 @@ import Link from "@/components/document-link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Building2, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, GraduationCap, Headphones, Home, LoaderCircle, LogOut, Menu, PackageSearch, Palette, PanelLeftClose, PanelLeftOpen, Settings, UserRound, Users, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ComponentType, type MouseEvent as ReactMouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentType, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { Avatar, IconButton } from "./ui";
 import { ConfirmDialog } from "./form-dialog";
 import { startLogin } from "@/lib/api-client";
@@ -29,6 +29,7 @@ const routeMatches = (pathname: string, route: string) => {
 };
 const iconByCode: Record<string, NavigationItem["icon"]> = { INICIO: Home, ORG: Building2, TH: Users, INV: PackageSearch, COM: CalendarRange, CONFIG: Settings, HD: Headphones, CAP: GraduationCap, TI: Settings };
 function moduleIcon(code: string) { return iconByCode[code.toUpperCase()] ?? Settings; }
+const sidebarMinimumWidth = 200, sidebarMaximumWidth = 360, sidebarDefaultWidth = 288;
 
 export function AppShell({ title, user: suppliedUser }: { title: string; user?: User }) {
   const security = useSecurity();
@@ -38,7 +39,9 @@ export function AppShell({ title, user: suppliedUser }: { title: string; user?: 
   const [reauthRequired, setReauthRequired] = useState(false); const [expanded, setExpanded] = useState<string[]>([]); const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
   const [accentTheme, setAccentTheme] = useState<AccentTheme>("forest");
+  const [sidebarWidth, setSidebarWidth] = useState(sidebarDefaultWidth); const [resizingSidebar, setResizingSidebar] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
+  const sidebarWidthRef = useRef(sidebarDefaultWidth);
   const navigation = useMemo<NavigationItem[]>(() => {
     const configured = security.modules;
     const inferredParentIds = new Map<string, string | null>();
@@ -76,7 +79,35 @@ export function AppShell({ title, user: suppliedUser }: { title: string; user?: 
     }
     return result;
   }, [security.modules]);
+  function updateSidebarWidth(value: number, persist = false) {
+    const width = Math.min(sidebarMaximumWidth, Math.max(sidebarMinimumWidth, Math.round(value)));
+    sidebarWidthRef.current = width;
+    setSidebarWidth(width);
+    document.documentElement.style.setProperty("--gaia-sidebar-expanded", `${width}px`);
+    if (persist) localStorage.setItem("gaia-sidebar-width", String(width));
+  }
+  function startSidebarResize(event: ReactPointerEvent<HTMLDivElement>) {
+    if (matchMedia("(max-width: 767px)").matches) return;
+    event.preventDefault();
+    setResizingSidebar(true);
+    const move = (moveEvent: PointerEvent) => updateSidebarWidth(moveEvent.clientX);
+    const end = () => {
+      setResizingSidebar(false);
+      localStorage.setItem("gaia-sidebar-width", String(sidebarWidthRef.current));
+      removeEventListener("pointermove", move);
+      removeEventListener("pointerup", end);
+    };
+    addEventListener("pointermove", move);
+    addEventListener("pointerup", end, { once: true });
+  }
+  function resizeSidebarWithKeyboard(event: ReactKeyboardEvent<HTMLDivElement>) {
+    const increments: Record<string, number> = { ArrowLeft: -12, ArrowRight: 12, Home: sidebarMinimumWidth - sidebarWidthRef.current, End: sidebarMaximumWidth - sidebarWidthRef.current };
+    if (!(event.key in increments)) return;
+    event.preventDefault();
+    updateSidebarWidth(sidebarWidthRef.current + increments[event.key], true);
+  }
   useEffect(() => { const frame = requestAnimationFrame(() => setCollapsed(localStorage.getItem("gaia-sidebar-collapsed") === "true")); return () => cancelAnimationFrame(frame); }, []);
+  useEffect(() => { const frame = requestAnimationFrame(() => { const saved = Number(localStorage.getItem("gaia-sidebar-width")); if (Number.isFinite(saved) && saved >= sidebarMinimumWidth && saved <= sidebarMaximumWidth) updateSidebarWidth(saved); }); return () => cancelAnimationFrame(frame); }, []);
   useEffect(() => { const frame = requestAnimationFrame(() => { const saved = localStorage.getItem("gaia-accent-theme"); if (accentThemes.some(theme => theme.value === saved)) setAccentTheme(saved as AccentTheme); }); return () => cancelAnimationFrame(frame); }, []);
   useEffect(() => { document.documentElement.dataset.gaiaSidebar = collapsed ? "collapsed" : "expanded"; localStorage.setItem("gaia-sidebar-collapsed", String(collapsed)); return () => { delete document.documentElement.dataset.gaiaSidebar; }; }, [collapsed]);
   useEffect(() => { if (suppliedUser) return; void fetch(`${apiUrl}/api/auth/me`, { credentials: "include" }).then(async response => { if (response.status === 401) { location.href = "/"; return; } if (response.ok) setUser(await response.json() as User); }); }, [suppliedUser]);
@@ -108,6 +139,7 @@ export function AppShell({ title, user: suppliedUser }: { title: string; user?: 
       <div className="gaia-sidebar-footer" ref={accountRef}>{accountOpen && <div className={`gaia-account-menu ${collapsed ? "is-collapsed" : ""}`} role="menu"><div className="gaia-account-summary"><UserRound size={17} /><div><strong>{displayedUser?.displayName ?? "Usuario Gaia"}</strong><span>{displayedUser?.email}</span></div></div><div className="gaia-theme-selector"><div><Palette size={16} /><span>Color de la plataforma</span></div><div aria-label="Color de la plataforma" className="gaia-theme-options" role="radiogroup">{accentThemes.map(theme => <button aria-checked={accentTheme === theme.value} aria-label={theme.label} className={accentTheme === theme.value ? "is-selected" : ""} key={theme.value} onClick={() => selectAccent(theme.value)} role="radio" title={theme.label} type="button"><span style={{ backgroundColor: theme.color }} /><small>{theme.label}</small></button>)}</div></div><button className="gaia-account-action" disabled={loggingOut} onClick={logout} role="menuitem" type="button">{loggingOut ? <LoaderCircle className="gaia-spin" size={17} /> : <LogOut size={17} />}{loggingOut ? "Cerrando sesión..." : "Cerrar sesión"}</button></div>}
         <button aria-expanded={accountOpen} className="gaia-user-trigger" onClick={() => setAccountOpen(value => !value)} title={collapsed ? displayedUser?.displayName : undefined} type="button"><Avatar currentUser name={displayedUser?.displayName ?? "Usuario Gaia"} />{!collapsed && <><span className="min-w-0 flex-1 text-left"><strong>{displayedUser?.displayName ?? "Usuario Gaia"}</strong><small>{displayedUser?.email ?? "Cuenta institucional"}</small></span><ChevronRight size={17} /></>}</button>
         <button className="gaia-collapse-button" onClick={() => setCollapsed(value => !value)} title={collapsed ? "Expandir navegación" : "Contraer navegación"} type="button">{collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}{!collapsed && <span>Contraer</span>}</button></div>
+      {!collapsed && <div aria-label="Ajustar ancho de la navegación" aria-orientation="vertical" aria-valuemax={sidebarMaximumWidth} aria-valuemin={sidebarMinimumWidth} aria-valuenow={sidebarWidth} aria-valuetext={`${sidebarWidth} píxeles`} className={`gaia-sidebar-resizer ${resizingSidebar ? "is-resizing" : ""}`} onKeyDown={resizeSidebarWithKeyboard} onPointerDown={startSidebarResize} role="slider" tabIndex={0} />}
     </aside>
     <header className="gaia-topbar"><IconButton className="gaia-menu-button" label="Abrir navegación" onClick={() => setMobileOpen(true)}><Menu size={21} /></IconButton><h1>{title}</h1><div className="gaia-topbar-status"><span aria-hidden="true" /><span>Entorno institucional</span></div></header>
     <ConfirmDialog confirmLabel="Volver a iniciar sesión" description="Por seguridad, vuelve a iniciar sesión para continuar." onCancel={() => setReauthRequired(false)} onConfirm={() => startLogin(location.href)} open={reauthRequired} title="Tu sesión necesita renovarse" />

@@ -47,6 +47,19 @@ public sealed class SolicitudesManagementApplicationTests
     }
 
     [Fact]
+    public async Task ReassignmentPublishesNotificationForTheNewResponsible()
+    {
+        var store=new Store();var notifications=new Notifications();
+        var application=new SolicitudesManagementApplication(store,TimeProvider.System,notifications);
+        var requestId=Guid.NewGuid();var responsibleId=Guid.NewGuid();
+
+        await application.ReassignAsync(requestId,Guid.NewGuid(),new(responsibleId,null,"Cambio por cobertura"),default);
+
+        Assert.Equal(requestId,notifications.RequestId);
+        Assert.Equal(responsibleId,notifications.ResponsibleId);
+    }
+
+    [Fact]
     public async Task DeleteResolvedRequiresAValidRequestAndActor()
     {
         var store=new Store();var application=new SolicitudesManagementApplication(store,TimeProvider.System);
@@ -90,5 +103,13 @@ public sealed class SolicitudesManagementApplicationTests
         public Task<SolicitudesAdminFormDefinition> ReadFormAsync(Guid formId,CancellationToken token)=>throw new NotImplementedException();
         public Task<Guid> SaveFormFieldAsync(Guid formId,Guid? fieldId,SaveSolicitudesFormField request,CancellationToken token)=>Task.FromResult(fieldId??Guid.NewGuid());
         public Task DeleteFormFieldAsync(Guid formId,Guid fieldId,CancellationToken token)=>Task.CompletedTask;
+    }
+
+    private sealed class Notifications:ISolicitudesNotificationPublisher
+    {
+        public Guid? RequestId{get;private set;}public Guid? ResponsibleId{get;private set;}
+        public Task RequestSubmittedAsync(CreatedSolicitudesRequest request,Guid requesterId,CancellationToken token)=>Task.CompletedTask;
+        public Task RequestReassignedAsync(Guid requestId,Guid responsibleId,CancellationToken token){RequestId=requestId;ResponsibleId=responsibleId;return Task.CompletedTask;}
+        public Task ManagementReassignedAsync(Guid managementId,Guid responsibleId,CancellationToken token)=>Task.CompletedTask;
     }
 }

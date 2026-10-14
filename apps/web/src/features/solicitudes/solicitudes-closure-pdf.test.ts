@@ -31,4 +31,19 @@ describe("buildClosurePdf", () => {
     expect(content).toContain("COMENTARIO_PUBLICO");
     expect(content).not.toContain("COMENTARIO_INTERNO");
   });
+
+  it("agrega al final el diagrama vectorial del recorrido cuando recibe el workflow", () => {
+    const content = new TextDecoder().decode(buildClosurePdf({ ...request, workflow: {
+      managements: [{ stepId: "inicio", status: 299540194, formTitle: "Validación inicial" }],
+      steps: [
+        { id: "inicio", code: "VALIDACION_INICIAL", order: 0, initial: true, final: false, active: true, positionX: 0, positionY: 0 },
+        { id: "cierre", code: "CIERRE", order: 1, initial: false, final: true, active: true, positionX: 300, positionY: 0 },
+      ],
+      routes: [{ id: "ruta", sourceStepId: "inicio", targetStepId: "cierre", active: true }],
+    }}));
+
+    expect(content).toContain("RECORRIDO DEL FLUJO DE ATENCI\\323N");
+    expect(content).toContain("Validaci\\363n inicial");
+    expect(content).toContain("(Cierre)");
+  });
 });

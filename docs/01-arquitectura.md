@@ -15,7 +15,7 @@ Gaia integra una intranet institucional y un entorno administrativo denominado A
 - autorización por roles y permisos propios de Gaia;
 - persistencia mediante Dataverse Web API;
 - archivos en SharePoint Online mediante Microsoft Graph;
-- notificaciones transversales mediante outbox en Dataverse y entrega con Power Automate/Microsoft 365;
+- notificaciones transversales mediante outbox en Dataverse y entrega con Power Automate/Google Workspace;
 - módulos backend con contratos, reglas y endpoints aislados;
 - frontend responsive con rutas y componentes compartidos;
 - pruebas backend con xUnit y frontend con Vitest, TypeScript y ESLint.

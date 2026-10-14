@@ -32,6 +32,32 @@ public sealed class SolicitudesWorkflowApplicationTests
     }
 
     [Fact]
+    public async Task ManagementReassignmentPublishesNotificationForTheNewResponsible()
+    {
+        var store=new Store();var notifications=new Notifications();
+        var app=new SolicitudesWorkflowApplication(store,TimeProvider.System,notifications);
+        var managementId=Guid.NewGuid();var responsibleId=Guid.NewGuid();
+
+        await app.ReassignAsync(managementId,Guid.NewGuid(),new(responsibleId,"Cambio por cobertura"),default);
+
+        Assert.Equal(managementId,notifications.ManagementId);
+        Assert.Equal(responsibleId,notifications.ResponsibleId);
+    }
+
+    [Fact]
+    public async Task TakingManagementPublishesNotificationForTheActor()
+    {
+        var store=new Store();var notifications=new Notifications();
+        var app=new SolicitudesWorkflowApplication(store,TimeProvider.System,notifications);
+        var managementId=Guid.NewGuid();var actorId=Guid.NewGuid();
+
+        await app.TakeAsync(managementId,actorId,default);
+
+        Assert.Equal(managementId,notifications.ManagementId);
+        Assert.Equal(actorId,notifications.ResponsibleId);
+    }
+
+    [Fact]
     public async Task RequesterCanRespondWithFileOnly()
     {
         var store=new Store();var app=new SolicitudesWorkflowApplication(store,TimeProvider.System);
@@ -170,5 +196,13 @@ public sealed class SolicitudesWorkflowApplicationTests
         public Task<IReadOnlyList<SavedSolicitudesManagementAnswer>> SaveManagementAnswersAsync(Guid managementId,Guid actorId,SaveSolicitudesManagementAnswers command,CancellationToken token)=>Task.FromResult<IReadOnlyList<SavedSolicitudesManagementAnswer>>([]);
         public Task<SolicitudesRequestWorkflowState?> ReadRequestStateAsync(Guid requestId,Guid actorId,bool managementAccess,CancellationToken token)=>Task.FromResult<SolicitudesRequestWorkflowState?>(null);
         public Task<IReadOnlyList<SolicitudesWorkflowQueueItem>> ReadWorkQueueAsync(Guid actorId,string queue,CancellationToken token)=>Task.FromResult<IReadOnlyList<SolicitudesWorkflowQueueItem>>([]);
+    }
+
+    private sealed class Notifications:ISolicitudesNotificationPublisher
+    {
+        public Guid? ManagementId{get;private set;}public Guid? ResponsibleId{get;private set;}
+        public Task RequestSubmittedAsync(CreatedSolicitudesRequest request,Guid requesterId,CancellationToken token)=>Task.CompletedTask;
+        public Task RequestReassignedAsync(Guid requestId,Guid responsibleId,CancellationToken token)=>Task.CompletedTask;
+        public Task ManagementReassignedAsync(Guid managementId,Guid responsibleId,CancellationToken token){ManagementId=managementId;ResponsibleId=responsibleId;return Task.CompletedTask;}
     }
 }

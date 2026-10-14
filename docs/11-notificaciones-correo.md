@@ -1,7 +1,7 @@
 # Notificaciones institucionales por correo
 
-> Estado: **base transversal implementada; flujo Power Automate y validación ambiental pendientes** · Verificado: **2026-10-13**
-> Evidencia principal: `Gaia.BuildingBlocks.Notifications`, `DataverseEmailNotificationQueue`, `DataverseSolicitudesNotificationPublisher` y solución Dataverse `ConfiguracionCorreo`.
+> Estado: **base transversal y flujos activos; pruebas controladas sin adjuntos y de reintento aprobadas; validación desde Solicitudes y con adjuntos pendiente** · Verificado: **2026-10-14**
+> Evidencia principal: `Gaia.BuildingBlocks.Notifications`, `DataverseEmailNotificationQueue`, `DataverseSolicitudesNotificationPublisher`, pruebas de cola y de casos de uso, y solución Dataverse `ConfiguracionCorreo` empaquetada desde fuente versionable.
 
 ## Propósito
 
@@ -75,21 +75,30 @@ Las tres plantillas deben crearse como versión `1`, módulo `SOLICITUDES`, perf
 - asignación: además `responsable`;
 - etapa: además `responsable` y `etapa`.
 
-## Flujo de Power Automate pendiente
+En `DesarrolloTI`, las tres plantillas versión `1` fueron creadas el 13 de octubre de 2026 mediante el aprovisionador idempotente. Cada ambiente nuevo debe ejecutar su propia validación y aprovisionamiento; los registros de configuración no se presuponen transportados por la solución.
 
-El flujo debe estar incluido en una solución y usar referencias de conexión y variables de entorno. Reglas mínimas:
+## Flujo principal de Power Automate
+
+El flujo `Despachar correos institucionales` está incluido, publicado y activo en `ConfiguracionCorreo`. Usa referencias de conexión y la variable de entorno del remitente. Su implementación:
 
 1. disparador Dataverse al agregar o modificar `gaia_correosaliente`, filtrado por cambios de `gaia_estadoenvio`;
 2. continuar únicamente si el estado es `Pendiente` y `gaia_disponibledesde` no está en el futuro;
 3. reclamar el registro como `En procesamiento` antes de descargar archivos;
-4. obtener adjuntos activos relacionados y leer SharePoint mediante sus identificadores estables;
+4. obtiene adjuntos activos relacionados y lee SharePoint mediante `DriveId` y `DriveItemId`;
 5. enviar mediante Gmail desde `notificaciones@gaiaamazonas.org`, asociado al perfil lógico `GAIA_INSTITUCIONAL`;
 6. actualizar `Enviado`, fecha e identificador devuelto por Gmail;
-7. clasificar fallos temporales como `Error reintentable` y definitivos como `Error definitivo`;
-8. limitar concurrencia y evitar procesar dos veces una misma fila;
-9. no registrar cuerpo, destinatarios ni contenido de archivos en el historial de ejecución.
+7. aplica reintentos exponenciales del conector Gmail y registra el fallo agotado como `Error definitivo`;
+8. procesa secuencialmente los adjuntos y evita procesar dos veces una misma fila mediante el estado del outbox;
+9. protege entradas y salidas que contienen cuerpo, destinatarios o contenido de archivos en el historial de ejecución;
+10. marca los adjuntos como `Incorporado` después de que el correo ya quedó registrado como `Enviado`.
 
-Se requiere un segundo flujo programado o una rama controlada de reintento para devolver a `Pendiente` los errores reintentables cuyo `gaia_proximointento` ya venció y que no superaron `gaia_maximointentos`.
+La referencia lógica de archivos es `gaia_SharePointCorreoInstitucional`. La conexión concreta se asigna en cada ambiente durante la importación.
+
+El flujo `Reintento controlado de correos` se ejecuta cada 15 minutos. Devuelve a `Pendiente` los errores reintentables cuya fecha ya venció y cuyo contador todavía es menor que `gaia_maximointentos`; cuando se alcanza el máximo registra `Error definitivo`.
+
+Ambos flujos están activos en `DesarrolloTI`. El 14 de octubre de 2026 se aprobaron un envío controlado sin adjuntos y un recorrido de reintento que pasó de `Error reintentable` a `Pendiente`, incrementó el contador y terminó en `Enviado`. Permanecen pendientes la validación originada desde una solicitud real y las pruebas con uno y varios documentos reales de SharePoint.
+
+La solución puede reconstruirse desde `solutions/ConfiguracionCorreo/src` en el repositorio de Power Apps. El paquete `artifacts/ConfiguracionCorreo.zip` fue empaquetado, desempaquetado nuevamente y validado con `scripts/Test-GaiaConfiguracionCorreoSolution.ps1`.
 
 ## Seguridad y operación
 
@@ -101,12 +110,35 @@ Se requiere un segundo flujo programado o una rama controlada de reintento para 
 - Los adjuntos respetan los límites del conector Gmail; para archivos grandes se utiliza el modo vínculo cuando la política lo permita.
 - La retención y conciliación se definen antes de automatizar depuración.
 
+## Requisito de despliegue por ambiente
+
+Las referencias de conexión viajan con la solución, pero las sesiones autenticadas no. En cada ambiente se deben crear o seleccionar las conexiones reales y vincularlas durante la importación de `ConfiguracionCorreo`.
+
+| Ambiente | SharePoint | Condición |
+|---|---|---|
+| Desarrollo local | Puede usar la conexión autorizada de `emunar@gaiaamazonas.org` | Solo para desarrollo y pruebas controladas. |
+| Servidor de pruebas | Crear una conexión propia en el ambiente de pruebas | El responsable del despliegue debe vincularla durante la importación y validar acceso al sitio de pruebas. |
+| Producción | Usar una cuenta técnica institucional de Microsoft | No usar cuentas personales o nominales; aplicar mínimo privilegio y continuidad operativa. |
+
+El procedimiento de despliegue debe pedir expresamente al operador:
+
+1. crear o comprobar las conexiones de Dataverse, Gmail y SharePoint en el ambiente destino;
+2. asignarlas a sus referencias de conexión al importar la solución;
+3. comprobar que ninguna referencia quede sin vincular;
+4. activar el flujo después de validar permisos;
+5. ejecutar un envío controlado sin adjunto y otro con un archivo de prueba de SharePoint;
+6. verificar los estados finales en Dataverse y eliminar únicamente los datos de prueba conforme al procedimiento autorizado.
+
+Las credenciales, certificados, contraseñas y tokens nunca se copian desde desarrollo ni se documentan en el repositorio. La conexión actual de desarrollo no define la identidad que deberá usarse en producción.
+
 ## Validación antes de producción
 
 - crear las tres plantillas iniciales;
 - importar y activar los flujos con sus referencias de conexión;
 - probar idempotencia, concurrencia, destinatario sin correo y plantilla ausente;
 - probar envío con cero, uno y varios adjuntos de SharePoint;
-- probar error temporal, reintento y error definitivo;
+- probar error temporal y error definitivo; el reintento exitoso ya fue validado en `DesarrolloTI`;
 - confirmar que radicar o reasignar continúa funcionando cuando Power Automate está detenido;
 - revisar auditoría sin datos sensibles innecesarios.
+- confirmar que SharePoint está vinculado a una cuenta técnica institucional y no a `emunar@gaiaamazonas.org` ni a otra cuenta personal;
+- dejar registrado el propietario operativo de las conexiones y el procedimiento de renovación o recuperación de acceso.

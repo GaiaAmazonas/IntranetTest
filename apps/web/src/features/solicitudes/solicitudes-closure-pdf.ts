@@ -1,7 +1,9 @@
+import { buildWorkflowRouteMapLayout, type WorkflowRouteMapData } from "./solicitudes-workflow-route-map";
+
 export type ClosurePdfAnswer = { label:string; value?:string|null; options?:string[] };
 export type ClosurePdfManagement = { stepCode:string; formTitle?:string|null; unitName?:string|null; responsibleName?:string|null; result?:number|null; observation?:string|null; completedAt?:string|null; answers?:ClosurePdfAnswer[] };
 export type ClosurePdfComment = { content:string; publishedAt:string; isInternal?:boolean; authorRole?:string|null };
-export type ClosurePdfData = { number:string; subject:string; description?:string|null; service:string; status:string; submittedAt?:string|null; dueDate?:string|null; managements:ClosurePdfManagement[]; comments?:ClosurePdfComment[] };
+export type ClosurePdfData = { id?:string; number:string; subject:string; description?:string|null; service:string; status:string; submittedAt?:string|null; dueDate?:string|null; managements:ClosurePdfManagement[]; comments?:ClosurePdfComment[]; workflow?:WorkflowRouteMapData };
 type ImageData = { bytes:Uint8Array; width:number; height:number };
 type Page = { commands:string[] };
 
@@ -9,12 +11,15 @@ const W=612,H=842,L=44,R=568,TOP=730,BOTTOM=58,CW=R-L;
 const C={ teal:"0.05 0.31 0.32", dark:"0.04 0.20 0.20", soft:"0.91 0.96 0.95", green:"0.11 0.48 0.36", greenSoft:"0.91 0.97 0.94", purple:"0.43 0.16 0.43", ink:"0.08 0.14 0.13", muted:"0.38 0.45 0.42", border:"0.82 0.87 0.85", panel:"0.97 0.98 0.98", white:"1 1 1" };
 
 export async function downloadClosurePdf(data:ClosurePdfData) {
-  const pdf=buildClosurePdf(data,await loadLogo());
+  const completed=data.workflow||!data.id?data:{...data,workflow:await loadWorkflow(data.id)};
+  const pdf=buildClosurePdf(completed,await loadLogo());
   const link=document.createElement("a");
   link.href=URL.createObjectURL(new Blob([pdf],{type:"application/pdf"}));
   link.download=`Constancia-${data.number}.pdf`; link.click();
   window.setTimeout(()=>URL.revokeObjectURL(link.href),1000);
 }
+
+async function loadWorkflow(requestId:string){const api=process.env.NEXT_PUBLIC_GAIA_API_URL??"https://localhost:7168",response=await fetch(`${api}/api/solicitudes/requests/${requestId}/workflow`,{credentials:"include",cache:"no-store"});if(!response.ok)throw new Error("No fue posible cargar el recorrido de la solicitud para la constancia.");return response.json() as Promise<WorkflowRouteMapData>;}
 
 export function buildClosurePdf(data:ClosurePdfData,logo:ImageData|null=null) {
   const pdf=new PdfDocument(logo);
@@ -29,6 +34,7 @@ export function buildClosurePdf(data:ClosurePdfData,logo:ImageData|null=null) {
   if (comments.length) comments.forEach(x=>pdf.comment(x));
   else pdf.empty("No se registraron comentarios visibles para el solicitante.");
   pdf.note("Esta constancia consolida la información registrada en el sistema institucional Gaia. Las notas internas del equipo no forman parte del documento descargable.");
+  if(data.workflow?.steps?.length)pdf.workflowDiagram(data.workflow);
   return pdf.build();
 }
 
@@ -61,6 +67,16 @@ class PdfDocument {
   comment(item:ClosurePdfComment){const lines=wrap(item.content.trim(),CW-42,9,false),height=48+lines.length*13;this.ensure(height+10,"Conversación de la solicitud");this.rect(L,this.y-height,CW,height,C.panel,C.border);this.text(role(item.authorRole),L+14,this.y-20,8,true,C.teal);this.text(formatDate(item.publishedAt),R-150,this.y-20,8,false,C.muted);this.textLines(lines,L+14,this.y-42,9,13,false,C.ink);this.y-=height+10;}
   empty(message:string){this.ensure(56);this.rect(L,this.y-42,CW,42,C.panel,C.border);this.text(message,L+14,this.y-25,9,false,C.muted);this.y-=56;}
   note(message:string){const lines=wrap(message,CW-28,8,false),height=28+lines.length*11;this.ensure(height+8);this.rect(L,this.y-height,CW,height,C.soft);this.textLines(lines,L+14,this.y-20,8,11,false,C.dark);this.y-=height;}
+  workflowDiagram(workflow:WorkflowRouteMapData){
+    const layout=buildWorkflowRouteMapLayout(workflow);if(!layout.nodes.length)return;
+    this.newPage();this.text("RECORRIDO DEL FLUJO DE ATENCIÓN",L,this.y-8,13,true,C.ink);this.text("Versión publicada y estado de ejecución al cierre.",L,this.y-23,8,false,C.muted);this.y-=42;
+    const availableHeight=this.y-BOTTOM-28,scale=Math.min((CW-12)/layout.width,availableHeight/layout.height,1),width=layout.width*scale,height=layout.height*scale,left=L+(CW-width)/2,bottom=BOTTOM+10+(availableHeight-height)/2;
+    this.rect(L,BOTTOM,CW,availableHeight,C.panel,C.border);const nodes=new Map(layout.nodes.map(node=>[node.step.id,node]));
+    const point=(node:{left:number;top:number},end:boolean)=>[left+(node.left+(end?220:0))*scale,bottom+(layout.height-node.top-41)*scale] as const;
+    (workflow.routes??[]).filter(route=>route.active).forEach(route=>{const source=nodes.get(route.sourceStepId),target=nodes.get(route.targetStepId);if(!source||!target)return;const[x1,y1]=point(source,true),[x2,y2]=point(target,false);this.connector(x1,y1,x2,y2,target.status!=="pending"?C.green:C.border,scale);});
+    layout.nodes.forEach(node=>{const x=left+node.left*scale,y=bottom+(layout.height-node.top-82)*scale,w=220*scale,h=82*scale,color=node.status==="completed"?C.green:node.status==="current"?C.teal:C.muted,fill=node.status==="completed"?C.greenSoft:node.status==="current"?C.soft:C.white;this.rect(x,y,w,h,fill,color);this.circle(x+14*scale,y+h-17*scale,4.5*scale,color);this.text(workflowLabel(node.status).toLocaleUpperCase("es"),x+26*scale,y+h-21*scale,Math.max(5,7*scale),true,color);this.text(short(node.label,34),x+12*scale,y+h-50*scale,Math.max(6,11*scale),true,C.ink);if(node.step.initial||node.step.final)this.text(node.step.initial?"INICIO":"FINAL",x+w-38*scale,y+h-21*scale,Math.max(5,7*scale),true,color);});
+    this.text("Verde: completada · Azul: etapa actual · Gris: pendiente o no recorrida",L,BOTTOM-14,7,false,C.muted);
+  }
   build(){return serialize(this.pages,this.logo);}
   private ensure(height:number,title?:string){if(this.y-height>=BOTTOM)return;this.newPage();if(title){this.text(`${title} (continuación)`,L,this.y,11,true,C.ink);this.y-=26;}}
   private newPage(){this.page={commands:[]};this.pages.push(this.page);this.y=TOP;this.rect(0,H-82,W,82,C.dark);this.rect(0,H-86,W,4,C.purple);this.rect(36,H-68,118,43,C.white);if(this.logo)this.page.commands.push("q",`74 0 0 40 58 ${H-67} cm`,"/Logo Do","Q");else{this.text("GAIA",49,H-43,15,true,C.dark);this.text("AMAZONAS",49,H-57,7,true,C.purple);}this.text("CONSTANCIA DE ATENCIÓN",178,H-39,15,true,C.white);this.text("Sistema institucional de solicitudes",178,H-58,8,false,C.white);}
@@ -69,6 +85,7 @@ class PdfDocument {
   private textLines(lines:string[],x:number,y:number,s:number,lh:number,b:boolean,color:string){lines.forEach((v,i)=>this.text(v,x,y-i*lh,s,b,color));}
   private rect(x:number,y:number,w:number,h:number,fill:string,stroke?:string){this.page.commands.push("q",`${fill} rg`,...(stroke?[`${stroke} RG`,"0.8 w"]:[]),`${x} ${y} ${w} ${h} re ${stroke?"B":"f"}`,"Q");}
   private line(x1:number,y1:number,x2:number,y2:number,color:string){this.page.commands.push("q",`${color} RG`,"0.7 w",`${x1} ${y1} m ${x2} ${y2} l S`,"Q");}
+  private connector(x1:number,y1:number,x2:number,y2:number,color:string,scale:number){const bend=Math.max(8,(x2-x1)*.42),size=Math.max(2.5,4*scale);this.page.commands.push("q",`${color} RG`,`${Math.max(.5,1.4*scale)} w`,`${x1} ${y1} m ${x1+bend} ${y1} ${x2-bend} ${y2} ${x2} ${y2} c S`,"Q","q",`${color} rg`,`${x2} ${y2} m ${x2-size} ${y2+size*.65} l ${x2-size} ${y2-size*.65} l h f`,"Q");}
   private circle(x:number,y:number,r:number,color:string){const k=r*.5522847498;this.page.commands.push("q",`${color} rg`,`${x+r} ${y} m ${x+r} ${y+k} ${x+k} ${y+r} ${x} ${y+r} c`,`${x-k} ${y+r} ${x-r} ${y+k} ${x-r} ${y} c`,`${x-r} ${y-k} ${x-k} ${y-r} ${x} ${y-r} c`,`${x+k} ${y-r} ${x+r} ${y-k} ${x+r} ${y} c f`,"Q");}
 }
 
@@ -93,3 +110,4 @@ function formatDate(v?:string|null){if(!v)return "Sin fecha";const d=new Date(v)
 function result(v?:number|null){return v===299540171?"Aprobada":v===299540172?"Rechazada":v===299540175?"No aplica":"Completada";}
 function resultColor(v?:number|null){return v===299540172?C.purple:v===299540175?C.muted:C.green;}
 function role(v?:string|null){return !v?"Participante":v.toLocaleLowerCase("es").includes("solicit")?"Solicitante":v;}
+function workflowLabel(value:"completed"|"current"|"cancelled"|"pending"){return value==="completed"?"Completada":value==="current"?"Etapa actual":value==="cancelled"?"No recorrida":"Pendiente";}
