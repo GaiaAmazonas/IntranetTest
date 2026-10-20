@@ -201,6 +201,7 @@ public sealed class SolicitudesAttachmentApplication(
         if (!policy.RequestExists) throw new KeyNotFoundException("La solicitud no existe o está inactiva.");
         if (!policy.IsRequester && !policy.IsManager) throw new UnauthorizedAccessException("No tiene acceso a esta solicitud.");
         if (!policy.AttachmentsAllowed) throw new InvalidOperationException("El servicio no permite adjuntos.");
+        SolicitudesFilePolicy.Validate(request.OriginalName, request.ContentType);
         if (policy.MaximumAttachments <= 0 || policy.CurrentAttachments >= policy.MaximumAttachments)
             throw new InvalidOperationException("La solicitud alcanzó el máximo de adjuntos permitido.");
         if (request.Length <= 0 || request.Length > policy.MaximumFileBytes)

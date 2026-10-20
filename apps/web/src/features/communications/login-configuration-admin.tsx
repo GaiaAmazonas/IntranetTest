@@ -5,6 +5,7 @@ import { useFeedback } from "@/components/feedback";
 import { ConfirmDialog } from "@/components/form-dialog";
 import { useSecurity } from "@/components/security-context";
 import { apiRequest } from "@/lib/api-client";
+import { normalizeLoginLineBreaks } from "@/lib/login-configuration";
 import { AlertCircle, CheckCircle2, ImageIcon, LoaderCircle, Pencil, Plus, Rocket, Trash2, X } from "lucide-react";
 import Image from "next/image";
 import { FormEvent, useCallback, useEffect, useState } from "react";
@@ -54,16 +55,16 @@ export function LoginConfigurationAdmin() {
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
 
   const edit = (item?: Configuration) => setEditor(item ? {
-    item, name: item.name, code: item.code, eyebrow: item.eyebrow, imageAlt: item.imageAlt ?? "",
-    description: item.description ?? "", platformName: item.platformName ?? "",
-    lowerLeftText: item.lowerLeftText ?? "", footerTitle: item.footerTitle ?? "",
-    footerDescription: item.footerDescription ?? "",
+    item, name: item.name, code: item.code, eyebrow: normalizeLoginLineBreaks(item.eyebrow), imageAlt: normalizeLoginLineBreaks(item.imageAlt),
+    description: normalizeLoginLineBreaks(item.description), platformName: normalizeLoginLineBreaks(item.platformName),
+    lowerLeftText: normalizeLoginLineBreaks(item.lowerLeftText), footerTitle: normalizeLoginLineBreaks(item.footerTitle),
+    footerDescription: normalizeLoginLineBreaks(item.footerDescription),
   } : { ...emptyEditor });
   const payload = (value: Editor) => ({
-    name: value.name, code: value.code, eyebrow: value.eyebrow, imageAlt: value.imageAlt || null,
-    description: value.description || null, platformName: value.platformName || null,
-    lowerLeftText: value.lowerLeftText || null, footerTitle: value.footerTitle || null,
-    footerDescription: value.footerDescription || null,
+    name: value.name, code: value.code, eyebrow: normalizeLoginLineBreaks(value.eyebrow), imageAlt: normalizeLoginLineBreaks(value.imageAlt) || null,
+    description: normalizeLoginLineBreaks(value.description) || null, platformName: normalizeLoginLineBreaks(value.platformName) || null,
+    lowerLeftText: normalizeLoginLineBreaks(value.lowerLeftText) || null, footerTitle: normalizeLoginLineBreaks(value.footerTitle) || null,
+    footerDescription: normalizeLoginLineBreaks(value.footerDescription) || null,
   });
 
   async function save(event: FormEvent) {
@@ -159,12 +160,12 @@ function ImageSlot({ item, operation, remove, revision, upload, variant }: { ite
 function LoginMediaPreview({alt,revision,url}:{alt:string;revision:number;url:string}){const[videoFailed,setVideoFailed]=useState(false),source=`${url}?v=${revision}`;return videoFailed?<Image alt={alt} height={180} sizes="(max-width: 700px) 100vw, 33vw" src={source} width={480}/>:<video aria-label={alt} autoPlay loop muted onError={()=>setVideoFailed(true)} playsInline preload="metadata" src={source}/>}
 
 function ConfigurationDialog({ editor, saving, setEditor, submit }: { editor: Editor; saving: boolean; setEditor: (value: Editor | null) => void; submit: (event: FormEvent) => Promise<void> }) {
-  return <div className="comms-dialog-backdrop"><section className="comms-dialog"><header><div><small>LOGIN INSTITUCIONAL</small><h2>{editor.item ? "Editar configuración" : "Nueva configuración"}</h2></div><button onClick={() => setEditor(null)} type="button">×</button></header><form onSubmit={submit}><div className="comms-form">{field("Nombre", "name", editor, setEditor, true)}{field("Código", "code", editor, setEditor, true)}{field("Antetítulo principal", "eyebrow", editor, setEditor, true)}{field("Texto alternativo del recurso", "imageAlt", editor, setEditor)}{field("Nombre plataforma", "platformName", editor, setEditor)}{field("Texto inferior izquierdo", "lowerLeftText", editor, setEditor)}{field("Título pie", "footerTitle", editor, setEditor)}{field("Descripción pie", "footerDescription", editor, setEditor)}<label className="is-wide">Descripción principal<textarea onChange={event => setEditor({ ...editor, description: event.target.value })} value={editor.description} /></label>{!editor.item && <label className="is-wide">Imagen o video de escritorio *<small>Imagen WebP/JPG/PNG de máximo 8 MB o video MP4/WebM de máximo 100 MB. El video se mostrará solamente en escritorio.</small><input accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" onChange={event => setEditor({ ...editor, desktop: event.target.files?.[0] })} required type="file" /></label>}</div><footer><button onClick={() => setEditor(null)} type="button">Cancelar</button><button disabled={saving} type="submit">{saving ? "Guardando…" : "Guardar"}</button></footer></form></section></div>;
+  return <div className="comms-dialog-backdrop"><section className="comms-dialog"><header><div><small>LOGIN INSTITUCIONAL</small><h2>{editor.item ? "Editar configuración" : "Nueva configuración"}</h2></div><button onClick={() => setEditor(null)} type="button">×</button></header><form onSubmit={submit}><div className="comms-form login-copy-form">{field("Nombre", "name", editor, setEditor, true)}{field("Código", "code", editor, setEditor, true)}<p className="login-copy-guidance">Los campos de contenido admiten saltos de línea con Enter. Las etiquetas HTML no se ejecutan.</p>{field("Antetítulo principal", "eyebrow", editor, setEditor, true, true)}{field("Título principal (Texto alternativo imagen)", "imageAlt", editor, setEditor, false, true)}{field("Nombre plataforma", "platformName", editor, setEditor, false, true)}{field("Texto inferior izquierdo", "lowerLeftText", editor, setEditor, false, true)}{field("Título pie", "footerTitle", editor, setEditor, false, true)}{field("Descripción pie", "footerDescription", editor, setEditor, false, true)}<label className="is-wide login-copy-description">Descripción principal<textarea onChange={event => setEditor({ ...editor, description: event.target.value })} rows={3} value={editor.description} /></label>{!editor.item && <label className="is-wide">Imagen o video de escritorio *<small>Imagen WebP/JPG/PNG de máximo 8 MB o video MP4/WebM de máximo 100 MB. El video se mostrará solamente en escritorio.</small><input accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" onChange={event => setEditor({ ...editor, desktop: event.target.files?.[0] })} required type="file" /></label>}</div><footer><button onClick={() => setEditor(null)} type="button">Cancelar</button><button disabled={saving} type="submit">{saving ? "Guardando…" : "Guardar"}</button></footer></form></section></div>;
 }
 function SocialDialog({ editor, saving, setEditor, submit }: { editor: SocialEditor; saving: boolean; setEditor: (value: SocialEditor | null) => void; submit: (event: FormEvent) => Promise<void> }) {
   return <div className="comms-dialog-backdrop"><section className="comms-dialog login-social-dialog"><header><div><small>RED SOCIAL</small><h2>{editor.item ? "Editar" : "Agregar"}</h2></div><button onClick={() => setEditor(null)} type="button">×</button></header><form onSubmit={submit}><div className="comms-form">{socialField("Nombre", "name", editor, setEditor)}{socialField("Etiqueta", "label", editor, setEditor)}<label>Orden<input min="0" onChange={event => setEditor({ ...editor, order: Number(event.target.value) })} required type="number" value={editor.order} /></label>{socialField("URL", "url", editor, setEditor)}</div><footer><button onClick={() => setEditor(null)} type="button">Cancelar</button><button disabled={saving} type="submit">Guardar</button></footer></form></section></div>;
 }
-function field(label: string, key: keyof Editor, value: Editor, set: (value: Editor) => void, required = false) { return <label>{label}{required ? " *" : ""}<input onChange={event => set({ ...value, [key]: event.target.value })} required={required} value={String(value[key] ?? "")} /></label>; }
+function field(label: string, key: keyof Editor, value: Editor, set: (value: Editor) => void, required = false, multiline = false) { return <label>{label}{required ? " *" : ""}{multiline ? <textarea className="login-copy-textarea" onChange={event => set({ ...value, [key]: event.target.value })} required={required} rows={2} value={String(value[key] ?? "")} /> : <input onChange={event => set({ ...value, [key]: event.target.value })} required={required} value={String(value[key] ?? "")} />}</label>; }
 function socialField(label: string, key: "name" | "label" | "url", value: SocialEditor, set: (value: SocialEditor) => void) { return <label>{label} *<input onChange={event => set({ ...value, [key]: event.target.value })} required type={key === "url" ? "url" : "text"} value={value[key]} /></label>; }
 function status(value: number) { return value === 2 ? "Publicada" : value === 3 ? "Retirada" : "Borrador"; }
 function variantLabel(value: Variant) { return value === "desktop" ? "Escritorio" : value === "tablet" ? "Tablet" : "Móvil"; }

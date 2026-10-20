@@ -48,6 +48,8 @@ Choices actuales: ámbito Intranet/AdminCore/Ambos; efectos Ninguno, Partículas
 
 La pantalla previa al login consume una instantánea pública, no Dataverse delegado por visita. AdminCore debe ejecutar “Actualizar publicación” después de cambiar la configuración.
 
+En el modelo vigente, `gaia_altimagen` contiene el título principal visible y también se utiliza como texto alternativo del recurso. La interfaz limita su presentación como encabezado a 80 caracteres y conserva el título institucional predeterminado ante una instantánea vacía o incompatible. Los campos editoriales admiten saltos de línea escritos con Enter; valores históricos con `<br>`, `<br/>` o `<br />` se normalizan como texto y nunca se interpretan como HTML. Cada instancia de la API mantiene su propia instantánea bajo `App_Data`; publicar en un servidor no actualiza automáticamente la copia de desarrollo local.
+
 - Escritorio admite imagen JPG/PNG/WebP de hasta 8 MB o video MP4/WebM de hasta 100 MB.
 - Tableta y móvil admiten imagen.
 - El video se reproduce silenciado, en bucle y `playsInline`; en pantallas pequeñas se usa imagen.

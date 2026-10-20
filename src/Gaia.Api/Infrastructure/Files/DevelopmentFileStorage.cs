@@ -11,12 +11,13 @@ internal sealed class DevelopmentFileStorage(IHostEnvironment environment)
 {
     private const long MaximumBytes = 2L * 1024 * 1024 * 1024;
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
-        { ".pdf", ".png", ".jpg", ".jpeg", ".docx", ".xlsx" };
+        { ".pdf", ".png", ".jpg", ".jpeg", ".docx", ".xlsx", ".pptx" };
     private static readonly HashSet<string> AllowedContentTypes = new(StringComparer.OrdinalIgnoreCase)
     {
         "application/pdf", "image/png", "image/jpeg",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation"
     };
     private readonly string root = Path.Combine(environment.ContentRootPath, "App_Data", "solicitudes-files");
     private string MetadataRoot => Path.Combine(root, ".metadata");

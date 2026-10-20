@@ -327,7 +327,8 @@ public static class SolicitudesFormFieldValidation
             while(!used.Add(candidate)){var ending=$"_{suffix++}";candidate=$"{root[..Math.Min(root.Length,80-ending.Length)]}{ending}";}
             options.Add(option with{Code=candidate,Label=labels[index]});
         }
-        return request with{Code=code,Label=label,HelpText=request.HelpText?.Trim(),Placeholder=request.Placeholder?.Trim(),ValidationPattern=request.ValidationPattern?.Trim(),ValidationMessage=request.ValidationMessage?.Trim(),DefaultValue=request.DefaultValue?.Trim(),ConfigurationJson=request.ConfigurationJson?.Trim(),Options=options};
+        var allowedFileTypes=request.DataType==299540047?SolicitudesFilePolicy.NormalizeAccept(request.AllowedFileTypes):null;
+        return request with{Code=code,Label=label,HelpText=request.HelpText?.Trim(),Placeholder=request.Placeholder?.Trim(),ValidationPattern=request.ValidationPattern?.Trim(),ValidationMessage=request.ValidationMessage?.Trim(),DefaultValue=request.DefaultValue?.Trim(),ConfigurationJson=request.ConfigurationJson?.Trim(),AllowedFileTypes=allowedFileTypes,Options=options};
     }
 
     private static string InternalCode(string value,int index)

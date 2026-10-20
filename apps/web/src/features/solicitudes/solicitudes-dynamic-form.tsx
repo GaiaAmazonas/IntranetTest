@@ -3,6 +3,7 @@ import {useEffect,useState,type FormEvent} from "react";
 import {Eye,GripVertical,Pencil,Plus,Trash2,X} from "lucide-react";
 import {apiRequest} from "@/lib/api-client";
 import {useFeedback} from "@/components/feedback";
+import {solicitudesFileAccept} from "./solicitudes-file-policy";
 
 export type DynamicOption={id:string;code:string;label:string;isDefault:boolean;order:number};
 export type DynamicField={id:string;code:string;label:string;dataType:number;controlType:number;helpText:string|null;placeholder:string|null;required:boolean;order:number;width:number;minimumLength:number|null;maximumLength:number|null;minimumValue:number|null;maximumValue:number|null;allowsMultiple:boolean;maximumFiles:number|null;allowedFileTypes:string|null;visible:boolean;options:DynamicOption[];validationPattern?:string|null;validationMessage?:string|null;defaultValue?:string|null;configurationJson?:string|null};
@@ -17,7 +18,7 @@ export function DynamicFormRenderer({form,values,onChange,disabled=false,showHid
 function DynamicControl({field,value,onChange,disabled}:{field:DynamicField;value:string|string[]|File[]|undefined;onChange:(value:string|string[]|File[])=>void;disabled:boolean}){
  const width=Math.min(12,Math.max(1,field.width||12)),common={disabled,required:field.required,placeholder:field.placeholder??undefined,className:"mt-2 min-h-11 w-full rounded-xl border border-[var(--gaia-line)] bg-[var(--surface-card)] px-3"};const stringValue=typeof value==="string"?value:field.defaultValue??"";const choices=Array.isArray(value)&&(!value.length||typeof value[0]==="string")?value as string[]:[];
  let control:React.ReactNode;
- if(field.dataType===299540047)control=<input {...common} accept={field.allowedFileTypes??undefined} multiple={field.allowsMultiple} onChange={e=>onChange(Array.from(e.target.files??[]))} type="file"/>;
+ if(field.dataType===299540047)control=<input {...common} accept={solicitudesFileAccept(field.allowedFileTypes)} multiple={field.allowsMultiple} onChange={e=>onChange(Array.from(e.target.files??[]))} type="file"/>;
  else if(field.controlType===299540051)control=<textarea {...common} maxLength={field.maximumLength??undefined} minLength={field.minimumLength??undefined} onChange={e=>onChange(e.target.value)} rows={4} value={stringValue}/>;
  else if(field.controlType===299540058)control=<select {...common} multiple={field.allowsMultiple} onChange={e=>onChange(field.allowsMultiple?Array.from(e.target.selectedOptions).map(x=>x.value):e.target.value)} value={field.allowsMultiple?choices:stringValue}><option value="">Seleccionar</option>{field.options.sort((a,b)=>a.order-b.order).map(x=><option key={x.id} value={x.id}>{x.label}</option>)}</select>;
  else if(field.controlType===299540059)control=<div className="mt-2 flex flex-wrap gap-3">{field.options.map(x=><label className="rounded-xl border px-3 py-2 text-sm" key={x.id}><input checked={stringValue===x.id} disabled={disabled} name={field.id} onChange={()=>onChange(x.id)} required={field.required} type="radio"/> <span>{x.label}</span></label>)}</div>;

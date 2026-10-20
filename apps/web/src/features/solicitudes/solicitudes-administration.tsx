@@ -30,6 +30,7 @@ import { PersonPicker } from "@/components/person-picker";
 import { useSecurity } from "@/components/security-context";
 import { apiRequest } from "@/lib/api-client";
 import { SolicitudesWorkflowManager } from "./solicitudes-workflow-manager";
+import { solicitudesFileAccept } from "./solicitudes-file-policy";
 import {
   exportSolicitudesRequests,
   type SolicitudesRequestExport,
@@ -1807,7 +1808,7 @@ function PreviewControl({ field }: { field: FormField }) {
   if (field.controlType === 299540062)
     return (
       <input
-        accept={field.allowedFileTypes ?? undefined}
+        accept={solicitudesFileAccept(field.allowedFileTypes)}
         className={`${style} py-2`}
         multiple={field.allowsMultiple}
         type="file"

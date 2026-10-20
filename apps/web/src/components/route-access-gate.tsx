@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useSecurity } from "./security-context";
 import { loginTransitionKey, startLogin } from "@/lib/api-client";
+import { loginDisplayText, loginPrimaryTitle } from "@/lib/login-configuration";
 import { routeRuleFor } from "@/lib/route-access";
 
 const loginTransitionMinimumMs = 300;
@@ -92,14 +93,14 @@ export function AccessState({ action, description, href, icon, notice, onAction,
         <section className="gaia-access-story">
           {loginConfiguration ? <LoginMedia configuration={loginConfiguration}/> : <Image alt="Paisaje de la Amazonía colombiana junto a un río" fill priority sizes="(max-width: 820px) 100vw, 62vw" src="/brand/intranet/evento-amazonia-gaia2.jpg" />}
           <div className="gaia-access-story-shade" />
-          <header><Image alt="Gaia Amazonas" height={48} src="/brand/logo-gaia.svg" width={88} /><span><small>{loginConfiguration?.platformName || "Ecosistema digital institucional"}</small></span></header>
+          <header><Image alt="Gaia Amazonas" height={48} src="/brand/logo-gaia.svg" width={88} /><span><small>{loginDisplayText(loginConfiguration?.platformName, "Ecosistema digital institucional")}</small></span></header>
           <div className="gaia-access-story-copy">
-            <p>{loginConfiguration?.eyebrow || "Territorio · conocimiento · futuro"}</p>
-            <h1>Todo Gaia,<br />en un solo lugar</h1>
-            <span>{loginConfiguration?.description || "Información, personas y herramientas conectadas para facilitar nuestro trabajo en la Amazonía."}</span>
+            <p>{loginDisplayText(loginConfiguration?.eyebrow, "Territorio · conocimiento · futuro")}</p>
+            <h1>{loginPrimaryTitle(loginConfiguration?.imageAlt)}</h1>
+            <span>{loginDisplayText(loginConfiguration?.description, "Información, personas y herramientas conectadas para facilitar nuestro trabajo en la Amazonía.")}</span>
           </div>
           <div className="gaia-access-capabilities">
-            <span><Building2 size={17} /><strong>Intranet</strong><small>{loginConfiguration?.lowerLeftText || "Información que nos conecta"}</small></span>
+            <span><Building2 size={17} /><strong>Intranet</strong><small>{loginDisplayText(loginConfiguration?.lowerLeftText, "Información que nos conecta")}</small></span>
             <nav aria-label="Redes sociales de Gaia Amazonas" className="gaia-access-socials gaia-access-socials-story">
               {configuredSocials.map(network => <a aria-label={`Gaia Amazonas en ${network.label}`} href={network.href} key={`${network.label}-${network.href}`} rel="noopener noreferrer" target="_blank"><i aria-hidden="true">{network.mark}</i><span>{network.label}</span></a>)}
             </nav>
@@ -118,7 +119,7 @@ export function AccessState({ action, description, href, icon, notice, onAction,
               {configuredSocials.map(network => <a aria-label={`Gaia Amazonas en ${network.label}`} href={network.href} key={`${network.label}-${network.href}`} rel="noopener noreferrer" target="_blank"><i aria-hidden="true">{network.mark}</i><span>{network.label}</span></a>)}
             </nav>
           </div>
-          <footer><span>{loginConfiguration?.footerTitle || loginConfiguration?.platformName || "GAIA ENTERPRISE PLATFORM"}</span><small>{loginConfiguration?.footerDescription || "Una plataforma creada para evolucionar con Gaia."}</small></footer>
+          <footer><span>{loginDisplayText(loginConfiguration?.footerTitle, loginDisplayText(loginConfiguration?.platformName, "GAIA ENTERPRISE PLATFORM"))}</span><small>{loginDisplayText(loginConfiguration?.footerDescription, "Una plataforma creada para evolucionar con Gaia.")}</small></footer>
         </section>
       </main>
     );

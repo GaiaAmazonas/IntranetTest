@@ -106,6 +106,8 @@ Reasignar una etapa requiere permiso, motivo y pertenencia vigente a la unidad d
 ## Adjuntos
 
 - metadatos y asociaciones en Dataverse; binario en SharePoint;
+- la política general de Solicitudes admite PDF, PNG, JPG/JPEG, Word (`.docx`), Excel (`.xlsx`) y PowerPoint (`.pptx`); el nombre, la extensión, el MIME y la firma del contenido se validan en servidor;
+- radicación, respuesta del solicitante y gestión usan la misma lista general; un campo de archivo dinámico puede declarar una lista más restrictiva de forma explícita;
 - cargas múltiples secuenciales;
 - una radicación puede quedar creada si un adjunto falla, informando resultado parcial;
 - carga de gestión autorizada al responsable o miembro habilitado de la unidad;

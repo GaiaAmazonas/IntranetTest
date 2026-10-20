@@ -5,6 +5,27 @@ namespace Gaia.ArchitectureTests;
 
 public sealed class SolicitudesAttachmentRulesTests
 {
+    [Theory]
+    [InlineData("documento.pdf", "application/pdf")]
+    [InlineData("imagen.png", "image/png")]
+    [InlineData("foto.jpeg", "image/jpeg")]
+    [InlineData("informe.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")]
+    [InlineData("matriz.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")]
+    [InlineData("presentacion.pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation")]
+    public void SolicitudesAcceptsApprovedDocumentTypes(string name,string contentType) =>
+        SolicitudesFilePolicy.Validate(name,contentType);
+
+    [Theory]
+    [InlineData("programa.exe", "application/octet-stream")]
+    [InlineData("documento.pdf", "application/octet-stream")]
+    [InlineData("video.mp4", "video/mp4")]
+    public void SolicitudesRejectsUnapprovedOrMismatchedTypes(string name,string contentType) =>
+        Assert.Throws<ArgumentException>(()=>SolicitudesFilePolicy.Validate(name,contentType));
+
+    [Fact]
+    public void EmptyFieldConfigurationUsesTheCompleteSolicitudesAllowlist() =>
+        Assert.Equal(SolicitudesFilePolicy.DefaultAccept,SolicitudesFilePolicy.NormalizeAccept(null));
+
     [Fact]
     public void ManagementFieldResponseRequiresManagement()
     {

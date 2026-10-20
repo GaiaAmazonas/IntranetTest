@@ -131,6 +131,8 @@ Cambiar `siteId/driveId` no mueve archivos existentes. La migración copia desde
 
 El campo de adjuntos configurable en el diseñador controla el mismo mecanismo existente de archivos. No crea un segundo sistema. El formulario publicado decide visibilidad y obligatoriedad; la carga continúa usando los endpoints y asociación de la solicitud. La gestión en AdminCore consulta los mismos adjuntos autorizados.
 
+La lista general de Solicitudes admite PDF, PNG, JPG/JPEG, DOCX, XLSX y PPTX. Los cargadores genéricos de radicación, respuesta y gestión presentan esa misma lista; los campos dinámicos pueden restringirla explícitamente. La API vuelve a comprobar la combinación de extensión y MIME, y la infraestructura valida además la firma binaria antes de almacenar el contenido. Los ejecutables, archivos comprimidos y formatos de Office heredados no forman parte de la lista aprobada.
+
 ## Notificaciones por correo
 
 Los módulos publican correos mediante `IEmailNotificationOutbox`; no llaman Outlook, Graph ni Power Automate directamente. La implementación Dataverse resuelve una plantilla vigente, conserva una instantánea renderizada, crea el correo como Borrador, registra referencias de SharePoint y solo después cambia a Pendiente. `gaia_idoperacion` hace idempotente el alta. Consulte [Notificaciones institucionales por correo](11-notificaciones-correo.md).
