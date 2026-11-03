@@ -21,3 +21,15 @@ Reglas esenciales:
 - actualizar documentación y pruebas cuando cambie el comportamiento.
 
 Si una fuente contradice el código vigente o una decisión oficial, registrar la evidencia y pedir una decisión cuando cambie el alcance; no escoger silenciosamente una arquitectura nueva.
+
+## Publicación personal y empresarial
+
+Cuando el propietario solicite **publicar en el personal, copiar al espejo o directorio 2 y publicar en la empresa**, ejecutar el procedimiento completo en este orden:
+
+1. validar el árbol de trabajo y publicar la rama `main` del repositorio personal `C:\Users\Edgar Munar\Documents\Proyecto Gaia Aplicacion` en su remoto `origin`;
+2. sincronizar únicamente el contenido versionado hacia `C:\ProyectoIntranetGaia\IntranetTest`, conservando sin modificación su directorio `.git`, historial, remoto, rama, secretos, configuraciones locales, dependencias y archivos ignorados;
+3. verificar mediante el hash del árbol Git que el contenido versionado personal y empresarial sea exactamente el mismo;
+4. crear el commit equivalente en la rama empresarial activa y publicarlo en su remoto `origin`;
+5. confirmar que ambos directorios queden limpios y que los commits locales coincidan con sus respectivos remotos.
+
+Este procedimiento no autoriza por sí solo hacer merge a otra rama, publicar en `main` empresarial, desplegar en servidores, reiniciar procesos ni modificar configuraciones ambientales. Esas acciones requieren una solicitud explícita adicional.

@@ -22,6 +22,8 @@ El modelo vigente contempla categoría, capacitación, versión, destinatario, s
 
 Contenido, evaluación, participantes y revisión/publicación son pasos contextuales de la capacitación seleccionada. Catálogo, Seguimiento y Resultados son vistas globales. Una versión publicada no se edita: se duplica como nuevo borrador.
 
+Cuando una ficha recién creada todavía no tiene versiones, la gestión muestra directamente la acción **Crear primera versión** y mantiene ocultos los pasos que dependen de ella. Al guardar el primer borrador se habilitan Contenido, Evaluación, Participantes y Revisión/publicación; el título público se propone inicialmente a partir del nombre de la capacitación y puede editarse.
+
 ## Estados editoriales
 
 Sin revisión: Borrador → Publicada. Con revisión: Borrador → En revisión → Publicada, con devolución motivada a Borrador. La revisión editorial no es aprobación del aprendizaje y no genera automáticamente correo ni selecciona un aprobador específico.
