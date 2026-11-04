@@ -9,12 +9,17 @@ using Gaia.BuildingBlocks.Files;
 namespace Gaia.Api.Infrastructure.Files;
 
 internal sealed class SharePointFileStorage(SharePointStorageConfiguration options, GraphFileTransport transport,
-    IEnumerable<IFileContentScanner> scanners, ILogger<SharePointFileStorage> logger) : IFileStorage, IFileStorageMaintenance
+    IEnumerable<IFileContentScanner> scanners, ILogger<SharePointFileStorage> logger) : IFileStorage, IFileStorageMaintenance, IFilePreviewStorage
 {
     internal const string Provider = "SharePoint";
     private const string ItemSelect = "id,name,eTag,size,webUrl,file,folder,parentReference,remoteItem";
     private static readonly Action<ILogger, string, Exception?> LogCleanupFailure = LoggerMessage.Define<string>(
         LogLevel.Warning, new EventId(4301, "UploadSessionCleanupFailed"), "File storage session cleanup failed: {Code}");
+    private static readonly Action<ILogger,string,Exception?> LogUploadConflict = LoggerMessage.Define<string>(
+        LogLevel.Warning,new EventId(4304,"FileUploadVersionConflict"),"File upload version conflict at stage {Stage}");
+    private static readonly Action<ILogger,long,long,Exception?> LogOfficePackageNormalized = LoggerMessage.Define<long,long>(
+        LogLevel.Information,new EventId(4305,"OfficePackageNormalized"),
+        "SharePoint normalized an Office package from {UploadedLength} to {StoredLength} bytes");
     private string Drive => $"drives/{Escape(options.DriveId)}";
     private static string Escape(string value) => Uri.EscapeDataString(value);
     private static Uri Graph(string path) => new("https://graph.microsoft.com/v1.0/" + path);
@@ -51,14 +56,46 @@ internal sealed class SharePointFileStorage(SharePointStorageConfiguration optio
                 request.Content.Headers.ContentLength = upload.Length;
                 return request;
             }, authenticated: true, retry: true, cancellationToken);
-            GraphFileTransport.EnsureSuccess(response);
-            item = await GraphFileTransport.JsonAsync(response, cancellationToken);
+            if (response.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed)
+            {
+                // A retried PUT can receive 409 after Graph committed the first attempt but its response was lost.
+                // The technical name is unique to this upload, so accepting the matching committed item is idempotent.
+                var committed = await CommittedItemAsync(folder.FolderId, storedName, upload.Length, cancellationToken);
+                if (committed is { } committedItem)
+                    item = committedItem;
+                else
+                {
+                    LogUploadConflict(logger,"SimpleUploadCommit",null);
+                    throw new FileStorageException(FileStorageError.VersionConflict,$"SP_SIMPLE_COMMIT_{(int)response.StatusCode}");
+                }
+            }
+            else
+            {
+                GraphFileTransport.EnsureSuccess(response);
+                item = await GraphFileTransport.JsonAsync(response, cancellationToken);
+            }
         }
         else item = await UploadSessionAsync(path, folder.FolderId, storedName, spool, upload.Length, cancellationToken);
         var result = ToMetadata(item, upload.OriginalName, upload.ContentType, folder.LogicalPath + "/" + storedName)
             with { Sha256 = sha256, UploadedAt = upload.UploadedAt };
-        if (result.Length != upload.Length || result.StoredName != storedName)
-            throw new FileStorageException(FileStorageError.VersionConflict);
+        if (result.StoredName != storedName)
+        {
+            LogUploadConflict(logger,"MetadataVerification",null);
+            throw new FileStorageException(FileStorageError.VersionConflict,"SP_METADATA_NAME");
+        }
+        if (result.Length != upload.Length)
+        {
+            var office=Path.GetExtension(storedName) is ".docx" or ".xlsx" or ".pptx";
+            if(!office||result.Length<=0||result.Length>options.MaximumFileBytes)
+            {
+                LogUploadConflict(logger,"MetadataVerification",null);
+                throw new FileStorageException(FileStorageError.VersionConflict,"SP_METADATA_LENGTH");
+            }
+            // SharePoint can normalize an Open XML package while preserving the logical document.
+            // The incoming stream length/signature was already validated before the remote write;
+            // from this point the provider's positive, bounded stored length is authoritative.
+            LogOfficePackageNormalized(logger,upload.Length,result.Length,null);
+        }
         return result;
     }
 
@@ -78,7 +115,12 @@ internal sealed class SharePointFileStorage(SharePointStorageConfiguration optio
                 using var response = await transport.SendAsync(() => new(HttpMethod.Post, Graph($"{Drive}/items/{Escape(Text(parent, "id"))}/children"))
                 { Content = JsonContent.Create(new Dictionary<string, object> { ["name"] = segment, ["folder"] = new { }, ["@microsoft.graph.conflictBehavior"] = "fail" }) },
                     authenticated: true, retry: false, cancellationToken);
-                if (response.StatusCode == HttpStatusCode.Conflict) next = await ReadAsync(path + "?$select=" + ItemSelect, cancellationToken);
+                if (response.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed)
+                {
+                    try{next = await ReadAsync(path + "?$select=" + ItemSelect, cancellationToken);}
+                    catch(FileStorageException error)when(error.Code==FileStorageError.VersionConflict)
+                    {throw new FileStorageException(FileStorageError.VersionConflict,$"SP_FOLDER_RECONCILE_{(int)response.StatusCode}");}
+                }
                 else { GraphFileTransport.EnsureSuccess(response); next = await GraphFileTransport.JsonAsync(response, cancellationToken); }
             }
             RequireFolder(next.Value);
@@ -129,7 +171,26 @@ internal sealed class SharePointFileStorage(SharePointStorageConfiguration optio
     public async Task<FileDownload> DownloadAsync(ExternalFileId file, CancellationToken cancellationToken)
     {
         var metadata = await GetMetadataAsync(file, cancellationToken);
-        var uri = Graph($"{Drive}/items/{Escape(file.FileId)}/content");
+        return await DownloadContentAsync(metadata, Graph($"{Drive}/items/{Escape(file.FileId)}/content"), cancellationToken);
+    }
+
+    public async Task<FilePreview> CreatePreviewAsync(ExternalFileId file, CancellationToken cancellationToken)
+    {
+        _ = await GetMetadataAsync(file, cancellationToken);
+        using var response = await transport.SendAsync(() => new(HttpMethod.Post,
+            Graph($"{Drive}/items/{Escape(file.FileId)}/preview"))
+        { Content = JsonContent.Create(new { }) }, authenticated: true, retry: true, cancellationToken);
+        GraphFileTransport.EnsureSuccess(response);
+        var result = await GraphFileTransport.JsonAsync(response, cancellationToken);
+        if (!result.TryGetProperty("getUrl", out var value)
+            || !Uri.TryCreate(value.GetString(), UriKind.Absolute, out var url)
+            || url.Scheme != Uri.UriSchemeHttps || !url.IsDefaultPort || url.UserInfo.Length != 0)
+            throw new FileStorageException(FileStorageError.PreviewUnavailable);
+        return new(url);
+    }
+
+    private async Task<FileDownload> DownloadContentAsync(StoredFile metadata, Uri uri, CancellationToken cancellationToken)
+    {
         var authenticated = true;
         for (var redirect = 0; redirect < 4; redirect++)
         {
@@ -262,11 +323,27 @@ internal sealed class SharePointFileStorage(SharePointStorageConfiguration optio
 
     private async Task<JsonElement> UploadSessionAsync(string path, string parentId, string name, FileStream spool, long length, CancellationToken cancellationToken)
     {
-        using var created = await transport.SendAsync(() => new(HttpMethod.Post, Graph(path + "/createUploadSession"))
-        { Content = JsonContent.Create(new { item = new Dictionary<string, object> { ["name"] = name, ["@microsoft.graph.conflictBehavior"] = "fail" } }) }, true, false, cancellationToken);
-        GraphFileTransport.EnsureSuccess(created);
-        var session = await GraphFileTransport.JsonAsync(created, cancellationToken);
-        if (!Uri.TryCreate(Text(session, "uploadUrl"), UriKind.Absolute, out var uploadUri)) throw new FileStorageException(FileStorageError.TransientFailure);
+        // The destination already includes a per-upload GUID technical name. Graph documents the
+        // request body as optional; omitting uploadable properties avoids SharePoint variants that
+        // reject conflict metadata during session creation without weakening Gaia's uniqueness rule.
+        using var created = await transport.SendAsync(() => new(HttpMethod.Post, Graph(path + "/createUploadSession")),
+            true, false, cancellationToken, "SP_SESSION_CREATE_TRANSPORT");
+        if (created.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed)
+        {
+            var committed = await CommittedItemAsync(parentId, name, length, cancellationToken);
+            if (committed is { } existing) return existing;
+            LogUploadConflict(logger,"UploadSessionCreation",null);
+            throw new FileStorageException(FileStorageError.VersionConflict,$"SP_SESSION_CREATE_{(int)created.StatusCode}");
+        }
+        var providerCode=created.IsSuccessStatusCode
+            ? null
+            : await GraphFileTransport.SafeErrorCodeAsync(created,cancellationToken);
+        GraphFileTransport.EnsureSuccess(created, diagnosticCode: providerCode is null
+            ? "SP_SESSION_CREATE_HTTP"
+            : $"SP_SESSION_CREATE_{providerCode}_HTTP");
+        var session = await GraphFileTransport.JsonAsync(created, cancellationToken, "SP_SESSION_CREATE_JSON");
+        if (!Uri.TryCreate(Text(session, "uploadUrl"), UriKind.Absolute, out var uploadUri))
+            throw new FileStorageException(FileStorageError.TransientFailure,"SP_SESSION_URL");
         transport.ValidateDestination(uploadUri, false);
         var complete = false;
         try
@@ -289,39 +366,65 @@ internal sealed class SharePointFileStorage(SharePointStorageConfiguration optio
                         request.Content.Headers.ContentRange = new ContentRangeHeaderValue(offset, offset + count - 1, length);
                         request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
                         return request;
-                    }, false, false, cancellationToken);
+                    }, false, false, cancellationToken, "SP_SESSION_CHUNK_TRANSPORT");
                     if (response.StatusCode is HttpStatusCode.Created or HttpStatusCode.OK)
-                    { var result = await GraphFileTransport.JsonAsync(response, cancellationToken); complete = true; return result; }
+                    {
+                        var result = await GraphFileTransport.JsonAsync(response, cancellationToken, "SP_SESSION_COMPLETE_JSON");
+                        complete = true;
+                        return result;
+                    }
                     if (response.StatusCode == HttpStatusCode.Accepted)
                     {
-                        var next = ExpectedOffset(await GraphFileTransport.JsonAsync(response, cancellationToken), length);
-                        if (next <= offset && ++failures > GraphFileTransport.MaximumRetries) throw new FileStorageException(FileStorageError.TransientFailure);
-                        offset = next; continue;
+                        var next = ExpectedOffset(
+                            await GraphFileTransport.JsonAsync(response, cancellationToken, "SP_SESSION_PROGRESS_JSON"),
+                            length,"SP_SESSION_PROGRESS_RANGE");
+                        if (next <= offset)
+                        {
+                            if (++failures > GraphFileTransport.MaximumRetries)
+                                throw new FileStorageException(FileStorageError.TransientFailure,"SP_SESSION_NO_PROGRESS");
+                        }
+                        else failures = 0;
+                        offset = next;
+                        continue;
+                    }
+                    if (response.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed)
+                    {
+                        var committed = await CommittedItemAsync(parentId, name, length, cancellationToken);
+                        if (committed is { } existing) { complete = true; return existing; }
+                        LogUploadConflict(logger,"UploadSessionChunk",null);
+                        throw new FileStorageException(FileStorageError.VersionConflict,$"SP_SESSION_CHUNK_{(int)response.StatusCode}");
                     }
                     if (!GraphFileTransport.IsTransient(response.StatusCode) && response.StatusCode != HttpStatusCode.RequestedRangeNotSatisfiable)
-                        GraphFileTransport.EnsureSuccess(response);
-                    if (++failures > GraphFileTransport.MaximumRetries) throw new FileStorageException(FileStorageError.TransientFailure);
-                    await transport.DelayAsync(response.Headers.RetryAfter, failures - 1, cancellationToken);
+                        GraphFileTransport.EnsureSuccess(response, diagnosticCode: "SP_SESSION_CHUNK_HTTP");
+                    if (++failures > GraphFileTransport.MaximumRetries)
+                        throw new FileStorageException(FileStorageError.TransientFailure,
+                            $"SP_SESSION_CHUNK_HTTP_{(int)response.StatusCode}");
+                    await transport.DelayAsync(response.Headers.RetryAfter, failures - 1, cancellationToken,
+                        "SP_SESSION_RETRY_DELAY");
                 }
                 catch (FileStorageException error) when (error.Code == FileStorageError.TransientFailure && response is null)
                 {
                     if (++failures > GraphFileTransport.MaximumRetries) throw;
-                    await transport.DelayAsync(null, failures - 1, cancellationToken);
+                    await transport.DelayAsync(null, failures - 1, cancellationToken,"SP_SESSION_RETRY_DELAY");
                 }
                 finally { response?.Dispose(); }
 
-                using var status = await transport.SendAsync(() => new(HttpMethod.Get, uploadUri), false, true, cancellationToken);
+                using var status = await transport.SendAsync(() => new(HttpMethod.Get, uploadUri), false, true,
+                    cancellationToken,"SP_SESSION_STATUS_TRANSPORT");
                 if (status.StatusCode == HttpStatusCode.NotFound)
                 {
                     // Last PUT may have committed while its response was lost. Never restart/overwrite blindly.
-                    var committed = await TryReadAsync($"{Drive}/items/{Escape(parentId)}:/{Escape(name)}?$select={ItemSelect}", cancellationToken);
-                    if (committed is not null && committed.Value.GetProperty("size").GetInt64() == length)
-                    { complete = true; return committed.Value; }
+                    var committed = await CommittedItemAsync(parentId, name, length, cancellationToken);
+                    if (committed is { } existing) { complete = true; return existing; }
                 }
-                GraphFileTransport.EnsureSuccess(status);
-                offset = ExpectedOffset(await GraphFileTransport.JsonAsync(status, cancellationToken), length);
+                GraphFileTransport.EnsureSuccess(status, diagnosticCode: "SP_SESSION_STATUS_HTTP");
+                var recovered = ExpectedOffset(
+                    await GraphFileTransport.JsonAsync(status, cancellationToken,"SP_SESSION_STATUS_JSON"),
+                    length,"SP_SESSION_STATUS_RANGE");
+                if (recovered > offset) failures = 0;
+                offset = recovered;
             }
-            throw new FileStorageException(FileStorageError.TransientFailure);
+            throw new FileStorageException(FileStorageError.TransientFailure,"SP_SESSION_INCOMPLETE");
         }
         finally
         {
@@ -340,17 +443,29 @@ internal sealed class SharePointFileStorage(SharePointStorageConfiguration optio
         }
     }
 
-    private static long ExpectedOffset(JsonElement session, long length)
+    private async Task<JsonElement?> CommittedItemAsync(string parentId, string name, long expectedLength,
+        CancellationToken cancellationToken)
+    {
+        var item = await TryReadAsync($"{Drive}/items/{Escape(parentId)}:/{Escape(name)}?$select={ItemSelect}", cancellationToken);
+        return item is { } value
+            && value.GetProperty("size").GetInt64() == expectedLength
+            && string.Equals(Text(value,"name"),name,StringComparison.Ordinal)
+                ? value : null;
+    }
+
+    private static long ExpectedOffset(JsonElement session, long length, string diagnosticCode)
     {
         if (!session.TryGetProperty("nextExpectedRanges", out var ranges) || ranges.ValueKind != JsonValueKind.Array)
-            throw new FileStorageException(FileStorageError.TransientFailure);
+            throw new FileStorageException(FileStorageError.TransientFailure,diagnosticCode);
         var starts = new List<long>();
         foreach (var range in ranges.EnumerateArray())
         {
             if (!long.TryParse(range.GetString()?.Split('-')[0], NumberStyles.None, CultureInfo.InvariantCulture, out var value)
-                || value < 0 || value >= length) throw new FileStorageException(FileStorageError.TransientFailure);
+                || value < 0 || value >= length)
+                throw new FileStorageException(FileStorageError.TransientFailure,diagnosticCode);
             starts.Add(value);
         }
-        return starts.Count > 0 ? starts.Min() : throw new FileStorageException(FileStorageError.TransientFailure);
+        return starts.Count > 0 ? starts.Min()
+            : throw new FileStorageException(FileStorageError.TransientFailure,diagnosticCode);
     }
 }

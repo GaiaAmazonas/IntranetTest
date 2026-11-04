@@ -5,12 +5,17 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Logging;
 using System.Security.Claims;
 
 namespace Gaia.Modules.Training;
 
 public static class TrainingEndpoints
 {
+    private static readonly Action<ILogger,FileStorageError,string,Exception?> LogResourceUploadFailure =
+        LoggerMessage.Define<FileStorageError,string>(LogLevel.Warning,new EventId(5401,"TrainingResourceUploadFailed"),
+            "Training resource upload failed with storage code {StorageCode}; correlation {CorrelationId}");
+
     public static IEndpointRouteBuilder MapTrainingEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group=endpoints.MapGroup("/api/training/administration").WithTags("Training");
@@ -19,6 +24,7 @@ public static class TrainingEndpoints
         group.MapPut("/categories/{id:guid}",async (Guid id,SaveTrainingCategory value,ITrainingAdministrationReader reader,CancellationToken token)=>Results.Ok(new{id=await reader.SaveCategoryAsync(id,value,token)})).RequireAuthorization(AdminCorePermissions.TrainingCatalogManage);
         group.MapPost("/trainings",async (SaveTraining value,ITrainingAdministrationReader reader,CancellationToken token)=>Results.Created("/api/training/administration/overview",new{id=await reader.SaveTrainingAsync(null,value,token)})).RequireAuthorization(AdminCorePermissions.TrainingCatalogManage);
         group.MapPut("/trainings/{id:guid}",async (Guid id,SaveTraining value,ITrainingAdministrationReader reader,CancellationToken token)=>Results.Ok(new{id=await reader.SaveTrainingAsync(id,value,token)})).RequireAuthorization(AdminCorePermissions.TrainingCatalogManage);
+        group.MapDelete("/trainings/{id:guid}",DeleteTraining).RequireAuthorization(AdminCorePermissions.TrainingCatalogDelete);
         group.MapPost("/versions",async (SaveTrainingVersion value,ClaimsPrincipal principal,ISecurityStore security,ITrainingAdministrationReader reader,CancellationToken token)=>Results.Created("/api/training/administration/overview",new{id=await reader.SaveVersionAsync(null,value,(await security.GetOrProvisionAsync(principal,token)).User.ThirdPartyId??throw new InvalidOperationException("El usuario no está vinculado a un tercero."),token)})).RequireAuthorization(AdminCorePermissions.TrainingContentManage);
         group.MapPut("/versions/{id:guid}",async (Guid id,SaveTrainingVersion value,ClaimsPrincipal principal,ISecurityStore security,ITrainingAdministrationReader reader,CancellationToken token)=>Results.Ok(new{id=await reader.SaveVersionAsync(id,value,(await security.GetOrProvisionAsync(principal,token)).User.ThirdPartyId??throw new InvalidOperationException("El usuario no está vinculado a un tercero."),token)})).RequireAuthorization(AdminCorePermissions.TrainingContentManage);
         group.MapGet("/versions/{id:guid}/content",async (Guid id,ITrainingAdministrationReader reader,CancellationToken token)=>Results.Ok(await reader.ReadContentAsync(id,token))).RequireAuthorization(AdminCorePermissions.TrainingContentRead);
@@ -59,6 +65,13 @@ public static class TrainingEndpoints
         return endpoints;
     }
 
+    private static async Task<IResult> DeleteTraining(Guid id,ITrainingAdministrationReader reader,CancellationToken token)
+    {
+        try { await reader.RemoveTrainingAsync(id,token); return Results.NoContent(); }
+        catch (KeyNotFoundException error) { return Results.NotFound(new { detail=error.Message }); }
+        catch (InvalidOperationException error) { return Results.Conflict(new { detail=error.Message }); }
+    }
+
     static Guid RequireActor(SecurityContextResponse context)=>context.User.ThirdPartyId??throw new InvalidOperationException("El usuario no está vinculado a un tercero.");
 
     static async Task<IResult> SaveEvaluation(Guid id,SaveTrainingEvaluation value,ITrainingAdministrationReader reader,CancellationToken token)
@@ -71,9 +84,52 @@ public static class TrainingEndpoints
         if(!message.StartsWith("Dataverse rechazó la operación",StringComparison.Ordinal))return message;var marker="\"message\":\"";var start=message.IndexOf(marker,StringComparison.OrdinalIgnoreCase);if(start<0)return "Dataverse rechazó la creación. Verifica que las columnas del modelo de Capacitaciones estén publicadas.";start+=marker.Length;var end=message.IndexOf('"',start);return end>start?message[start..end].Replace("\\u0027","'",StringComparison.Ordinal):"Dataverse rechazó la creación. Verifica que las columnas del modelo de Capacitaciones estén publicadas.";
     }
 
-    static async Task<IResult> UploadResource(Guid id,HttpRequest request,ClaimsPrincipal principal,ISecurityStore security,IFileStorage storage,IFileStorageMaintenance maintenance,ITrainingAdministrationReader reader,CancellationToken token)
+    static async Task<IResult> UploadResource(Guid id,HttpRequest request,ClaimsPrincipal principal,ISecurityStore security,IFileStorage storage,IFileStorageMaintenance maintenance,ITrainingAdministrationReader reader,ILoggerFactory loggerFactory,CancellationToken token)
     {
         if(request.ContentLength is >262_144_000)return Results.Problem(statusCode:413,title:"El archivo es demasiado grande",detail:"El archivo supera el límite permitido de 250 MB.");
-        if(!request.HasFormContentType)return Results.BadRequest(new{detail="La carga debe usar multipart/form-data."});var form=await request.ReadFormAsync(token);var file=form.Files.GetFile("file");if(file is null||file.Length<=0)return Results.BadRequest(new{detail="Selecciona un archivo válido."});var kind=string.Equals(form["kind"],"video",StringComparison.OrdinalIgnoreCase)?299541021:299541022;var extension=Path.GetExtension(file.FileName).ToLowerInvariant();var normalizedContentType=kind==299541021&&extension==".mp4"?"video/mp4":file.ContentType;var allowed=kind==299541021?(normalizedContentType.StartsWith("video/",StringComparison.OrdinalIgnoreCase)&&extension is ".mp4" or ".webm" or ".mov"):file.ContentType is "application/pdf" or "application/vnd.openxmlformats-officedocument.wordprocessingml.document" or "application/vnd.openxmlformats-officedocument.presentationml.presentation" or "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";if(!allowed)return Results.BadRequest(new{detail=kind==299541021?"Selecciona un video MP4, WebM o MOV válido.":"El documento debe ser PDF, Word, Excel o PowerPoint."});var actor=RequireActor(await security.GetOrProvisionAsync(principal,token));var uploadedAt=DateTimeOffset.UtcNow;var fileId=Guid.NewGuid();StoredFile? stored=null;try{await using var stream=file.OpenReadStream();stored=await storage.UploadAsync(new(new("Capacitaciones",id.ToString("D")),file.FileName,normalizedContentType,file.Length,fileId,uploadedAt),stream,token);var saved=await reader.SaveResourceAsync(new(id,actor,kind,file.FileName,stored.StoredName,stored.Id.Provider,stored.Id.RepositoryId,stored.Id.ContainerId,stored.Id.FileId,stored.LogicalPath,stored.WebUrl?.ToString(),stored.ContentType,stored.Length,stored.Sha256,stored.ETag,stored.UploadedAt??uploadedAt),token);return Results.Created(".",saved);}catch{if(stored is not null)try{await maintenance.DeletePhysicallyAsync(new(stored.Id,stored.ETag,"Cleanup of uncommitted training resource"),CancellationToken.None);}catch(FileStorageException){}throw;}
+        if(!request.HasFormContentType)return Results.BadRequest(new{detail="La carga debe usar multipart/form-data."});
+        var form=await request.ReadFormAsync(token);
+        var file=form.Files.GetFile("file");
+        if(file is null||file.Length<=0)return Results.BadRequest(new{detail="Selecciona un archivo válido."});
+        var kind=string.Equals(form["kind"],"video",StringComparison.OrdinalIgnoreCase)?299541021:299541022;
+        var extension=Path.GetExtension(file.FileName).ToLowerInvariant();
+        var normalizedContentType=kind==299541021&&extension==".mp4"?"video/mp4":file.ContentType;
+        var allowed=kind==299541021
+            ? normalizedContentType.StartsWith("video/",StringComparison.OrdinalIgnoreCase)&&extension is ".mp4" or ".webm" or ".mov"
+            : file.ContentType is "application/pdf" or "application/vnd.openxmlformats-officedocument.wordprocessingml.document" or "application/vnd.openxmlformats-officedocument.presentationml.presentation" or "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        if(!allowed)return Results.BadRequest(new{detail=kind==299541021?"Selecciona un video MP4, WebM o MOV válido.":"El documento debe ser PDF, Word, Excel o PowerPoint."});
+        var actor=RequireActor(await security.GetOrProvisionAsync(principal,token));
+        var uploadedAt=DateTimeOffset.UtcNow;
+        var fileId=Guid.NewGuid();
+        StoredFile? stored=null;
+        try
+        {
+            await using var stream=file.OpenReadStream();
+            stored=await storage.UploadAsync(new(new("Capacitaciones",id.ToString("D")),file.FileName,normalizedContentType,file.Length,fileId,uploadedAt),stream,token);
+            var saved=await reader.SaveResourceAsync(new(id,actor,kind,file.FileName,stored.StoredName,stored.Id.Provider,stored.Id.RepositoryId,stored.Id.ContainerId,stored.Id.FileId,stored.LogicalPath,stored.WebUrl?.ToString(),stored.ContentType,stored.Length,stored.Sha256,stored.ETag,stored.UploadedAt??uploadedAt),token);
+            return Results.Created(".",saved);
+        }
+        catch(FileStorageException error)
+        {
+            await Cleanup(stored,maintenance);
+            LogResourceUploadFailure(loggerFactory.CreateLogger("Gaia.Training.ResourceUpload"),
+                error.Code,request.HttpContext.TraceIdentifier,null);
+            var status=error.Code==FileStorageError.VersionConflict?409:
+                error.Code==FileStorageError.TransientFailure?503:422;
+            return Results.Problem(statusCode:status,title:"No fue posible cargar el archivo",detail:error.Message,
+                extensions:new Dictionary<string,object?>{{"code",error.Code.ToString()},{"diagnosticCode",error.DiagnosticCode},{"correlationId",request.HttpContext.TraceIdentifier}});
+        }
+        catch
+        {
+            await Cleanup(stored,maintenance);
+            throw;
+        }
+    }
+
+    static async Task Cleanup(StoredFile? stored,IFileStorageMaintenance maintenance)
+    {
+        if(stored is null)return;
+        try{await maintenance.DeletePhysicallyAsync(new(stored.Id,stored.ETag,"Cleanup of uncommitted training resource"),CancellationToken.None);}
+        catch(FileStorageException){/* Best effort: the business record was not committed. */}
     }
 }

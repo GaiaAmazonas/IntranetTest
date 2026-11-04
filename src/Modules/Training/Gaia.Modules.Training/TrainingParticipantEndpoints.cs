@@ -4,6 +4,7 @@ using Gaia.BuildingBlocks.Files;
 using Gaia.Modules.Security;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 
 namespace Gaia.Modules.Training;
@@ -18,19 +19,34 @@ public static class TrainingParticipantEndpoints
         my.MapPost("/attempts/{attemptId:guid}/submit",(Guid id,Guid attemptId,SubmitTrainingAttempt value,ClaimsPrincipal user,ISecurityStore security,ITrainingParticipantOperations operations,CancellationToken ct)=>Safe(async()=>Results.Ok(await operations.SubmitAttemptAsync(id,attemptId,value,await Actor(user,security,ct),ct))));
         my.MapGet("/resources/{resourceId:guid}",(Guid id,Guid resourceId,bool? download,HttpContext context,ISecurityStore security,ITrainingParticipantOperations operations,IFileStorage storage,CancellationToken ct)=>Safe(async()=>
         {
-            var file=await storage.DownloadAsync(await operations.ReadResourceAsync(id,resourceId,await Actor(context.User,security,ct),ct),ct);
+            var fileId=await operations.ReadResourceAsync(id,resourceId,await Actor(context.User,security,ct),ct);
+            var file=await storage.DownloadAsync(fileId,ct);
             context.Response.Headers.CacheControl="private, no-store";context.Response.Headers["X-Content-Type-Options"]="nosniff";
             var mime=file.Metadata.ContentType;var inline=mime=="application/pdf"||mime.StartsWith("video/",StringComparison.OrdinalIgnoreCase);
             var content=inline?await Seekable(file,ct):file.Content;
             return Results.Stream(content,mime,download==true||!inline?file.Metadata.OriginalName??file.Metadata.StoredName:null,enableRangeProcessing:true);
         }));
+        my.MapGet("/resources/{resourceId:guid}/preview",(Guid id,Guid resourceId,HttpContext context,ISecurityStore security,ITrainingParticipantOperations operations,[FromServices] IFilePreviewStorage previews,CancellationToken ct)=>Safe(async()=>
+        {
+            var fileId=await operations.ReadResourceAsync(id,resourceId,await Actor(context.User,security,ct),ct);
+            var preview=await previews.CreatePreviewAsync(fileId,ct);
+            context.Response.Headers.CacheControl="private, no-store";
+            return Results.Ok(new{url=preview.Url});
+        }));
         var admin=endpoints.MapGroup("/api/training/administration");
         admin.MapGet("/versions/{versionId:guid}/resources/{resourceId:guid}",(Guid versionId,Guid resourceId,bool? download,HttpContext context,ITrainingParticipantOperations operations,IFileStorage storage,CancellationToken ct)=>Safe(async()=>
         {
-            var file=await storage.DownloadAsync(await operations.ReadVersionResourceAsync(versionId,resourceId,ct),ct);
+            var fileId=await operations.ReadVersionResourceAsync(versionId,resourceId,ct);
+            var file=await storage.DownloadAsync(fileId,ct);
             context.Response.Headers.CacheControl="private, no-store";context.Response.Headers["X-Content-Type-Options"]="nosniff";
             var mime=file.Metadata.ContentType;var inline=mime=="application/pdf"||mime.StartsWith("video/",StringComparison.OrdinalIgnoreCase);
             return Results.Stream(inline?await Seekable(file,ct):file.Content,mime,download==true||!inline?file.Metadata.OriginalName??file.Metadata.StoredName:null,enableRangeProcessing:true);
+        })).RequireAuthorization(AdminCorePermissions.TrainingContentRead);
+        admin.MapGet("/versions/{versionId:guid}/resources/{resourceId:guid}/preview",(Guid versionId,Guid resourceId,HttpContext context,ITrainingParticipantOperations operations,[FromServices] IFilePreviewStorage previews,CancellationToken ct)=>Safe(async()=>
+        {
+            var preview=await previews.CreatePreviewAsync(await operations.ReadVersionResourceAsync(versionId,resourceId,ct),ct);
+            context.Response.Headers.CacheControl="private, no-store";
+            return Results.Ok(new{url=preview.Url});
         })).RequireAuthorization(AdminCorePermissions.TrainingContentRead);
         admin.MapGet("/pending-reviews",(ITrainingParticipantOperations operations,CancellationToken ct)=>Safe(async()=>Results.Ok(await operations.ReadPendingReviewsAsync(ct)))).RequireAuthorization(AdminCorePermissions.TrainingReview);
         admin.MapPost("/attempts/{attemptId:guid}/grade",(Guid attemptId,GradeTrainingAttempt value,ClaimsPrincipal user,ISecurityStore security,ITrainingParticipantOperations operations,CancellationToken ct)=>Safe(async()=>{await operations.GradeAttemptAsync(attemptId,value,await Actor(user,security,ct),ct);return Results.NoContent();})).RequireAuthorization(AdminCorePermissions.TrainingReview);

@@ -2,13 +2,14 @@
 
 import { Button, Badge } from "@/components/ui";
 import { apiRequest } from "@/lib/api-client";
-import { ArrowLeft, BookOpen, CalendarClock, CheckCircle2, ChevronDown, FileText, LoaderCircle, Search, List, LayoutGrid, Sparkles, ArrowRight, PlayCircle } from "lucide-react";
+import { ArrowLeft, BookOpen, CalendarClock, CheckCircle2, ChevronDown, LoaderCircle, Search, List, LayoutGrid, Sparkles, ArrowRight, PlayCircle } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { youtubeEmbed } from "../training/training-content-rules";
 import { activeTrainingStatuses, trainingDueLabel, trainingStatus, type TrainingAssignment } from "./training-assignment";
 import { ParticipantEvaluations } from "./training-participant-evaluations";
 import { TrainingVideo } from "./training-video";
+import { TrainingDocumentViewer } from "../training/training-document-viewer";
 import "./training-participant.css";
 
 type Block = { id:string; name:string; type:number; order:number; required:boolean; html:string|null; externalUrl:string|null; actionText:string|null; resourceId:string|null; minimumViewPercentage:number|null; requiresConfirmation:boolean; active:boolean };
@@ -71,10 +72,11 @@ export function IntranetTraining() {
 
 function TrainingMaterial({assignmentId,block,onProgress}:{assignmentId:string;block:Block;onProgress:(percentage:number,seconds:number)=>void}) {
   const url=safeUrl(block.externalUrl);const embed=url?youtubeEmbed(url):null;
-  const resource=block.resourceId?`${apiUrl}/api/training/my/assignments/${assignmentId}/resources/${block.resourceId}`:null;
+  const resourcePath=block.resourceId?`/api/training/my/assignments/${assignmentId}/resources/${block.resourceId}`:null;
+  const resource=resourcePath?`${apiUrl}${resourcePath}`:null;
   return <div className="training-material">{block.html&&<p className={block.type===299541072?"training-notice":"whitespace-pre-wrap"}>{plain(block.html)}</p>}
     {block.type===299541074&&<TrainingVideo source={resource||url} embed={embed} title={block.name} onProgress={onProgress}/>}
-    {resource&&block.type!==299541074&&<a className="gaia-button gaia-button-secondary" href={`${resource}?download=true`} target="_blank" rel="noopener noreferrer"><FileText size={17}/>Abrir / descargar documento</a>}
+    {resourcePath&&block.type!==299541074&&<TrainingDocumentViewer resourcePath={resourcePath} title={block.name}/>}
     {url&&block.type!==299541074&&<a className="gaia-button gaia-button-secondary" href={url} target="_blank" rel="noopener noreferrer">{block.actionText||"Abrir enlace"}</a>}
     {block.requiresConfirmation&&<small>Al confirmar declaras que revisaste y comprendiste este material.</small>}
   </div>;

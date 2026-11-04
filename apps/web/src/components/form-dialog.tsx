@@ -26,11 +26,21 @@ export function FormDialog({ open, title, subtitle, children, onClose, formId, s
     window.addEventListener("gaia:form-error", report);
     return () => window.removeEventListener("gaia:form-error", report);
   }, [open]);
+  const visibleError = error || reportedError;
+  useEffect(() => {
+    if (!open || !visibleError) return;
+    const frame = requestAnimationFrame(() => {
+      const content = dialogRef.current?.querySelector<HTMLElement>(".gaia-dialog-content");
+      content?.scrollTo({ top: 0, behavior: "smooth" });
+      dialogRef.current?.querySelector<HTMLElement>("[role='alert']")?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [open, visibleError]);
   if (!open) return null;
   return <div className="gaia-dialog-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !loading) onClose(); }}>
     <div aria-labelledby={`${formId}-title`} aria-modal="true" className="gaia-form-dialog" ref={dialogRef} role="dialog">
       <header className="gaia-dialog-header"><div><p>Plataforma Gaia</p><h2 id={`${formId}-title`}>{title}</h2>{subtitle && <span>{subtitle}</span>}</div><IconButton label="Cerrar formulario" disabled={loading} onClick={onClose}><X size={19} /></IconButton></header>
-      <div className="gaia-dialog-content">{(error || reportedError) && <div className="gaia-form-error" role="alert"><AlertTriangle size={17} /><span>{error || reportedError}</span></div>}{children}</div>
+      <div className="gaia-dialog-content">{visibleError && <div className="gaia-form-error" role="alert" tabIndex={-1}><AlertTriangle size={17} /><span>{visibleError}</span></div>}{children}</div>
       <footer className="gaia-dialog-footer"><Button disabled={loading} onClick={onClose} variant="secondary">Cancelar</Button><Button disabled={loading} form={formId} type="submit"><Save size={17} />{loading ? "Guardando…" : submitLabel}</Button></footer>
     </div>
   </div>;

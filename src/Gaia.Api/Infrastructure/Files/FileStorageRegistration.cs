@@ -21,6 +21,7 @@ internal static class FileStorageRegistration
             services.AddScoped<DevelopmentFileStorage>();
             services.AddScoped<IFileStorage>(provider => provider.GetRequiredService<DevelopmentFileStorage>());
             services.AddScoped<IFileStorageMaintenance>(provider => provider.GetRequiredService<DevelopmentFileStorage>());
+            services.AddScoped<IFilePreviewStorage>(provider => provider.GetRequiredService<DevelopmentFileStorage>());
             services.AddScoped<IFileStorageDiagnostics>(provider => provider.GetRequiredService<DevelopmentFileStorage>());
             return services;
         }
@@ -36,6 +37,7 @@ internal static class FileStorageRegistration
             services.AddScoped<DataverseConfiguredFileStorage>();
             services.AddScoped<IFileStorage>(provider => provider.GetRequiredService<DataverseConfiguredFileStorage>());
             services.AddScoped<IFileStorageMaintenance>(provider => provider.GetRequiredService<DataverseConfiguredFileStorage>());
+            services.AddScoped<IFilePreviewStorage>(provider => provider.GetRequiredService<DataverseConfiguredFileStorage>());
             services.AddScoped<IFileStorageDiagnostics>(provider => provider.GetRequiredService<DataverseConfiguredFileStorage>());
             services.AddScoped<IFileStorageMigration, FileStorageMigration>();
             return services;
@@ -54,6 +56,7 @@ internal static class FileStorageRegistration
         services.AddScoped<SharePointFileStorage>();
         services.AddScoped<IFileStorage>(serviceProvider => serviceProvider.GetRequiredService<SharePointFileStorage>());
         services.AddScoped<IFileStorageMaintenance>(serviceProvider => serviceProvider.GetRequiredService<SharePointFileStorage>());
+        services.AddScoped<IFilePreviewStorage>(serviceProvider => serviceProvider.GetRequiredService<SharePointFileStorage>());
         services.AddScoped<IFileStorageMigration, FileStorageMigration>();
         return services;
     }

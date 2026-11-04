@@ -25,7 +25,7 @@ export async function apiRequest<T>(path: string, options?: RequestInit): Promis
   const response = await fetch(`${apiUrl}${path}`, { credentials: "include", ...options,
     headers });
   if (!response.ok) {
-    const problem = await response.json().catch(() => null) as { code?: string; detail?: string; errors?: Record<string, string[]> } | null;
+    const problem = await response.json().catch(() => null) as { code?: string; detail?: string; diagnosticCode?: string; correlationId?: string; errors?: Record<string, string[]> } | null;
     if (response.status === 401) {
       if (problem?.code === "reauth_required") window.dispatchEvent(new CustomEvent("gaia:reauth-required"));
       else window.location.href = "/";
@@ -33,13 +33,17 @@ export async function apiRequest<T>(path: string, options?: RequestInit): Promis
     const fallback = response.status === 403
       ? "Tu cuenta está autenticada, pero no está autorizada para ejecutar esta operación."
       : "No fue posible completar la operación.";
-    throw new Error(problem?.detail ?? Object.values(problem?.errors ?? {}).flat()[0] ?? fallback);
+    const detail = problem?.detail ?? Object.values(problem?.errors ?? {}).flat()[0] ?? fallback;
+    const diagnostic = problem?.diagnosticCode ? ` Diagnóstico: ${problem.diagnosticCode}.` : "";
+    throw new Error(problem?.correlationId ? `${detail}${diagnostic} Referencia: ${problem.correlationId}.` : `${detail}${diagnostic}`);
   }
   if (response.status === 204) return undefined as T;
   const body = await response.text();
   if (!body.trim()) return undefined as T;
   return JSON.parse(body) as T;
 }
+
+export const apiUrlFor = (path: string) => `${apiUrl}${path}`;
 
 export function startLogin(returnUrl = window.location.href) {
   try {

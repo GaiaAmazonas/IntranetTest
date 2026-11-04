@@ -25,4 +25,22 @@ public sealed class ProfilePhotoContractsTests
         Assert.False(ProfilePhotoResult.Missing.Unavailable);
         Assert.True(ProfilePhotoResult.ServiceUnavailable().Unavailable);
     }
+
+    [Fact]
+    public void MissingPhotoUsesAnEmptySuccessfulResponseInsteadOfAConsoleError()
+    {
+        var source = Read("src", "Modules", "ThirdParties", "Gaia.Modules.ThirdParties", "ThirdPartiesEndpoints.cs");
+        var missingBranch = source[(source.IndexOf("if (result.Content is null)", StringComparison.Ordinal))..];
+        missingBranch = missingBranch[..missingBranch.IndexOf("context.Response.Headers.CacheControl = \"private, max-age=21600\"", StringComparison.Ordinal)];
+
+        Assert.Contains("return Results.NoContent();", missingBranch);
+        Assert.DoesNotContain("return Results.NotFound();", missingBranch);
+    }
+
+    private static string Read(params string[] path)
+    {
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "Gaia.Platform.slnx"))) root = root.Parent;
+        return File.ReadAllText(Path.Combine(new[] { root?.FullName ?? throw new DirectoryNotFoundException() }.Concat(path).ToArray()));
+    }
 }

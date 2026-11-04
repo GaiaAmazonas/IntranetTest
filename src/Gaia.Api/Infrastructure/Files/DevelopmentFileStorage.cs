@@ -7,7 +7,7 @@ namespace Gaia.Api.Infrastructure.Files;
 
 // Development-only durable provider. Production remains bound to the configured SharePoint repository.
 internal sealed class DevelopmentFileStorage(IHostEnvironment environment)
-    : IFileStorage, IFileStorageMaintenance, IFileStorageDiagnostics
+    : IFileStorage, IFileStorageMaintenance, IFilePreviewStorage, IFileStorageDiagnostics
 {
     private const long MaximumBytes = 2L * 1024 * 1024 * 1024;
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -72,6 +72,11 @@ internal sealed class DevelopmentFileStorage(IHostEnvironment environment)
     {
         var metadata = await GetMetadataAsync(file, token);
         return new(metadata, new FileStream(Path.Combine(root, metadata.StoredName), FileMode.Open, FileAccess.Read, FileShare.Read));
+    }
+    public async Task<FilePreview> CreatePreviewAsync(ExternalFileId file, CancellationToken token)
+    {
+        _ = await GetMetadataAsync(file, token);
+        throw new FileStorageException(FileStorageError.PreviewUnavailable);
     }
     public async Task<StoredFile> GetMetadataAsync(ExternalFileId file, CancellationToken token)
     {

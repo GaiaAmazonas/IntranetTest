@@ -12,6 +12,17 @@ public interface IFileStorage
     Task<FileStorageAvailability> CheckAvailabilityAsync(CancellationToken cancellationToken);
 }
 
+/// <summary>
+/// Produces a short-lived Microsoft 365 preview after the caller has authorized access to the file.
+/// The original file remains available through <see cref="IFileStorage.DownloadAsync"/>.
+/// </summary>
+public interface IFilePreviewStorage
+{
+    Task<FilePreview> CreatePreviewAsync(ExternalFileId file, CancellationToken cancellationToken);
+}
+
+public sealed record FilePreview(Uri Url);
+
 /// <summary>Separate port for authorized cleanup, never for ordinary business soft deletion.</summary>
 public interface IFileStorageMaintenance
 {
@@ -75,13 +86,15 @@ public enum FileStorageError
 {
     MissingConfiguration, InvalidCredentials, RepositoryInaccessible, ContainerInaccessible,
     FileNotFound, FileUnauthorized, FileTooLarge, TypeNotAllowed, InvalidFileName,
-    InvalidLogicalPath, InvalidLength, VersionConflict, TransientFailure, ScanRejected, ScanUnavailable
+    InvalidLogicalPath, InvalidLength, VersionConflict, TransientFailure, ScanRejected, ScanUnavailable,
+    PreviewUnavailable
 }
 
 /// <summary>Only controlled messages: never provider bodies, tokens or signed URLs.</summary>
-public sealed class FileStorageException(FileStorageError code) : Exception(MessageFor(code))
+public sealed class FileStorageException(FileStorageError code, string? diagnosticCode = null) : Exception(MessageFor(code))
 {
     public FileStorageError Code { get; } = code;
+    public string? DiagnosticCode { get; } = diagnosticCode;
 
     private static string MessageFor(FileStorageError code) => code switch
     {
@@ -99,6 +112,7 @@ public sealed class FileStorageException(FileStorageError code) : Exception(Mess
         FileStorageError.VersionConflict => "El archivo cambió o existe un conflicto de versión.",
         FileStorageError.ScanRejected => "El archivo fue rechazado por la revisión de seguridad.",
         FileStorageError.ScanUnavailable => "No fue posible completar la revisión de seguridad del archivo.",
+        FileStorageError.PreviewUnavailable => "No fue posible generar la vista previa del documento. Puedes descargar el archivo original.",
         _ => "El servicio de archivos no está disponible temporalmente."
     };
 }

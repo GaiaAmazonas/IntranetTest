@@ -14,7 +14,7 @@ public static class AdminCorePermissions
     public const string IntranetAdminCoreVer="INT.APP.ADMINCORE.VER";
     public const string SolicitudesVer="HD.SOLICITUDES.VER"; public const string SolicitudesReasignar="HD.SOLICITUDES.REASIGNAR";
     public const string SolicitudesCatalogosVer="HD.CATALOGOS.VER"; public const string SolicitudesCatalogosAdministrar="HD.CATALOGOS.ADMINISTRAR";
-    public const string TrainingCatalogRead="CAP.CATALOGO.VER"; public const string TrainingCatalogManage="CAP.CATALOGO.ADMINISTRAR";
+    public const string TrainingCatalogRead="CAP.CATALOGO.VER"; public const string TrainingCatalogManage="CAP.CATALOGO.ADMINISTRAR"; public const string TrainingCatalogDelete="CAP.CATALOGO.ELIMINAR";
     public const string TrainingContentRead="CAP.CONTENIDO.VER"; public const string TrainingContentManage="CAP.CONTENIDO.ADMINISTRAR";
     public const string TrainingReview="CAP.REVISAR"; public const string TrainingPublish="CAP.PUBLICAR"; public const string TrainingArchive="CAP.ARCHIVAR";
     public const string TrainingAudiencesRead="CAP.AUDIENCIAS.VER"; public const string TrainingAudiencesManage="CAP.AUDIENCIAS.ADMINISTRAR";

@@ -6,7 +6,7 @@ namespace Gaia.Api.Infrastructure.Files;
 // No settings or delegated Dataverse results are cached globally across users.
 internal sealed class DataverseConfiguredFileStorage(ISharePointRepositoryReader reader, IConfiguration configuration,
     IHostEnvironment environment, IHttpClientFactory clients, IEnumerable<IFileContentScanner> scanners,
-    ILogger<SharePointFileStorage> logger) : IFileStorage, IFileStorageMaintenance, IFileStorageDiagnostics, IDisposable
+    ILogger<SharePointFileStorage> logger) : IFileStorage, IFileStorageMaintenance, IFilePreviewStorage, IFileStorageDiagnostics, IDisposable
 {
     private static readonly Action<ILogger, FileStorageError, Exception?> LogRepositoryProfileFailure =
         LoggerMessage.Define<FileStorageError>(LogLevel.Warning, new EventId(4302, "RepositoryProfileValidationFailed"),
@@ -72,6 +72,8 @@ internal sealed class DataverseConfiguredFileStorage(ISharePointRepositoryReader
         await (await ResolveAsync(null, false, cancellationToken)).Storage.ListAsync(scope, cancellationToken);
     public async Task<FileDownload> DownloadAsync(ExternalFileId file, CancellationToken cancellationToken) =>
         await (await ResolveAsync(file, false, cancellationToken)).Storage.DownloadAsync(file, cancellationToken);
+    public async Task<FilePreview> CreatePreviewAsync(ExternalFileId file, CancellationToken cancellationToken) =>
+        await (await ResolveAsync(file, false, cancellationToken)).Storage.CreatePreviewAsync(file, cancellationToken);
     public async Task DeletePhysicallyAsync(PhysicalFileDeletion deletion, CancellationToken cancellationToken) =>
         await (await ResolveAsync(deletion.Id, true, cancellationToken)).Storage.DeletePhysicallyAsync(deletion, cancellationToken);
     public async Task<FileStorageAvailability> CheckAvailabilityAsync(CancellationToken cancellationToken) =>

@@ -35,6 +35,8 @@ Convenciones:
 
 OpenAPI solo se habilita en desarrollo. La lista anterior no reemplaza el contrato del código ni implica que todos los métodos sean accesibles con el mismo permiso.
 
+Las rutas de fotografía institucional devuelven `200` con la imagen cuando existe, `204` cuando la persona no tiene fotografía en Microsoft 365 y `503` cuando Microsoft Graph no está disponible. La ausencia esperada no se representa como `404`, porque la interfaz utiliza iniciales como alternativa visual.
+
 ## Persistencia en Dataverse
 
 Los adaptadores consumen Microsoft Dataverse Web API v9.2 mediante OData. El repositorio no usa PostgreSQL ni Entity Framework como persistencia operativa actual.
@@ -90,15 +92,19 @@ Principios:
 
 `StoredFile.Id` contiene proveedor, repositorio (`siteId`), contenedor (`driveId`) y archivo (`driveItemId`). El resultado también conserva ETag, nombre original/técnico, MIME, longitud y, opcionalmente, URL/ruta informativas. URL y ruta nunca sustituyen los IDs estables.
 
-`IFileStorage` cubre carga, descarga, metadata, carpeta y disponibilidad. `IFileStorageMaintenance` separa eliminación física y exige ID externo, ETag y motivo. `IFileStorageMigration` copia y verifica entre repositorios. Separar interfaces no concede autorización: el módulo valida usuario, recurso y alcance antes de invocarlas.
+`IFileStorage` cubre carga, descarga, metadata, carpeta y disponibilidad. `IFilePreviewStorage` solicita a Microsoft Graph una vista previa temporal de Microsoft 365 después de que el módulo autoriza el recurso; no publica la URL estable de SharePoint ni convierte el documento. `IFileStorageMaintenance` separa eliminación física y exige ID externo, ETag y motivo. `IFileStorageMigration` copia y verifica entre repositorios. Separar interfaces no concede autorización: el módulo valida usuario, recurso y alcance antes de invocarlas.
+
+Las cargas usan nombres técnicos únicos. Si Graph confirma un conflicto después de un reintento cuyo primer envío pudo haberse confirmado, la API reconcilia el elemento por carpeta, nombre técnico y longitud antes de fallar; esto evita reportar como conflicto una carga ya completada sin sobrescribir archivos existentes.
 
 La carga:
 
 - valida segmentos, extensión, MIME declarado y tamaño;
 - usa nombre técnico GUID con conflicto `fail`;
 - hace spool temporal `DeleteOnClose` para medir, escanear y reintentar sin cargar todo en memoria;
-- usa fragmentos acotados y respeta `Retry-After` para fallos transitorios;
+- usa fragmentos acotados, respeta `Retry-After` y reinicia el presupuesto de reintentos cuando Graph confirma avance;
+- crea la sesión con el nombre técnico GUID en la ruta y sin propiedades opcionales en el cuerpo, conforme al contrato de Graph;
 - no reintenta automáticamente `401`, `403`, `404` ni errores de validación;
+- identifica de forma controlada la etapa y el estado HTTP de una falla de sesión sin registrar cuerpos, tokens ni URL firmadas;
 - devuelve metadata válida antes de anunciar éxito.
 
 `IFileContentScanner` es un punto de extensión, no un antivirus. Si `RequireContentScan=true`, la ausencia o indisponibilidad del scanner bloquea la carga. Una allowlist de MIME/extensión no prueba el contenido real.

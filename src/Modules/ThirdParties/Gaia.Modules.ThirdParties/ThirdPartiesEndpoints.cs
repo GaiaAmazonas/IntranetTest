@@ -142,7 +142,10 @@ internal static class ThirdPartiesEndpoints
         if (result.Content is null)
         {
             context.Response.Headers.CacheControl = "private, max-age=900";
-            return Results.NotFound();
+            // Not every collaborator has a Microsoft 365 profile photo. Treat that
+            // expected absence as an empty response so the avatar can fall back to
+            // initials without flooding the browser console with false 404 errors.
+            return Results.NoContent();
         }
         context.Response.Headers.CacheControl = "private, max-age=21600";
         return Results.File(result.Content.Bytes, result.Content.ContentType);

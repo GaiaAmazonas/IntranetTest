@@ -70,7 +70,7 @@ Las fotografías se consultan desde la API con token delegado de Graph:
 - `/api/profile/photo?size=...` para la identidad actual;
 - `/api/intranet/people/{personId}/photo?size=...` para directorio autorizado;
 - tamaños permitidos: 48, 64, 96, 120 y 240 píxeles;
-- `404` significa ausencia de foto; `401/403` falta de sesión/permiso; `503` indisponibilidad controlada de Graph;
+- `204` significa ausencia normal de foto y permite mostrar iniciales sin registrar un error de red; `401/403` falta de sesión/permiso; `503` indisponibilidad controlada de Graph;
 - respuestas positivas se almacenan temporalmente en memoria y las ausencias por un periodo menor;
 - el frontend usa `PersonAvatar`, carga diferida, concurrencia acotada e iniciales como fallback.
 

@@ -49,6 +49,52 @@ public sealed class SharePointFileStorageTests
     }
 
     [Fact]
+    public async Task SmallUploadRecoversWhenGraphCommittedBeforeReturningConflict()
+    {
+        using var handler = new FakeGraph();
+        FolderReplies(handler);
+        string? name = null;
+        handler.Add(request =>
+        {
+            name = request.RequestUri!.AbsolutePath.Split(":/")[1].Split(':')[0];
+            return new HttpResponseMessage(HttpStatusCode.Conflict);
+        });
+        handler.Add(_ => Item(name!, 5));
+        using var transport = Transport(handler);
+        await using var content = new MemoryStream(PdfBytes(5));
+
+        var result = await Store(transport).UploadAsync(Upload("correlation", "report.pdf", 5), content, default);
+
+        Assert.Equal(5, result.Length);
+        Assert.Equal(name, result.StoredName);
+        Assert.Empty(handler.Replies);
+    }
+
+    [Fact]
+    public async Task SharePointOfficeNormalizationUsesProviderStoredLengthWithoutFalseConflict()
+    {
+        using var handler = new FakeGraph();
+        FolderReplies(handler);
+        handler.Add(request =>
+        {
+            var name = request.RequestUri!.AbsolutePath.Split(":/")[1].Split(':')[0];
+            return Item(name, 19);
+        });
+        using var transport = Transport(handler);
+        var store = Store(transport);
+        await using var content = new MemoryStream(OpenXmlBytes(12));
+        var upload = new FileUpload(new("Documents","correlation"),"slides.pptx",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",content.Length,
+            Guid.NewGuid(),DateTimeOffset.UtcNow);
+
+        var result = await store.UploadAsync(upload, content, default);
+
+        Assert.Equal(19,result.Length);
+        Assert.EndsWith(".pptx",result.StoredName,StringComparison.Ordinal);
+        Assert.Empty(handler.Replies);
+    }
+
+    [Fact]
     public async Task WrongLengthAndRequiredScannerPreventAnyRemoteWrite()
     {
         using var handler = new FakeGraph();
@@ -83,10 +129,10 @@ public sealed class SharePointFileStorageTests
     {
         using var handler = new FakeGraph(); FolderReplies(handler);
         string? name = null;
-        handler.Add(async request =>
+        handler.Add(request =>
         {
-            var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
-            using (body) name = body.RootElement.GetProperty("item").GetProperty("name").GetString();
+            Assert.Null(request.Content);
+            name = UploadSessionName(request);
             return Json(new { uploadUrl = "https://tenant.sharepoint.com/upload?signature=private" });
         });
         handler.Add(request =>
@@ -130,6 +176,101 @@ public sealed class SharePointFileStorageTests
     }
 
     [Fact]
+    public async Task SessionCreationOmitsOptionalBodyAndReportsSafeProviderCode()
+    {
+        using var handler = new FakeGraph(); FolderReplies(handler);
+        handler.Add(request =>
+        {
+            Assert.Null(request.Content);
+            return Json(new { error = new { code = "invalidRequest", message = "provider detail" } },
+                HttpStatusCode.BadRequest);
+        });
+        using var transport = Transport(handler);
+        await using var source = new MemoryStream(PdfBytes(101));
+
+        var error = await Assert.ThrowsAsync<FileStorageException>(() => Store(transport).UploadAsync(
+            Upload("id","a.pdf",101),source,default));
+
+        Assert.Equal(FileStorageError.TransientFailure,error.Code);
+        Assert.Equal("SP_SESSION_CREATE_INVALIDREQUEST_HTTP_400",error.DiagnosticCode);
+        Assert.Empty(handler.Replies);
+    }
+
+    [Fact]
+    public async Task SessionProtocolFailureReportsStageAndHttpStatus()
+    {
+        using var handler = new FakeGraph(); FolderReplies(handler);
+        handler.Add(_ => Json(new { uploadUrl = "https://tenant.sharepoint.com/upload" }));
+        handler.Add(_ => new HttpResponseMessage(HttpStatusCode.BadRequest));
+        handler.Add(request =>
+        {
+            Assert.Equal(HttpMethod.Delete, request.Method);
+            return new HttpResponseMessage(HttpStatusCode.NoContent);
+        });
+        using var transport = Transport(handler);
+        await using var source = new MemoryStream(PdfBytes(101));
+
+        var error = await Assert.ThrowsAsync<FileStorageException>(() => Store(transport).UploadAsync(
+            Upload("id", "a.pdf", 101), source, default));
+
+        Assert.Equal(FileStorageError.TransientFailure,error.Code);
+        Assert.Equal("SP_SESSION_CHUNK_HTTP_400",error.DiagnosticCode);
+        Assert.Empty(handler.Replies);
+    }
+
+    [Fact]
+    public async Task SessionRetryBudgetResetsAfterConfirmedForwardProgress()
+    {
+        using var handler = new FakeGraph(); FolderReplies(handler);
+        string? name = null;
+        handler.Add(request =>
+        {
+            Assert.Null(request.Content);
+            name = UploadSessionName(request);
+            return Json(new { uploadUrl = "https://tenant.sharepoint.com/upload" });
+        });
+        for (var attempt = 0; attempt < GraphFileTransport.MaximumRetries; attempt++)
+        {
+            handler.Add(_ => new HttpResponseMessage(HttpStatusCode.TooManyRequests));
+            handler.Add(_ => Json(new { nextExpectedRanges = InitialRange }));
+        }
+        handler.Add(_ => Json(new { nextExpectedRanges = SecondRange },HttpStatusCode.Accepted));
+        handler.Add(_ => new HttpResponseMessage(HttpStatusCode.TooManyRequests));
+        handler.Add(_ => Json(new { nextExpectedRanges = SecondRange }));
+        handler.Add(_ => Item(name!,327690));
+        using var transport = Transport(handler);
+        await using var source = new MemoryStream(PdfBytes(327690));
+
+        var result = await Store(transport).UploadAsync(Upload("id","a.pdf",source.Length),source,default);
+
+        Assert.Equal(327690,result.Length);
+        Assert.Empty(handler.Replies);
+    }
+
+    [Fact]
+    public async Task SessionUploadRecoversWhenFinalChunkWasCommittedBeforeConflictResponse()
+    {
+        using var handler = new FakeGraph(); FolderReplies(handler);
+        string? name = null;
+        handler.Add(request =>
+        {
+            Assert.Null(request.Content);
+            name = UploadSessionName(request);
+            return Json(new { uploadUrl = "https://tenant.sharepoint.com/upload?signature=private" });
+        });
+        handler.Add(_ => new HttpResponseMessage(HttpStatusCode.Conflict));
+        handler.Add(_ => Item(name!, 101));
+        using var transport = Transport(handler);
+        await using var source = new MemoryStream(PdfBytes(101));
+
+        var result = await Store(transport).UploadAsync(Upload("id", "a.pdf", source.Length), source, default);
+
+        Assert.Equal(101, result.Length);
+        Assert.Equal(name, result.StoredName);
+        Assert.Empty(handler.Replies);
+    }
+
+    [Fact]
     public async Task DownloadValidatesAncestryAndOwnsResponseStream()
     {
         using var handler = new FakeGraph(); MetadataReplies(handler);
@@ -149,6 +290,25 @@ public sealed class SharePointFileStorageTests
             Assert.Null(download.Metadata.OriginalName);
         }
         Assert.False(stream.CanRead);
+        Assert.Empty(handler.Replies);
+    }
+
+    [Fact]
+    public async Task PreviewReturnsOnlyAValidatedShortLivedHttpsUrl()
+    {
+        using var handler = new FakeGraph(); MetadataReplies(handler);
+        handler.Add(request =>
+        {
+            Assert.Equal(HttpMethod.Post, request.Method);
+            Assert.EndsWith("/drives/drive/items/file/preview", request.RequestUri!.AbsolutePath, StringComparison.Ordinal);
+            return Json(new { getUrl = "https://view.officeapps.live.com/op/embed.aspx?opaque=temporary" });
+        });
+        using var transport = Transport(handler);
+
+        var preview = await Store(transport).CreatePreviewAsync(FileId, default);
+
+        Assert.Equal("https", preview.Url.Scheme);
+        Assert.Contains("opaque=temporary", preview.Url.Query, StringComparison.Ordinal);
         Assert.Empty(handler.Replies);
     }
 
@@ -350,6 +510,8 @@ public sealed class SharePointFileStorageTests
             ["SiteId"] = Site, ["DriveId"] = Drive, ["RootFolder"] = "Gaia/Files", ["MaximumFileBytes"] = "1000000",
             ["SimpleUploadThresholdBytes"] = "100", ["UploadChunkBytes"] = "327680",
             ["AllowedExtensions:0"] = ".pdf", ["AllowedMimeTypes:0"] = "application/pdf",
+            ["AllowedExtensions:1"] = ".pptx",
+            ["AllowedMimeTypes:1"] = "application/vnd.openxmlformats-officedocument.presentationml.presentation",
             ["TransferAllowedHosts:0"] = "tenant.sharepoint.com"
         };
         if (key is not null) values[key] = value;
@@ -366,6 +528,21 @@ public sealed class SharePointFileStorageTests
         var bytes = new byte[length];
         "%PDF-"u8.CopyTo(bytes);
         return bytes;
+    }
+    private static byte[] OpenXmlBytes(int length)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(length,4);
+        var bytes=new byte[length];
+        new byte[]{0x50,0x4b,0x03,0x04}.CopyTo(bytes,0);
+        return bytes;
+    }
+    private static string UploadSessionName(HttpRequestMessage request)
+    {
+        var path=request.RequestUri!.AbsolutePath;
+        var marker=path.IndexOf(":/",StringComparison.Ordinal);
+        var end=path.IndexOf(":/createUploadSession",marker+2,StringComparison.Ordinal);
+        Assert.True(marker>=0&&end>marker);
+        return Uri.UnescapeDataString(path[(marker+2)..end]);
     }
     private static void RepositoryReplies(FakeGraph handler)
     { handler.Add(_ => Json(new { id = Site })); handler.Add(_ => Json(new { value = new[] { new { id = Drive } } })); }

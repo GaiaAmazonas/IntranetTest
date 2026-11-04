@@ -40,6 +40,7 @@ public interface ITrainingAdministrationReader
     Task<TrainingAdministrationOverview> ReadAsync(Guid? actorId,CancellationToken token);
     Task<Guid> SaveCategoryAsync(Guid? id,SaveTrainingCategory value,CancellationToken token);
     Task<Guid> SaveTrainingAsync(Guid? id,SaveTraining value,CancellationToken token);
+    Task RemoveTrainingAsync(Guid id,CancellationToken token);
     Task<Guid> SaveVersionAsync(Guid? id,SaveTrainingVersion value,Guid actorId,CancellationToken token);
     Task<IReadOnlyList<TrainingSectionItem>> ReadContentAsync(Guid versionId,CancellationToken token);
     Task<Guid> SaveSectionAsync(Guid versionId,Guid? id,SaveTrainingSection value,CancellationToken token);

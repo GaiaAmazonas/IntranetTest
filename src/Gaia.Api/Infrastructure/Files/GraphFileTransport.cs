@@ -12,7 +12,7 @@ internal sealed class GraphFileTransport(HttpClient client, IGraphApplicationTok
     internal const int MaximumRetries = 3;
 
     public async Task<HttpResponseMessage> SendAsync(Func<HttpRequestMessage> requestFactory, bool authenticated,
-        bool retry, CancellationToken cancellationToken)
+        bool retry, CancellationToken cancellationToken, string? diagnosticCode = null)
     {
         for (var attempt = 0; ; attempt++)
         {
@@ -23,24 +23,28 @@ internal sealed class GraphFileTransport(HttpClient client, IGraphApplicationTok
             try { response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken); }
             catch (HttpRequestException)
             {
-                if (!retry || attempt >= MaximumRetries) throw new FileStorageException(FileStorageError.TransientFailure);
-                await DelayAsync(null, attempt, cancellationToken); continue;
+                if (!retry || attempt >= MaximumRetries)
+                    throw new FileStorageException(FileStorageError.TransientFailure, diagnosticCode);
+                await DelayAsync(null, attempt, cancellationToken, diagnosticCode); continue;
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
-                if (!retry || attempt >= MaximumRetries) throw new FileStorageException(FileStorageError.TransientFailure);
-                await DelayAsync(null, attempt, cancellationToken); continue;
+                if (!retry || attempt >= MaximumRetries)
+                    throw new FileStorageException(FileStorageError.TransientFailure, diagnosticCode);
+                await DelayAsync(null, attempt, cancellationToken, diagnosticCode); continue;
             }
             if (!retry || !IsTransient(response.StatusCode) || attempt >= MaximumRetries) return response;
-            using (response) await DelayAsync(response.Headers.RetryAfter, attempt, cancellationToken);
+            using (response) await DelayAsync(response.Headers.RetryAfter, attempt, cancellationToken, diagnosticCode);
         }
     }
 
-    public async Task DelayAsync(RetryConditionHeaderValue? retryAfter, int attempt, CancellationToken cancellationToken)
+    public async Task DelayAsync(RetryConditionHeaderValue? retryAfter, int attempt,
+        CancellationToken cancellationToken, string? diagnosticCode = null)
     {
         var delay = retryAfter?.Delta ?? (retryAfter?.Date is { } date ? date - clock.GetUtcNow() : TimeSpan.FromSeconds(Math.Pow(2, attempt)));
         // Do not retry earlier than Graph requested; fail instead when outside our request budget.
-        if (delay > TimeSpan.FromSeconds(120)) throw new FileStorageException(FileStorageError.TransientFailure);
+        if (delay > TimeSpan.FromSeconds(120))
+            throw new FileStorageException(FileStorageError.TransientFailure, diagnosticCode);
         if (delay > TimeSpan.Zero) await Task.Delay(delay, clock, cancellationToken);
     }
 
@@ -56,10 +60,11 @@ internal sealed class GraphFileTransport(HttpClient client, IGraphApplicationTok
         or HttpStatusCode.RequestTimeout or HttpStatusCode.InternalServerError or HttpStatusCode.BadGateway
         or HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout;
 
-    internal static void EnsureSuccess(HttpResponseMessage response, FileStorageError? accessError = null)
+    internal static void EnsureSuccess(HttpResponseMessage response, FileStorageError? accessError = null,
+        string? diagnosticCode = null)
     {
         if (response.IsSuccessStatusCode) return;
-        throw new FileStorageException(response.StatusCode switch
+        var code = response.StatusCode switch
         {
             HttpStatusCode.Unauthorized => FileStorageError.InvalidCredentials,
             HttpStatusCode.Forbidden => accessError ?? FileStorageError.FileUnauthorized,
@@ -68,10 +73,13 @@ internal sealed class GraphFileTransport(HttpClient client, IGraphApplicationTok
             HttpStatusCode.RequestEntityTooLarge => FileStorageError.FileTooLarge,
             HttpStatusCode.UnsupportedMediaType => FileStorageError.TypeNotAllowed,
             _ => FileStorageError.TransientFailure
-        });
+        };
+        var diagnostic = diagnosticCode is null ? null : $"{diagnosticCode}_{(int)response.StatusCode}";
+        throw new FileStorageException(code, diagnostic);
     }
 
-    internal static async Task<JsonElement> JsonAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    internal static async Task<JsonElement> JsonAsync(HttpResponseMessage response,
+        CancellationToken cancellationToken, string? diagnosticCode = null)
     {
         try
         {
@@ -80,6 +88,26 @@ internal sealed class GraphFileTransport(HttpClient client, IGraphApplicationTok
             return document.RootElement.Clone();
         }
         catch (Exception exception) when (exception is JsonException or HttpRequestException)
-        { throw new FileStorageException(FileStorageError.TransientFailure); }
+        { throw new FileStorageException(FileStorageError.TransientFailure, diagnosticCode); }
+    }
+
+    internal static async Task<string?> SafeErrorCodeAsync(HttpResponseMessage response,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await response.Content.LoadIntoBufferAsync(64 * 1024,cancellationToken);
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+            if (!document.RootElement.TryGetProperty("error",out var error)
+                || !error.TryGetProperty("code",out var value)
+                || value.ValueKind != JsonValueKind.String) return null;
+            var code=value.GetString();
+            return code is {Length:>0 and <=64}
+                && code.All(character=>char.IsAsciiLetterOrDigit(character)||character is '_' or '-')
+                    ? code.ToUpperInvariant()
+                    : null;
+        }
+        catch (Exception exception) when (exception is JsonException or HttpRequestException)
+        { return null; }
     }
 }
