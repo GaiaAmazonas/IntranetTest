@@ -11,4 +11,9 @@ public sealed class CommunicationsRulesTests
  [Theory][InlineData("javascript:alert(1)")][InlineData("http://example.org")][InlineData("https://user@example.org")]
  public void ExternalDestinationRejectsUnsafeSchemes(string url)=>Assert.Throws<ArgumentException>(()=>CommunicationsRules.Validate(new BannerWriteRequest("Pieza",null,null,"Título",null,DateTimeOffset.UtcNow,null,1,2,url,Guid.NewGuid())));
  [Fact] public void EventRejectsUnsafeUrl()=>Assert.Throws<ArgumentException>(()=>CommunicationsRules.Validate(new EventWriteRequest("Encuentro",Guid.NewGuid(),null,null,DateTimeOffset.UtcNow,DateTimeOffset.UtcNow.AddHours(1),false,1,null,"javascript:alert(1)",Guid.NewGuid())));
+ [Theory]
+ [InlineData(null)]
+ [InlineData("")]
+ [InlineData("   ")]
+ public void EventAllowsMissingOptionalUrl(string? eventUrl)=>CommunicationsRules.Validate(new EventWriteRequest("Encuentro",Guid.NewGuid(),null,null,DateTimeOffset.UtcNow,DateTimeOffset.UtcNow.AddHours(1),false,1,null,eventUrl,Guid.NewGuid()));
 }
